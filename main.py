@@ -3,13 +3,12 @@ import asyncio
 import json
 import logging
 import traceback
+import urllib.parse
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
-import websockets
-from fastapi.logger import logger
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -193,10 +192,25 @@ async def create_session():
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Ошибка при создании сессии: {str(e)}")
 
+@app.get("/direct-connect/{session_id}")
+async def direct_connect(session_id: str):
+    """Возвращает URL и токен для прямого подключения к API OpenAI (обходной путь)"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    session_info = sessions[session_id]
+    client_secret = session_info["client_secret"]
+    
+    return {
+        "websocket_url": f"{REALTIME_WEBSOCKET_URL}/{session_id}",
+        "authorization": f"Bearer {client_secret}"
+    }
+
 @app.websocket("/ws-proxy/{session_id}")
 async def websocket_proxy(websocket: WebSocket, session_id: str):
     """
     Прокси для WebSocket соединения между клиентом и OpenAI Realtime API
+    Этот подход избегает прямого использования библиотеки websockets для соединения с OpenAI
     """
     client_ip = websocket.client.host
     logger.info(f"Новое WebSocket соединение от {client_ip} для сессии {session_id}")
@@ -219,146 +233,42 @@ async def websocket_proxy(websocket: WebSocket, session_id: str):
     client_secret = session_info["client_secret"]
     
     # Принимаем соединение
-    try:
-        await websocket.accept()
-        logger.info(f"WebSocket соединение принято для сессии {session_id}")
-        
-        # Устанавливаем соединение с OpenAI через websockets
-        try:
-            logger.debug(f"Попытка соединения с OpenAI WebSocket для сессии {session_id}")
-            openai_ws_url = f"{REALTIME_WEBSOCKET_URL}/{session_id}"
-            logger.debug(f"URL OpenAI WebSocket: {openai_ws_url}")
-            
-            # Исправленная часть: передаем заголовки как список кортежей
-            headers = [('Authorization', f'Bearer {client_secret}')]
-            
-            async with websockets.connect(
-                openai_ws_url,
-                extra_headers=headers
-            ) as ws_openai:
-                logger.info(f"Соединение с OpenAI WebSocket установлено для сессии {session_id}")
-                
-                # Создаем две задачи для двустороннего обмена данными
-                async def forward_to_openai():
-                    try:
-                        while True:
-                            # Получаем данные от клиента
-                            message = await websocket.receive_text()
-                            try:
-                                msg_data = json.loads(message)
-                                msg_type = msg_data.get("type", "unknown")
-                                logger.debug(f"Клиент -> OpenAI ({msg_type}): {message[:100]}...")
-                            except:
-                                logger.debug(f"Клиент -> OpenAI (raw): {message[:100]}...")
-                            
-                            # Отправляем данные в OpenAI
-                            await ws_openai.send(message)
-                    except WebSocketDisconnect:
-                        logger.info(f"Клиент отключился от сессии {session_id}")
-                        raise
-                    except Exception as e:
-                        logger.error(f"Ошибка при отправке в OpenAI: {str(e)}")
-                        logger.error(traceback.format_exc())
-                        raise
-                
-                async def forward_from_openai():
-                    try:
-                        while True:
-                            # Получаем данные от OpenAI
-                            message = await ws_openai.recv()
-                            
-                            # Логируем тип сообщения, если это текстовое сообщение
-                            if isinstance(message, str):
-                                try:
-                                    msg_data = json.loads(message)
-                                    msg_type = msg_data.get("type", "unknown")
-                                    logger.debug(f"OpenAI -> Клиент ({msg_type}): {message[:100]}...")
-                                except:
-                                    logger.debug(f"OpenAI -> Клиент (raw): {message[:100]}...")
-                            else:
-                                logger.debug(f"OpenAI -> Клиент (binary): {len(message)} bytes")
-                            
-                            # Отправляем данные клиенту
-                            if isinstance(message, str):
-                                await websocket.send_text(message)
-                            else:
-                                await websocket.send_bytes(message)
-                    except websockets.exceptions.ConnectionClosed as wcc:
-                        logger.info(f"OpenAI закрыл соединение для сессии {session_id}: {wcc.code} - {wcc.reason}")
-                        # Сообщаем клиенту о закрытии соединения с OpenAI
-                        try:
-                            await websocket.send_text(json.dumps({
-                                "type": "error",
-                                "error": {
-                                    "message": f"Соединение с OpenAI закрыто: {wcc.reason}"
-                                }
-                            }))
-                        except:
-                            pass
-                        raise
-                    except Exception as e:
-                        logger.error(f"Ошибка при получении от OpenAI: {str(e)}")
-                        logger.error(traceback.format_exc())
-                        raise
-                
-                # Запускаем обе задачи одновременно
-                forwarding_task1 = asyncio.create_task(forward_to_openai())
-                forwarding_task2 = asyncio.create_task(forward_from_openai())
-                
-                # Ждем, пока одна из задач не завершится
-                try:
-                    done, pending = await asyncio.wait(
-                        [forwarding_task1, forwarding_task2],
-                        return_when=asyncio.FIRST_COMPLETED
-                    )
-                    
-                    # Проверяем, завершилась ли какая-либо задача с ошибкой
-                    for task in done:
-                        if task.exception():
-                            logger.error(f"Задача завершилась с ошибкой: {task.exception()}")
-                    
-                    # Отменяем незавершенные задачи
-                    for task in pending:
-                        task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError:
-                            pass
-                
-                except Exception as e:
-                    logger.error(f"Ошибка при ожидании задач: {str(e)}")
-                    logger.error(traceback.format_exc())
-                
-                logger.info(f"Завершение WebSocket соединения для сессии {session_id}")
-                
-        except websockets.exceptions.ConnectionClosedError as wce:
-            logger.error(f"Ошибка соединения с OpenAI WebSocket: {str(wce)}")
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "error": {
-                    "message": f"Ошибка соединения с OpenAI: {str(wce)}"
-                }
-            }))
-        except Exception as e:
-            logger.error(f"Ошибка при соединении с OpenAI: {str(e)}")
-            logger.error(traceback.format_exc())
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "error": {
-                    "message": f"Ошибка: {str(e)}"
-                }
-            }))
+    await websocket.accept()
+    logger.info(f"WebSocket соединение принято для сессии {session_id}")
     
+    # Отправляем инструкции клиенту для прямого подключения к OpenAI
+    await websocket.send_text(json.dumps({
+        "type": "connection_info",
+        "websocket_url": f"{REALTIME_WEBSOCKET_URL}/{session_id}",
+        "authorization": f"Bearer {client_secret}"
+    }))
+    
+    # Сообщаем клиенту, что нужно использовать прямое подключение
+    await websocket.send_text(json.dumps({
+        "type": "error",
+        "error": {
+            "code": "direct_connection_required",
+            "message": "Пожалуйста, используйте прямое подключение к OpenAI API. Смотрите инструкции в консоли."
+        }
+    }))
+    
+    # Поддерживаем соединение открытым для отладки
+    try:
+        while True:
+            data = await websocket.receive_text()
+            logger.debug(f"Получено сообщение от клиента: {data[:100]}...")
+            # Эхо-ответ для подтверждения работы соединения
+            await websocket.send_text(json.dumps({
+                "type": "echo",
+                "message": "Сервер получил сообщение, но работает в режиме прямого подключения"
+            }))
     except WebSocketDisconnect:
-        logger.info(f"Клиент отключился до установления соединения с OpenAI: {session_id}")
+        logger.info(f"Клиент отключился от сессии {session_id}")
     except Exception as e:
-        logger.error(f"Необработанная ошибка в WebSocket прокси: {str(e)}")
+        logger.error(f"Ошибка в WebSocket: {str(e)}")
         logger.error(traceback.format_exc())
     finally:
-        try:
-            await websocket.close()
-        except:
-            pass
+        await websocket.close()
         logger.info(f"WebSocket соединение закрыто для сессии {session_id}")
 
 # Для обратной совместимости с предыдущей версией
