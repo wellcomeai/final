@@ -229,9 +229,12 @@ async def websocket_proxy(websocket: WebSocket, session_id: str):
             openai_ws_url = f"{REALTIME_WEBSOCKET_URL}/{session_id}"
             logger.debug(f"URL OpenAI WebSocket: {openai_ws_url}")
             
+            # Исправленная часть: передаем заголовки как список кортежей
+            headers = [('Authorization', f'Bearer {client_secret}')]
+            
             async with websockets.connect(
                 openai_ws_url,
-                extra_headers={"Authorization": f"Bearer {client_secret}"}
+                extra_headers=headers
             ) as ws_openai:
                 logger.info(f"Соединение с OpenAI WebSocket установлено для сессии {session_id}")
                 
