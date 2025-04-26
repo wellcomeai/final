@@ -3,25 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Claude Sonnet - Голосовой помощник</title>
+  <title>welcomeAI - Голосовой помощник</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
     :root {
-      --bg-color: #000000;
-      --primary-color: #8A2BE2;
-      --secondary-color: #5D3FD3;
+      --bg-color: #050505;
+      --primary-color: #00b3ff;
+      --secondary-color: #2576ff;
       --text-color: #FFFFFF;
       --assistant-color: #3498db;
       --user-color: #9b59b6; 
-      --panel-bg: rgba(30, 30, 30, 0.8);
-      --surface-bg: rgba(40, 40, 40, 0.7);
+      --panel-bg: rgba(10, 10, 10, 0.7);
+      --surface-bg: rgba(20, 20, 20, 0.6);
     }
     
-    /* Светлая тема */
     [data-theme="light"] {
       --bg-color: #F5F5F7;
-      --primary-color: #8C39FF;
-      --secondary-color: #A872FF;
+      --primary-color: #0088ff;
+      --secondary-color: #0055ff;
       --text-color: #1D1D1F;
       --assistant-color: #0070e0;
       --user-color: #9933CC;
@@ -37,7 +36,7 @@
     }
     
     body {
-      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background-color: var(--bg-color);
       color: var(--text-color);
       overflow: hidden;
@@ -45,6 +44,8 @@
       width: 100vw;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
     
     /* Градиентный фон */
@@ -55,162 +56,254 @@
       width: 100%;
       height: 100%;
       background: radial-gradient(circle at 50% 50%, var(--secondary-color) 0%, transparent 40%);
-      opacity: 0.15;
+      opacity: 0.1;
       z-index: -1;
+      animation: pulse-bg 15s ease infinite alternate;
     }
     
+    @keyframes pulse-bg {
+      0% { opacity: 0.05; transform: scale(1); }
+      50% { opacity: 0.15; transform: scale(1.5); }
+      100% { opacity: 0.05; transform: scale(1); }
+    }
+    
+    /* Контейнер для всего содержимого */
     .container {
-      max-width: 1200px;
+      position: relative;
       width: 100%;
-      margin: 0 auto;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
       height: 100%;
-      position: relative;
-      z-index: 1;
-    }
-    
-    /* Верхняя панель */
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      padding: 15px 0;
-    }
-    
-    .logo {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--primary-color);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .controls {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-    
-    .control-button {
-      background: var(--surface-bg);
-      border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-color);
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      transition: all 0.2s ease;
-    }
-    
-    .control-button:hover {
-      background: var(--primary-color);
-      color: white;
-      transform: scale(1.05);
-    }
-    
-    .voice-selector {
-      background: var(--surface-bg);
-      color: var(--text-color);
-      border: none;
-      border-radius: 20px;
-      padding: 8px 15px;
-      font-size: 14px;
-      outline: none;
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    
-    .voice-selector:focus {
-      box-shadow: 0 0 0 2px var(--primary-color);
-    }
-    
-    /* Основная область */
-    .main-content {
-      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      width: 100%;
-      position: relative;
+      overflow: hidden;
     }
     
-    /* Центральная анимированная сфера */
+    /* Логотип */
+    .logo {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--primary-color);
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 10;
+    }
+    
+    .logo i {
+      font-size: 20px;
+    }
+    
+    /* Центральная сфера */
     .sphere-container {
       position: relative;
-      width: 250px;
-      height: 250px;
+      width: 280px;
+      height: 280px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 30px;
+      z-index: 10;
     }
     
     .sphere {
-      width: 180px;
-      height: 180px;
+      width: 200px;
+      height: 200px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      background: radial-gradient(circle at 30% 30%, var(--primary-color), var(--secondary-color));
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 5px 30px rgba(138, 43, 226, 0.5);
-      transition: all 0.3s ease;
+      box-shadow: 
+        0 0 60px rgba(0, 179, 255, 0.3),
+        0 0 30px rgba(0, 179, 255, 0.2),
+        0 0 10px rgba(0, 179, 255, 0.1);
+      animation: ambient-glow 8s ease-in-out infinite alternate;
+      cursor: pointer;
+      transform-style: preserve-3d;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
     
-    .sphere::before {
-      content: '';
-      position: absolute;
-      top: -5px;
-      left: -5px;
-      right: -5px;
-      bottom: -5px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-      z-index: -1;
-      opacity: 0.7;
-      filter: blur(10px);
+    .sphere:hover {
+      transform: scale(1.05);
+      box-shadow: 
+        0 0 80px rgba(0, 179, 255, 0.4),
+        0 0 40px rgba(0, 179, 255, 0.3),
+        0 0 15px rgba(0, 179, 255, 0.2);
+    }
+    
+    @keyframes ambient-glow {
+      0% { 
+        box-shadow: 
+          0 0 60px rgba(0, 179, 255, 0.3),
+          0 0 30px rgba(0, 179, 255, 0.2),
+          0 0 10px rgba(0, 179, 255, 0.1);
+      }
+      50% { 
+        box-shadow: 
+          0 0 70px rgba(0, 179, 255, 0.4),
+          0 0 35px rgba(0, 179, 255, 0.3),
+          0 0 12px rgba(0, 179, 255, 0.2);
+      }
+      100% { 
+        box-shadow: 
+          0 0 55px rgba(0, 179, 255, 0.3),
+          0 0 25px rgba(0, 179, 255, 0.2),
+          0 0 8px rgba(0, 179, 255, 0.1);
+      }
     }
     
     .sphere-core {
-      width: 160px;
-      height: 160px;
+      width: 180px;
+      height: 180px;
       border-radius: 50%;
-      background: var(--bg-color);
+      background: radial-gradient(circle at 40% 40%, var(--bg-color) 0%, rgba(10, 10, 10, 0.9) 80%);
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
       overflow: hidden;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
     }
     
     .sphere-icon {
-      font-size: 40px;
+      font-size: 50px;
       color: var(--primary-color);
       z-index: 1;
+      opacity: 0.9;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    
+    /* Анимации сферы */
+    
+    /* Прослушивание */
+    .sphere.listening {
+      animation: 
+        listening-pulse 1.5s infinite ease-in-out alternate,
+        listening-glow 1.5s infinite ease-in-out alternate;
     }
     
     .sphere.listening .sphere-icon {
-      animation: pulse 1.5s infinite;
+      animation: microphone-pulse 1.5s infinite ease-in-out alternate;
+    }
+    
+    @keyframes listening-pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.05); }
+    }
+    
+    @keyframes listening-glow {
+      0% { 
+        box-shadow: 
+          0 0 60px rgba(0, 179, 255, 0.4),
+          0 0 30px rgba(0, 179, 255, 0.3),
+          0 0 10px rgba(0, 179, 255, 0.2);
+      }
+      100% { 
+        box-shadow: 
+          0 0 80px rgba(0, 179, 255, 0.6),
+          0 0 40px rgba(0, 179, 255, 0.5),
+          0 0 15px rgba(0, 179, 255, 0.4);
+      }
+    }
+    
+    @keyframes microphone-pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.15); opacity: 1; }
+    }
+    
+    /* Обработка */
+    .sphere.processing {
+      animation: 
+        processing-pulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1),
+        processing-glow 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
     }
     
     .sphere.processing .sphere-icon {
       animation: spin 2s infinite linear;
     }
     
+    @keyframes processing-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+    
+    @keyframes processing-glow {
+      0%, 100% { 
+        box-shadow: 
+          0 0 70px rgba(0, 179, 255, 0.4),
+          0 0 35px rgba(0, 179, 255, 0.3),
+          0 0 12px rgba(0, 179, 255, 0.2);
+      }
+      50% { 
+        box-shadow: 
+          0 0 90px rgba(0, 179, 255, 0.5),
+          0 0 45px rgba(0, 179, 255, 0.4),
+          0 0 15px rgba(0, 179, 255, 0.3);
+      }
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Анимация при ответе */
+    .sphere.speaking {
+      animation: 
+        speaking-pulse 1s infinite ease-in-out alternate,
+        speaking-glow 1s infinite ease-in-out alternate,
+        slight-float 5s infinite ease-in-out alternate;
+    }
+    
+    .sphere.speaking .sphere-core {
+      animation: core-pulse 1s infinite ease-in-out alternate;
+    }
+    
+    .sphere.speaking .sphere-icon {
+      animation: icon-wave 1s infinite ease-in-out alternate;
+    }
+    
+    @keyframes speaking-pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(1.08); }
+    }
+    
+    @keyframes speaking-glow {
+      0% { 
+        box-shadow: 
+          0 0 70px rgba(0, 179, 255, 0.5),
+          0 0 35px rgba(0, 179, 255, 0.4),
+          0 0 12px rgba(0, 179, 255, 0.3);
+      }
+      100% { 
+        box-shadow: 
+          0 0 100px rgba(0, 179, 255, 0.7),
+          0 0 50px rgba(0, 179, 255, 0.6),
+          0 0 20px rgba(0, 179, 255, 0.5);
+      }
+    }
+    
+    @keyframes core-pulse {
+      0% { transform: scale(1); }
+      100% { transform: scale(0.97); }
+    }
+    
+    @keyframes icon-wave {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(1.1); opacity: 1; }
+    }
+    
+    @keyframes slight-float {
+      0% { transform: translateY(0) scale(1); }
+      100% { transform: translateY(-3px) scale(1.08); }
+    }
+    
+    /* Волны вокруг сферы */
     .sphere-waves {
       position: absolute;
       top: 50%;
@@ -218,7 +311,6 @@
       transform: translate(-50%, -50%);
       width: 300px;
       height: 300px;
-      opacity: 0;
       pointer-events: none;
     }
     
@@ -229,19 +321,26 @@
       height: 100%;
       border-radius: 50%;
       opacity: 0;
-      animation: wave 3s infinite linear;
+      animation: wave 4s infinite linear;
     }
     
     .sphere.listening .wave {
+      opacity: 0.1;
+      border-color: var(--primary-color);
+    }
+    
+    .sphere.speaking .wave {
       opacity: 0.2;
+      border-color: var(--secondary-color);
+      animation: wave 2.5s infinite linear;
     }
     
     .wave:nth-child(2) {
-      animation-delay: 0.5s;
+      animation-delay: 1s;
     }
     
     .wave:nth-child(3) {
-      animation-delay: 1s;
+      animation-delay: 2s;
     }
     
     @keyframes wave {
@@ -250,23 +349,12 @@
         opacity: 0.7;
       }
       100% {
-        transform: scale(1);
+        transform: scale(1.2);
         opacity: 0;
       }
     }
     
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-    
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    /* Визуализация звука */
+    /* Визуализация аудио */
     .audio-visualizer {
       position: absolute;
       bottom: -50px;
@@ -276,7 +364,7 @@
       align-items: flex-end;
       justify-content: center;
       height: 40px;
-      width: 200px;
+      width: 220px;
       gap: 3px;
     }
     
@@ -288,206 +376,177 @@
       transition: height 0.1s ease;
     }
     
-    /* Сообщения */
-    .messages-container {
+    /* Эффект свечения для сферы */
+    .glow-effect {
       position: absolute;
-      bottom: 50px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle at center, var(--primary-color) 0%, transparent 70%);
+      opacity: 0.2;
+      filter: blur(20px);
+      animation: glow-breathing 8s infinite ease-in-out alternate;
+    }
+    
+    @keyframes glow-breathing {
+      0% { opacity: 0.1; transform: scale(1); filter: blur(20px); }
+      50% { opacity: 0.3; transform: scale(1.5); filter: blur(30px); }
+      100% { opacity: 0.1; transform: scale(1); filter: blur(20px); }
+    }
+    
+    /* Частицы внутри сферы */
+    .particles {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 50%;
+    }
+    
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background-color: var(--primary-color);
+      border-radius: 50%;
+      opacity: 0.5;
+    }
+    
+    /* Сообщения */
+    .message-display {
+      position: absolute;
+      bottom: 10%;
       left: 50%;
       transform: translateX(-50%);
-      width: 80%;
-      max-width: 600px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      max-height: 200px;
-      overflow-y: auto;
-      padding: 10px;
-      mask-image: linear-gradient(to bottom, transparent, black 20px, black calc(100% - 20px), transparent);
-      -webkit-mask-image: linear-gradient(to bottom, transparent, black 20px, black calc(100% - 20px), transparent);
-      scrollbar-width: thin;
-      scrollbar-color: var(--primary-color) transparent;
-    }
-    
-    .messages-container::-webkit-scrollbar {
-      width: 5px;
-    }
-    
-    .messages-container::-webkit-scrollbar-thumb {
-      background-color: var(--primary-color);
+      max-width: 90%;
+      width: 500px;
+      text-align: center;
+      padding: 15px;
       border-radius: 10px;
-    }
-    
-    .message {
-      padding: 12px 20px;
-      border-radius: 20px;
-      max-width: 80%;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
+      background-color: var(--panel-bg);
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      transition: opacity 0.5s, transform 0.5s;
+      z-index: 5;
+      pointer-events: none;
+    }
+    
+    .message-display.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    
+    .message-text {
       font-size: 16px;
       line-height: 1.5;
-      animation: fadeIn 0.3s forwards;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      word-break: break-word;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .user-message {
-      background: rgba(155, 89, 182, 0.2);
-      border: 1px solid var(--user-color);
       color: var(--text-color);
-      align-self: flex-end;
-      margin-left: auto;
     }
     
-    .assistant-message {
-      background: rgba(52, 152, 219, 0.2);
-      border: 1px solid var(--assistant-color);
+    /* Транскрипция */
+    .transcript {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: 90%;
+      width: 500px;
+      text-align: center;
+      padding: 15px;
+      font-style: italic;
       color: var(--text-color);
-      align-self: flex-start;
-      margin-right: auto;
+      opacity: 0.8;
+      min-height: 24px;
+      transition: opacity 0.3s;
+    }
+    
+    .transcript:empty {
+      opacity: 0;
     }
     
     /* Статусное сообщение */
     .status-message {
       position: absolute;
-      bottom: 20px;
+      bottom: 25px;
       left: 50%;
       transform: translateX(-50%);
       text-align: center;
-      font-size: 16px;
+      font-size: 14px;
       color: var(--text-color);
-      opacity: 0.8;
+      opacity: 0.6;
       transition: opacity 0.3s;
-      pointer-events: none;
     }
     
-    /* Настройки и информация */
-    .settings-panel {
-      position: fixed;
-      top: 0;
-      right: -350px;
-      width: 350px;
-      height: 100vh;
-      background: var(--panel-bg);
-      backdrop-filter: blur(15px);
-      -webkit-backdrop-filter: blur(15px);
-      z-index: 1000;
-      transition: right 0.3s ease;
-      padding: 30px;
-      overflow-y: auto;
-      box-shadow: -5px 0 20px rgba(0, 0, 0, 0.2);
-    }
-    
-    .settings-panel.open {
-      right: 0;
-    }
-    
-    .settings-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-    }
-    
-    .settings-title {
+    /* Настройки */
+    .settings-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
       font-size: 22px;
-      font-weight: 600;
+      color: var(--text-color);
+      opacity: 0.7;
+      cursor: pointer;
+      z-index: 10;
+      transition: opacity 0.3s;
     }
     
-    .close-settings {
-      background: none;
-      border: none;
-      color: var(--text-color);
-      font-size: 24px;
-      cursor: pointer;
+    .settings-toggle:hover {
+      opacity: 1;
+    }
+    
+    .settings-panel {
+      position: absolute;
+      top: 60px;
+      right: 20px;
+      background-color: var(--panel-bg);
+      padding: 15px;
+      border-radius: 10px;
+      width: 250px;
+      z-index: 10;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      transform: translateY(-10px);
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    
+    .settings-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
     }
     
     .settings-section {
-      margin-bottom: 30px;
+      margin-bottom: 15px;
     }
     
     .settings-section-title {
-      font-size: 18px;
-      font-weight: 500;
-      margin-bottom: 15px;
+      font-size: 16px;
+      margin-bottom: 10px;
       color: var(--primary-color);
     }
     
     .settings-option {
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
     
     .settings-label {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 5px;
       font-size: 14px;
     }
     
     .settings-select {
       width: 100%;
-      padding: 10px 15px;
-      border-radius: 10px;
+      padding: 8px 10px;
+      border-radius: 5px;
       border: 1px solid rgba(255, 255, 255, 0.2);
       background: rgba(0, 0, 0, 0.2);
       color: var(--text-color);
       font-size: 14px;
-      outline: none;
-    }
-    
-    .theme-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    
-    .toggle-switch {
-      position: relative;
-      display: inline-block;
-      width: 60px;
-      height: 30px;
-    }
-    
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    
-    .toggle-slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #444;
-      transition: .4s;
-      border-radius: 34px;
-    }
-    
-    .toggle-slider:before {
-      position: absolute;
-      content: "";
-      height: 22px;
-      width: 22px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-    
-    input:checked + .toggle-slider {
-      background-color: var(--primary-color);
-    }
-    
-    input:checked + .toggle-slider:before {
-      transform: translateX(30px);
     }
     
     /* Модальное окно загрузки */
@@ -505,7 +564,7 @@
     }
     
     .modal-content {
-      background-color: var(--surface-bg);
+      background-color: var(--panel-bg);
       padding: 30px;
       border-radius: 20px;
       max-width: 500px;
@@ -544,87 +603,6 @@
       border-top-color: var(--primary-color);
       animation: spin 1s linear infinite;
       margin-bottom: 20px;
-    }
-    
-    /* Подсказки */
-    .tooltip {
-      position: absolute;
-      top: -40px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--surface-bg);
-      padding: 8px 15px;
-      border-radius: 10px;
-      font-size: 14px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s, transform 0.3s;
-      white-space: nowrap;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    .sphere:hover .tooltip {
-      opacity: 1;
-      transform: translateX(-50%) translateY(-5px);
-    }
-    
-    /* Адаптивность */
-    @media (max-width: 768px) {
-      .sphere {
-        width: 150px;
-        height: 150px;
-      }
-      
-      .sphere-core {
-        width: 135px;
-        height: 135px;
-      }
-      
-      .sphere-icon {
-        font-size: 30px;
-      }
-      
-      .messages-container {
-        width: 95%;
-        bottom: 80px;
-      }
-      
-      .settings-panel {
-        width: 300px;
-      }
-    }
-    
-    @media (max-width: 480px) {
-      .top-bar {
-        flex-direction: column;
-        gap: 15px;
-      }
-      
-      .sphere {
-        width: 120px;
-        height: 120px;
-      }
-      
-      .sphere-core {
-        width: 105px;
-        height: 105px;
-      }
-      
-      .sphere-icon {
-        font-size: 24px;
-      }
-      
-      .message {
-        max-width: 90%;
-        font-size: 14px;
-      }
-      
-      .settings-panel {
-        width: 100%;
-        right: -100%;
-      }
     }
     
     /* Отладочная панель */
@@ -679,21 +657,47 @@
     .log-warn { color: #d29922; }
     .log-debug { color: #8b949e; }
     
-    /* Транскрипты речи */
-    .transcript {
-      position: absolute;
-      top: -40px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 80%;
-      max-width: 500px;
-      text-align: center;
-      font-size: 16px;
-      color: var(--text-color);
-      opacity: 0.8;
-      min-height: 24px;
-      font-style: italic;
-      pointer-events: none;
+    /* Адаптивность */
+    @media (max-width: 768px) {
+      .sphere {
+        width: 180px;
+        height: 180px;
+      }
+      
+      .sphere-core {
+        width: 160px;
+        height: 160px;
+      }
+      
+      .sphere-icon {
+        font-size: 40px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .sphere {
+        width: 150px;
+        height: 150px;
+      }
+      
+      .sphere-core {
+        width: 130px;
+        height: 130px;
+      }
+      
+      .sphere-icon {
+        font-size: 32px;
+      }
+      
+      .message-display,
+      .transcript {
+        width: 90%;
+        padding: 10px;
+      }
+      
+      .message-text {
+        font-size: 14px;
+      }
     }
   </style>
 </head>
@@ -703,117 +707,74 @@
   
   <!-- Основной контейнер -->
   <div class="container">
-    <!-- Верхняя панель -->
-    <div class="top-bar">
-      <div class="logo">
-        <i class="fas fa-brain"></i>
-        Claude Sonnet
-      </div>
-      <div class="controls">
-        <select id="voice-selector" class="voice-selector">
-          <option value="alloy">Alloy (Ровный)</option>
-          <option value="echo">Echo (Эхо)</option>
-          <option value="fable">Fable (Сказка)</option>
-          <option value="onyx">Onyx (Оникс)</option>
-          <option value="nova">Nova (Нова)</option>
-          <option value="shimmer">Shimmer (Мерцание)</option>
-        </select>
-        <button id="settings-button" class="control-button" aria-label="Настройки">
-          <i class="fas fa-gear"></i>
-        </button>
-        <button id="theme-toggle-button" class="control-button" aria-label="Переключить тему">
-          <i class="fas fa-moon"></i>
-        </button>
-      </div>
+    <!-- Логотип -->
+    <div class="logo">
+      <i class="fas fa-atom"></i>
+      welcomeAI
     </div>
     
-    <!-- Основная область с голосовым ассистентом -->
-    <div class="main-content">
-      <!-- Транскрипт распознанной речи -->
-      <div class="transcript" id="transcript"></div>
-      
-      <!-- Центральная сфера -->
-      <div class="sphere-container">
-        <div class="sphere" id="main-sphere">
-          <div class="sphere-core">
-            <i class="fas fa-microphone sphere-icon"></i>
-          </div>
-          <div class="tooltip">Нажмите для переключения режима прослушивания</div>
-          <div class="sphere-waves">
-            <div class="wave"></div>
-            <div class="wave"></div>
-            <div class="wave"></div>
-          </div>
-        </div>
-        <div class="audio-visualizer" id="audio-visualizer">
-          <!-- Аудио бары будут добавлены скриптом -->
+    <!-- Настройки -->
+    <div class="settings-toggle" id="settings-toggle">
+      <i class="fas fa-cog"></i>
+    </div>
+    
+    <div class="settings-panel" id="settings-panel">
+      <div class="settings-section">
+        <div class="settings-section-title">Голос</div>
+        <div class="settings-option">
+          <select id="voice-selector" class="settings-select">
+            <option value="alloy">Alloy (Стандартный)</option>
+            <option value="echo">Echo (Эхо)</option>
+            <option value="fable">Fable (Сказочный)</option>
+            <option value="onyx">Onyx (Глубокий)</option>
+            <option value="nova">Nova (Женский)</option>
+            <option value="shimmer">Shimmer (Мерцающий)</option>
+          </select>
         </div>
       </div>
       
-      <!-- Контейнер сообщений -->
-      <div class="messages-container" id="messages">
-        <div class="message assistant-message">
-          Здравствуйте! Я голосовой помощник Claude. Чем могу помочь?
+      <div class="settings-section">
+        <div class="settings-section-title">Режим прослушивания</div>
+        <div class="settings-option">
+          <select id="listening-mode" class="settings-select">
+            <option value="manual">Ручной (нажатием на сферу)</option>
+            <option value="continuous">Постоянный (всегда активен)</option>
+            <option value="vad">Авто (определение речи)</option>
+          </select>
         </div>
       </div>
-      
-      <!-- Статусное сообщение -->
-      <div class="status-message" id="status-message">
-        Нажмите на сферу, чтобы активировать постоянное прослушивание
-      </div>
-    </div>
-  </div>
-  
-  <!-- Панель настроек -->
-  <div class="settings-panel" id="settings-panel">
-    <div class="settings-header">
-      <div class="settings-title">Настройки</div>
-      <button class="close-settings" id="close-settings">×</button>
     </div>
     
-    <div class="settings-section">
-      <div class="settings-section-title">Голосовой помощник</div>
-      
-      <div class="settings-option">
-        <label class="settings-label">Выбор голоса</label>
-        <select id="voice-selector-settings" class="settings-select">
-          <option value="alloy">Alloy (Ровный)</option>
-          <option value="echo">Echo (Эхо)</option>
-          <option value="fable">Fable (Сказка)</option>
-          <option value="onyx">Onyx (Оникс)</option>
-          <option value="nova">Nova (Нова)</option>
-          <option value="shimmer">Shimmer (Мерцание)</option>
-        </select>
+    <!-- Область транскрипции -->
+    <div class="transcript" id="transcript"></div>
+    
+    <!-- Центральная сфера -->
+    <div class="sphere-container">
+      <div class="glow-effect"></div>
+      <div class="sphere" id="main-sphere">
+        <div class="sphere-core">
+          <i class="fas fa-microphone sphere-icon"></i>
+          <div class="particles" id="particles"></div>
+        </div>
+        <div class="sphere-waves">
+          <div class="wave"></div>
+          <div class="wave"></div>
+          <div class="wave"></div>
+        </div>
       </div>
-      
-      <div class="settings-option">
-        <label class="settings-label">Режим прослушивания</label>
-        <select id="listening-mode" class="settings-select">
-          <option value="manual">Ручной (нажатием на сферу)</option>
-          <option value="continuous">Постоянный (всегда активен)</option>
-          <option value="vad">Авто (определение речи)</option>
-        </select>
+      <div class="audio-visualizer" id="audio-visualizer">
+        <!-- Аудио бары будут добавлены скриптом -->
       </div>
     </div>
     
-    <div class="settings-section">
-      <div class="settings-section-title">Интерфейс</div>
-      
-      <div class="settings-option theme-toggle">
-        <span class="settings-label">Светлая тема</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="theme-toggle-settings">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
+    <!-- Отображение сообщения -->
+    <div class="message-display" id="message-display">
+      <div class="message-text" id="message-text"></div>
     </div>
     
-    <div class="settings-section">
-      <div class="settings-section-title">О приложении</div>
-      <p style="font-size: 14px; line-height: 1.5;">
-        Claude Voice Assistant 1.0<br>
-        Использует OpenAI Realtime API и GPT-4o для обработки речи.
-      </p>
+    <!-- Статусное сообщение -->
+    <div class="status-message" id="status-message">
+      Нажмите на сферу, чтобы активировать помощника
     </div>
   </div>
   
@@ -821,16 +782,16 @@
   <div id="loading-modal" class="modal">
     <div class="modal-content">
       <div class="spinner"></div>
-      <h2>Инициализация помощника</h2>
-      <p>Устанавливаем соединение с нейросетью...</p>
-      <div id="loading-status">Загрузка компонентов...</div>
+      <h2>Инициализация</h2>
+      <p>Подключение к нейросети...</p>
+      <div id="loading-status">Подождите...</div>
     </div>
   </div>
   
   <!-- Отладочная панель -->
   <div class="debug-panel" id="debug-panel">
     <div class="debug-header">
-      <div class="debug-title">Отладочная информация</div>
+      <div class="debug-title">Отладка</div>
       <div class="debug-close" id="debug-close">✕</div>
     </div>
     <div class="debug-log" id="debug-log"></div>
@@ -839,13 +800,13 @@
   <script>
     // Конфигурация и состояние
     const config = {
-      debug: true,           // Включить отладку 
+      debug: true,             // Включить отладку 
       listeningMode: 'manual', // manual, continuous, vad
-      voice: 'alloy',        // Голос ассистента
-      theme: 'dark',         // Тема (dark/light)
-      vadTimeout: 2000,      // Таймаут для определения окончания речи (мс)
-      maxMessages: 10,       // Максимальное количество сообщений в истории
-      audioSampleRate: 24000 // Частота дискретизации аудио
+      voice: 'alloy',          // Голос ассистента
+      vadTimeout: 2000,        // Таймаут для определения окончания речи (мс)
+      maxMessageTime: 5000,    // Время отображения сообщения (мс)
+      audioSampleRate: 24000,  // Частота дискретизации аудио
+      particleCount: 10        // Количество частиц в сфере
     };
     
     // Элементы UI
@@ -853,21 +814,19 @@
       sphere: document.getElementById('main-sphere'),
       audioVisualizer: document.getElementById('audio-visualizer'),
       transcript: document.getElementById('transcript'),
-      messages: document.getElementById('messages'),
+      messageDisplay: document.getElementById('message-display'),
+      messageText: document.getElementById('message-text'),
       statusMessage: document.getElementById('status-message'),
       loadingModal: document.getElementById('loading-modal'),
       loadingStatus: document.getElementById('loading-status'),
       debugPanel: document.getElementById('debug-panel'),
       debugLog: document.getElementById('debug-log'),
       settingsPanel: document.getElementById('settings-panel'),
-      settingsButton: document.getElementById('settings-button'),
-      closeSettings: document.getElementById('close-settings'),
+      settingsToggle: document.getElementById('settings-toggle'),
       voiceSelector: document.getElementById('voice-selector'),
-      voiceSelectorSettings: document.getElementById('voice-selector-settings'),
       listeningMode: document.getElementById('listening-mode'),
-      themeToggleButton: document.getElementById('theme-toggle-button'),
-      themeToggleSettings: document.getElementById('theme-toggle-settings'),
-      debugClose: document.getElementById('debug-close')
+      debugClose: document.getElementById('debug-close'),
+      particles: document.getElementById('particles')
     };
     
     // Стейт приложения
@@ -875,20 +834,113 @@
       isConnected: false,
       isListening: false,
       isProcessing: false,
+      isSpeaking: false,
       websocket: null,
       audioContext: null,
       mediaStream: null,
       audioProcessor: null,
       vadTimer: null,
+      messageTimer: null,
       currentResponseText: "",
       audioChunks: [],
-      shouldReconnect: true
+      shouldReconnect: true,
+      particlesRef: []
     };
+    
+    // Создаем частицы внутри сферы
+    function createParticles() {
+      elements.particles.innerHTML = '';
+      state.particlesRef = [];
+      
+      for (let i = 0; i < config.particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        
+        // Случайные начальные позиции
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        
+        particle.style.left = `${x}%`;
+        particle.style.top = `${y}%`;
+        particle.style.opacity = Math.random() * 0.7 + 0.1;
+        
+        // Сохраняем начальные координаты
+        state.particlesRef.push({
+          element: particle,
+          x, y,
+          speedX: (Math.random() - 0.5) * 0.3,
+          speedY: (Math.random() - 0.5) * 0.3,
+          size: Math.random() * 3 + 1
+        });
+        
+        elements.particles.appendChild(particle);
+      }
+    }
+    
+    // Анимация частиц
+    function animateParticles() {
+      state.particlesRef.forEach(particle => {
+        // Обновляем позиции
+        particle.x += particle.speedX;
+        particle.y += particle.speedY;
+        
+        // Отражение от краев
+        if (particle.x <= 0 || particle.x >= 100) {
+          particle.speedX *= -1;
+        }
+        if (particle.y <= 0 || particle.y >= 100) {
+          particle.speedY *= -1;
+        }
+        
+        // Применяем новые позиции
+        particle.element.style.left = `${particle.x}%`;
+        particle.element.style.top = `${particle.y}%`;
+        
+        // Изменяем размер и скорость при слушании и ответе
+        if (state.isListening) {
+          particle.speedX *= 1.001;
+          particle.speedY *= 1.001;
+          particle.element.style.width = `${particle.size * 1.5}px`;
+          particle.element.style.height = `${particle.size * 1.5}px`;
+        } else if (state.isSpeaking) {
+          particle.speedX *= 1.002;
+          particle.speedY *= 1.002;
+          particle.element.style.width = `${particle.size * 2}px`;
+          particle.element.style.height = `${particle.size * 2}px`;
+        } else if (state.isProcessing) {
+          // Сделать их более хаотичными при обработке
+          particle.speedX += (Math.random() - 0.5) * 0.05;
+          particle.speedY += (Math.random() - 0.5) * 0.05;
+          particle.element.style.width = `${particle.size * 1.2}px`;
+          particle.element.style.height = `${particle.size * 1.2}px`;
+        } else {
+          // Возвращаем к нормальному состоянию
+          particle.speedX *= 0.99;
+          particle.speedY *= 0.99;
+          particle.element.style.width = `${particle.size}px`;
+          particle.element.style.height = `${particle.size}px`;
+        }
+        
+        // Ограничиваем скорость
+        const maxSpeed = 0.5;
+        const minSpeed = 0.05;
+        particle.speedX = Math.max(Math.min(particle.speedX, maxSpeed), -maxSpeed);
+        particle.speedY = Math.max(Math.min(particle.speedY, maxSpeed), -maxSpeed);
+        
+        // Если частица почти остановилась, добавляем немного случайного движения
+        if (Math.abs(particle.speedX) < minSpeed && Math.abs(particle.speedY) < minSpeed) {
+          particle.speedX += (Math.random() - 0.5) * 0.1;
+          particle.speedY += (Math.random() - 0.5) * 0.1;
+        }
+      });
+      
+      requestAnimationFrame(animateParticles);
+    }
     
     // Инициализация визуализатора аудио
     function initAudioVisualizer() {
       elements.audioVisualizer.innerHTML = '';
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 40; i++) {
         const bar = document.createElement('div');
         bar.className = 'audio-bar';
         elements.audioVisualizer.appendChild(bar);
@@ -913,6 +965,22 @@
       if (level === 'info' && elements.loadingModal.style.display !== 'none') {
         elements.loadingStatus.textContent = message;
       }
+    }
+    
+    // Показать сообщение
+    function showMessage(text, duration = config.maxMessageTime) {
+      // Очищаем предыдущий таймер, если он есть
+      if (state.messageTimer) {
+        clearTimeout(state.messageTimer);
+      }
+      
+      elements.messageText.textContent = text;
+      elements.messageDisplay.classList.add('visible');
+      
+      // Скрываем сообщение через заданное время
+      state.messageTimer = setTimeout(() => {
+        elements.messageDisplay.classList.remove('visible');
+      }, duration);
     }
     
     // Инициализация аудио
@@ -979,7 +1047,8 @@
       if ((state.isListening || config.listeningMode === 'continuous') && 
           state.websocket && 
           state.websocket.readyState === WebSocket.OPEN && 
-          !state.isProcessing) {
+          !state.isProcessing && 
+          !state.isSpeaking) {
             
         // Получаем данные с микрофона
         const inputData = e.inputBuffer.getChannelData(0);
@@ -1174,6 +1243,10 @@
         
         log(`Получено ${audioData.byteLength} байт аудио данных`);
         
+        // Активируем анимацию при воспроизведении
+        state.isSpeaking = true;
+        elements.sphere.classList.add('speaking');
+        
         // Конвертируем PCM16 в WAV для воспроизведения
         const wavBuffer = createWavFromPcm(audioData);
         const blob = new Blob([wavBuffer], { type: 'audio/wav' });
@@ -1183,41 +1256,38 @@
         const audio = new Audio(audioUrl);
         audio.onerror = function(e) {
           log(`Ошибка воспроизведения аудио: ${e.target.error?.message || 'Неизвестная ошибка'}`, "error");
+          state.isSpeaking = false;
+          elements.sphere.classList.remove('speaking');
         };
         
         audio.oncanplaythrough = function() {
           log(`Готов к воспроизведению аудио: ${audio.duration.toFixed(2)} секунд`);
           audio.play().catch(err => {
             log(`Ошибка при воспроизведении: ${err.message}`, "error");
+            state.isSpeaking = false;
+            elements.sphere.classList.remove('speaking');
           });
         };
         
-        // Освобождаем ресурсы после воспроизведения
+        // Освобождаем ресурсы и отключаем анимацию после воспроизведения
         audio.onended = function() {
           URL.revokeObjectURL(audioUrl);
+          state.isSpeaking = false;
+          elements.sphere.classList.remove('speaking');
+          
+          // Если в режиме постоянного прослушивания, активируем его снова
+          if (config.listeningMode === 'continuous' && !state.isProcessing) {
+            setTimeout(() => {
+              state.isListening = true;
+              elements.sphere.classList.add('listening');
+              elements.statusMessage.textContent = "Слушаю вас...";
+            }, 500);
+          }
         };
       } catch (error) {
         log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
-      }
-    }
-    
-    // Добавление сообщения в чат
-    function addMessage(text, isUser = false) {
-      const messageElement = document.createElement('div');
-      messageElement.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
-      messageElement.textContent = text;
-      elements.messages.appendChild(messageElement);
-      
-      // Прокручиваем к последнему сообщению
-      elements.messages.scrollTop = elements.messages.scrollHeight;
-      
-      // Ограничиваем количество сообщений
-      const messages = elements.messages.querySelectorAll('.message');
-      if (messages.length > config.maxMessages) {
-        const firstUserMessage = elements.messages.querySelector('.user-message');
-        if (firstUserMessage && firstUserMessage !== messages[0]) {
-          elements.messages.removeChild(firstUserMessage);
-        }
+        state.isSpeaking = false;
+        elements.sphere.classList.remove('speaking');
       }
     }
     
@@ -1247,9 +1317,10 @@
           state.websocket.onopen = function() {
             clearTimeout(connectionTimeout);
             log("WebSocket соединение установлено");
-            elements.statusMessage.textContent = "Подключено. Готов к работе";
+            elements.statusMessage.textContent = "Готово";
             state.isConnected = true;
             elements.loadingModal.style.display = 'none';
+            showMessage("Привет! Я готов помочь вам. Задайте вопрос или нажмите на сферу для активации голосового ввода.", 6000);
             
             // Отправляем обновление настроек с выбранным голосом
             updateVoice(config.voice);
@@ -1273,6 +1344,7 @@
             elements.statusMessage.textContent = `Соединение закрыто`;
             elements.sphere.classList.remove('listening');
             elements.sphere.classList.remove('processing');
+            elements.sphere.classList.remove('speaking');
             state.isConnected = false;
             state.isListening = false;
             
@@ -1346,6 +1418,7 @@
         case "error":
           log(`Ошибка от сервера: ${event.error ? event.error.message : 'Неизвестная ошибка'}`, "error");
           elements.statusMessage.textContent = `Ошибка: ${event.error ? event.error.message : 'Неизвестная ошибка'}`;
+          showMessage(`Произошла ошибка: ${event.error ? event.error.message : 'Неизвестная ошибка'}`, 3000);
           break;
           
         case "conversation.item.input_audio_transcription.delta":
@@ -1357,7 +1430,7 @@
             log(`Транскрипция: ${transcript}`, "info");
             
             if (event.type === "conversation.item.input_audio_transcription.completed") {
-              addMessage(transcript, true);
+              showMessage(transcript, 5000);
               elements.transcript.textContent = "";
             }
           }
@@ -1367,15 +1440,7 @@
           // Обрабатываем текстовый ответ по частям
           if (event.delta) {
             state.currentResponseText += event.delta;
-            
-            // Обновляем текущее сообщение или создаем новое
-            const lastMessage = elements.messages.lastElementChild;
-            if (lastMessage && lastMessage.classList.contains('assistant-message') && 
-                lastMessage !== elements.messages.firstElementChild) {
-              lastMessage.textContent = state.currentResponseText;
-            } else {
-              addMessage(state.currentResponseText, false);
-            }
+            showMessage(state.currentResponseText);
           }
           break;
           
@@ -1384,15 +1449,7 @@
           if (event.text) {
             state.currentResponseText = event.text;
             log(`Текстовый ответ завершен: ${state.currentResponseText.substring(0, 50)}...`, "info");
-            
-            // Обновляем текущее сообщение или создаем новое
-            const lastMessage = elements.messages.lastElementChild;
-            if (lastMessage && lastMessage.classList.contains('assistant-message') && 
-                lastMessage !== elements.messages.firstElementChild) {
-              lastMessage.textContent = state.currentResponseText;
-            } else {
-              addMessage(state.currentResponseText, false);
-            }
+            showMessage(state.currentResponseText);
           }
           break;
           
@@ -1432,16 +1489,15 @@
           
           // Сбрасываем состояние
           state.currentResponseText = "";
-          state.audioChunks = [];
           resetAudioVisualization();
           
           // Если режим непрерывного прослушивания, продолжаем слушать
-          if (config.listeningMode === 'continuous') {
+          if (config.listeningMode === 'continuous' && !state.isSpeaking) {
             elements.statusMessage.textContent = "Слушаю вас...";
             elements.sphere.classList.add('listening');
             state.isListening = true;
-          } else {
-            elements.statusMessage.textContent = "Готов к работе";
+          } else if (!state.isSpeaking) {
+            elements.statusMessage.textContent = "Готово";
             elements.sphere.classList.remove('listening');
             state.isListening = false;
           }
@@ -1478,8 +1534,8 @@
     
     // Начало записи голоса
     function startListening() {
-      if (!state.isConnected || state.isProcessing) {
-        log("Невозможно начать запись: " + (!state.isConnected ? "не подключено" : "идет обработка"), "warn");
+      if (!state.isConnected || state.isProcessing || state.isSpeaking) {
+        log("Невозможно начать запись: " + (!state.isConnected ? "не подключено" : state.isProcessing ? "идет обработка" : "идет воспроизведение"), "warn");
         return;
       }
       
@@ -1545,7 +1601,7 @@
       
       if (state.isListening) {
         stopListening();
-      } else if (!state.isProcessing) {
+      } else if (!state.isProcessing && !state.isSpeaking) {
         startListening();
       }
     }
@@ -1584,7 +1640,7 @@
       switch (mode) {
         case 'continuous':
           elements.statusMessage.textContent = "Постоянное прослушивание активно";
-          if (state.isConnected && !state.isProcessing) {
+          if (state.isConnected && !state.isProcessing && !state.isSpeaking) {
             state.isListening = true;
             elements.sphere.classList.add('listening');
           }
@@ -1603,27 +1659,14 @@
       }
     }
     
-    // Переключение темы
-    function toggleTheme() {
-      if (config.theme === 'dark') {
-        config.theme = 'light';
-        document.body.setAttribute('data-theme', 'light');
-        elements.themeToggleButton.innerHTML = '<i class="fas fa-sun"></i>';
-        elements.themeToggleSettings.checked = true;
-      } else {
-        config.theme = 'dark';
-        document.body.setAttribute('data-theme', 'dark');
-        elements.themeToggleButton.innerHTML = '<i class="fas fa-moon"></i>';
-        elements.themeToggleSettings.checked = false;
-      }
-      
-      log(`Тема изменена на ${config.theme}`, "info");
-    }
-    
     // Инициализация всего приложения
     async function init() {
       try {
         log("Инициализация приложения", "info");
+        
+        // Создаем частицы и запускаем анимацию
+        createParticles();
+        animateParticles();
         
         // Инициализируем аудио
         const audioInitialized = await initAudio();
@@ -1640,9 +1683,8 @@
             // Настраиваем обработчики событий UI
             setupEventListeners();
             
-            // Синхронизируем селекторы голоса
+            // Синхронизируем селектор голоса
             elements.voiceSelector.value = config.voice;
-            elements.voiceSelectorSettings.value = config.voice;
             
             // Устанавливаем режим прослушивания
             elements.listeningMode.value = config.listeningMode;
@@ -1651,17 +1693,17 @@
           } else {
             log("Не удалось установить подключение к WebSocket", "error");
             elements.loadingModal.style.display = 'none';
-            alert("Не удалось подключиться к серверу. Проверьте консоль для получения дополнительной информации.");
+            showMessage("Не удалось подключиться к серверу. Проверьте соединение и обновите страницу.", 0);
           }
         } else {
           log("Не удалось инициализировать аудио", "error");
           elements.loadingModal.style.display = 'none';
-          alert("Не удалось инициализировать аудио. Пожалуйста, разрешите доступ к микрофону и перезагрузите страницу.");
+          showMessage("Не удалось получить доступ к микрофону. Пожалуйста, разрешите доступ к микрофону и обновите страницу.", 0);
         }
       } catch (error) {
         log(`Ошибка инициализации: ${error.message}`, "error");
         elements.loadingModal.style.display = 'none';
-        alert(`Произошла ошибка: ${error.message}`);
+        showMessage(`Произошла ошибка при инициализации: ${error.message}. Пожалуйста, обновите страницу.`, 0);
       }
     }
     
@@ -1670,28 +1712,23 @@
       // Обработка клика по сфере
       elements.sphere.addEventListener('click', toggleListening);
       
-      // Взаимодействие с панелью настроек
-      elements.settingsButton.addEventListener('click', () => {
-        elements.settingsPanel.classList.add('open');
+      // Настройки
+      elements.settingsToggle.addEventListener('click', () => {
+        elements.settingsPanel.classList.toggle('visible');
       });
       
-      elements.closeSettings.addEventListener('click', () => {
-        elements.settingsPanel.classList.remove('open');
+      // Закрытие панели настроек при клике вне неё
+      document.addEventListener('click', (e) => {
+        if (elements.settingsPanel.classList.contains('visible') && 
+            !elements.settingsPanel.contains(e.target) && 
+            e.target !== elements.settingsToggle) {
+          elements.settingsPanel.classList.remove('visible');
+        }
       });
-      
-      // Переключение темы
-      elements.themeToggleButton.addEventListener('click', toggleTheme);
-      elements.themeToggleSettings.addEventListener('change', toggleTheme);
       
       // Изменение голоса
       elements.voiceSelector.addEventListener('change', (e) => {
         updateVoice(e.target.value);
-        elements.voiceSelectorSettings.value = e.target.value;
-      });
-      
-      elements.voiceSelectorSettings.addEventListener('change', (e) => {
-        updateVoice(e.target.value);
-        elements.voiceSelector.value = e.target.value;
       });
       
       // Изменение режима прослушивания
@@ -1709,15 +1746,6 @@
       
       elements.debugClose.addEventListener('click', () => {
         elements.debugPanel.classList.remove('open');
-      });
-      
-      // Закрытие панелей по клику вне их области
-      document.addEventListener('click', (e) => {
-        if (elements.settingsPanel.classList.contains('open') && 
-            !elements.settingsPanel.contains(e.target) && 
-            e.target !== elements.settingsButton) {
-          elements.settingsPanel.classList.remove('open');
-        }
       });
       
       // Обработка перед закрытием страницы
