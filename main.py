@@ -1,12 +1,13 @@
 import os
 import asyncio
 import json
+import base64
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
-from base64 import b64encode, b64decode
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+import websockets
 
 app = FastAPI()
 
@@ -89,7 +90,6 @@ async def create_session():
 async def websocket_proxy(websocket: WebSocket, session_id: str):
     """
     Прокси для WebSocket соединения между клиентом и OpenAI Realtime API
-    Это нужно, если у вас проблемы с CORS или вы хотите логировать/модифицировать сообщения
     """
     if session_id not in sessions:
         await websocket.close(code=1008, reason="Сессия не найдена")
@@ -99,49 +99,67 @@ async def websocket_proxy(websocket: WebSocket, session_id: str):
     client_secret = session_info["client_secret"]
     
     await websocket.accept()
+    print(f"WebSocket соединение принято для сессии {session_id}")
     
-    # Создаем клиентское соединение к OpenAI Realtime API
-    async with httpx.AsyncClient() as client:
-        async with client.websocket(
+    # Устанавливаем соединение с OpenAI через websockets
+    try:
+        async with websockets.connect(
             f"{REALTIME_WEBSOCKET_URL}/{session_id}",
-            headers={"Authorization": f"Bearer {client_secret}"}
+            extra_headers={"Authorization": f"Bearer {client_secret}"}
         ) as ws_openai:
-            # Задачи для одновременного обмена сообщениями в обоих направлениях
+            # Создаем две задачи для двустороннего обмена данными
             async def forward_to_openai():
                 try:
                     while True:
-                        data = await websocket.receive_bytes()
-                        await ws_openai.send_bytes(data)
+                        message = await websocket.receive_text()
+                        print(f"-> OpenAI: {message[:100]}...")
+                        await ws_openai.send(message)
+                except WebSocketDisconnect:
+                    print(f"Клиент отключился от сессии {session_id}")
                 except Exception as e:
                     print(f"Ошибка при отправке в OpenAI: {str(e)}")
             
-            async def forward_to_client():
+            async def forward_from_openai():
                 try:
                     while True:
-                        data = await ws_openai.receive_bytes()
-                        await websocket.send_bytes(data)
+                        message = await ws_openai.recv()
+                        print(f"<- OpenAI: {message[:100] if isinstance(message, str) else 'binary data'}...")
+                        if isinstance(message, str):
+                            await websocket.send_text(message)
+                        else:
+                            await websocket.send_bytes(message)
+                except websockets.exceptions.ConnectionClosed:
+                    print(f"OpenAI закрыл соединение для сессии {session_id}")
                 except Exception as e:
-                    print(f"Ошибка при отправке клиенту: {str(e)}")
+                    print(f"Ошибка при получении от OpenAI: {str(e)}")
             
             # Запускаем обе задачи одновременно
-            forward_tasks = [
-                asyncio.create_task(forward_to_openai()),
-                asyncio.create_task(forward_to_client())
-            ]
+            forwarding_task1 = asyncio.create_task(forward_to_openai())
+            forwarding_task2 = asyncio.create_task(forward_from_openai())
             
             # Ждем, пока одна из задач не завершится (это произойдет при разрыве соединения)
-            try:
-                await asyncio.wait(
-                    forward_tasks,
-                    return_when=asyncio.FIRST_COMPLETED
-                )
-            except Exception as e:
-                print(f"Ошибка WebSocket proxy: {str(e)}")
-            finally:
-                # Отменяем все задачи при завершении
-                for task in forward_tasks:
-                    if not task.done():
-                        task.cancel()
+            done, pending = await asyncio.wait(
+                [forwarding_task1, forwarding_task2],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            # Отменяем незавершенные задачи
+            for task in pending:
+                task.cancel()
+                
+    except Exception as e:
+        print(f"Ошибка при соединении с OpenAI: {str(e)}")
+        await websocket.close(code=1011, reason=f"Ошибка: {str(e)}")
+
+# Для обратной совместимости с предыдущей версией
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        await websocket.send_text("Эта версия API обновлена. Пожалуйста, используйте новый интерфейс для голосового общения.")
+        await websocket.close()
+    except WebSocketDisconnect:
+        print("Клиент отключился")
 
 # Запускаем приложение с uvicorn
 if __name__ == "__main__":
