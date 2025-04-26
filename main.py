@@ -2,16 +2,19 @@ import os
 import json
 import base64
 import asyncio
+import logging
+import traceback
 import websockets
-from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import logging
 
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("jarvis")
+logger = logging.getLogger("claude-voice")
+logger.setLevel(logging.DEBUG)
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -21,10 +24,14 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = int(os.getenv('PORT', 5050))
 REALTIME_WS_URL = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01'
 SYSTEM_MESSAGE = (
-    "Ты Джарвис - умный голосовой помощник. Отвечай коротко и по существу. "
-    "Ты готов помочь пользователю с любыми вопросами и задачами."
+    "Ты Claude Sonnet - умный голосовой помощник. Отвечай на вопросы пользователя коротко, "
+    "информативно и с небольшой ноткой юмора, когда это уместно. Стремись быть полезным "
+    "и предоставлять точную информацию."
 )
-VOICE = 'alloy'  # Доступные голоса: alloy, echo, fable, onyx, nova, shimmer
+
+# Допустимые голоса
+AVAILABLE_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+DEFAULT_VOICE = "alloy"
 
 app = FastAPI()
 
@@ -51,11 +58,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 if not OPENAI_API_KEY:
     raise ValueError('Отсутствует ключ API OpenAI. Пожалуйста, укажите его в .env файле.')
 
-# Отслеживаемые события от OpenAI для логирования
+# Отслеживаемые события от OpenAI для подробного логирования
 LOG_EVENT_TYPES = [
     'response.content.done', 'rate_limits.updated', 'response.done',
     'input_audio_buffer.committed', 'input_audio_buffer.speech_stopped',
-    'input_audio_buffer.speech_started', 'session.created'
+    'input_audio_buffer.speech_started', 'session.created', 'session.updated'
 ]
 
 # Хранилище активных соединений клиент <-> OpenAI
@@ -84,7 +91,7 @@ async def index_page():
 async def check_api():
     """Проверка состояния API и доступности OpenAI"""
     try:
-        # Проверим, что ключ API существует
+        # Проверяем, что ключ API существует
         if not OPENAI_API_KEY:
             return {
                 "status": "error",
@@ -95,7 +102,8 @@ async def check_api():
         return {
             "status": "success",
             "api_key_valid": True,
-            "openai_api_version": "Realtime API"
+            "openai_api_version": "Realtime API",
+            "available_voices": AVAILABLE_VOICES
         }
     except Exception as e:
         logger.error(f"Ошибка при проверке API: {str(e)}")
@@ -119,7 +127,9 @@ async def websocket_endpoint(websocket: WebSocket):
     client_connections[client_id] = {
         "client_ws": websocket,
         "openai_ws": None,
-        "active": True
+        "active": True,
+        "voice": DEFAULT_VOICE,
+        "turn_detection_enabled": True
     }
     
     try:
@@ -136,24 +146,40 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info(f"Соединение с OpenAI установлено для клиента {client_id}")
         
         # Отправляем настройки сессии в OpenAI
-        await send_session_update(openai_ws)
+        await send_session_update(openai_ws, DEFAULT_VOICE)
         
         # Создаем две задачи для двустороннего обмена сообщениями
         client_to_openai = asyncio.create_task(forward_client_to_openai(websocket, openai_ws, client_id))
         openai_to_client = asyncio.create_task(forward_openai_to_client(openai_ws, websocket, client_id))
         
         # Ждем, пока одна из задач не завершится
-        _, pending = await asyncio.wait(
+        done, pending = await asyncio.wait(
             [client_to_openai, openai_to_client],
             return_when=asyncio.FIRST_COMPLETED
         )
         
+        # Проверяем, есть ли ошибка в завершенных задачах
+        for task in done:
+            try:
+                # Если задача завершилась с ошибкой, вызываем исключение
+                task.result()
+            except Exception as e:
+                logger.error(f"Задача {task.get_name()} завершилась с ошибкой: {str(e)}")
+                logger.error(traceback.format_exc())
+        
         # Отменяем оставшиеся задачи
         for task in pending:
             task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"Ошибка при отмене задачи: {str(e)}")
         
     except Exception as e:
         logger.error(f"Ошибка при обработке WebSocket соединения: {str(e)}")
+        logger.error(traceback.format_exc())
         try:
             await websocket.send_json({
                 "type": "error",
@@ -182,27 +208,50 @@ async def forward_client_to_openai(client_ws: WebSocket, openai_ws, client_id: i
     """Пересылает сообщения от клиента (браузера) к API OpenAI"""
     try:
         while client_id in client_connections and client_connections[client_id]["active"]:
-            # Получаем сообщение от клиента
-            message = await client_ws.receive_text()
+            # Получаем данные от клиента
+            try:
+                message = await client_ws.receive_text()
+            except WebSocketDisconnect:
+                logger.info(f"Клиент {client_id} отключился")
+                break
             
+            # Проверяем, что сообщение не пустое
+            if not message:
+                continue
+                
             # Парсим JSON
             try:
                 data = json.loads(message)
                 msg_type = data.get("type", "unknown")
                 
+                # Если это обновление сессии, обрабатываем его
+                if msg_type == "session.update":
+                    # Обновляем настройки сессии
+                    session_data = data.get("session", {})
+                    
+                    # Если указан голос, обновляем его
+                    if "voice" in session_data:
+                        voice = session_data["voice"]
+                        if voice in AVAILABLE_VOICES:
+                            client_connections[client_id]["voice"] = voice
+                            logger.info(f"Голос для клиента {client_id} изменен на {voice}")
+                
                 # Выводим информацию о сообщении в логи
-                logger.debug(f"[Клиент -> OpenAI] {msg_type}")
+                logger.debug(f"[Клиент {client_id} -> OpenAI] {msg_type}")
                 
                 # Отправляем сообщение в OpenAI
                 await openai_ws.send(message)
                 
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 logger.error(f"Получены некорректные данные от клиента: {message[:100]}...")
+            except Exception as e:
+                logger.error(f"Ошибка при обработке сообщения от клиента: {str(e)}")
+                logger.error(traceback.format_exc())
     
-    except WebSocketDisconnect:
-        logger.info(f"Клиент {client_id} отключился")
     except Exception as e:
-        logger.error(f"Ошибка при пересылке данных от клиента к OpenAI: {str(e)}")
+        logger.error(f"Ошибка в задаче forward_client_to_openai: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
 
 async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: int):
     """Пересылает сообщения от API OpenAI клиенту (браузеру)"""
@@ -213,17 +262,28 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
                 
             try:
                 # Парсим JSON от OpenAI
-                response = json.loads(openai_message)
-                
-                # Логируем определенные типы событий
-                if response.get('type') in LOG_EVENT_TYPES:
-                    logger.info(f"[OpenAI -> Клиент] {response.get('type')}")
-                
-                # Пересылаем сообщение клиенту
-                await client_ws.send_text(openai_message)
+                if isinstance(openai_message, str):
+                    response = json.loads(openai_message)
+                    
+                    # Логируем определенные типы событий
+                    if response.get('type') in LOG_EVENT_TYPES:
+                        logger.info(f"[OpenAI -> Клиент {client_id}] {response.get('type')}")
+                    
+                    # Пересылаем сообщение клиенту
+                    await client_ws.send_text(openai_message)
+                else:
+                    # Если это бинарные данные, отправляем как есть
+                    await client_ws.send_bytes(openai_message)
                 
             except json.JSONDecodeError:
-                logger.error(f"Получены некорректные данные от OpenAI: {openai_message[:100]}...")
+                logger.error(f"Получены некорректные данные от OpenAI")
+                # Пытаемся все равно отправить данные клиенту
+                if isinstance(openai_message, str):
+                    await client_ws.send_text(openai_message)
+                else:
+                    await client_ws.send_bytes(openai_message)
+            except Exception as e:
+                logger.error(f"Ошибка при пересылке данных от OpenAI клиенту: {str(e)}")
     
     except websockets.exceptions.ConnectionClosed as e:
         logger.info(f"Соединение с OpenAI закрыто для клиента {client_id}: {e.code}, {e.reason}")
@@ -238,23 +298,35 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
         except:
             pass
     except Exception as e:
-        logger.error(f"Ошибка при пересылке данных от OpenAI к клиенту: {str(e)}")
+        logger.error(f"Ошибка в задаче forward_openai_to_client: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
 
-async def send_session_update(openai_ws):
+async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_enabled=True):
     """Отправляет настройки сессии в WebSocket OpenAI"""
+    
+    # Настройка определения завершения речи
+    turn_detection = {
+        "type": "server_vad",
+        "threshold": 0.5,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 500
+    } if turn_detection_enabled else None
+    
     session_update = {
         "type": "session.update",
         "session": {
-            "turn_detection": {"type": "server_vad"},
-            "input_audio_format": "pcm16",  # Формат входящего аудио
-            "output_audio_format": "pcm16", # Формат исходящего аудио
-            "voice": VOICE,                 # Голос ассистента
-            "instructions": SYSTEM_MESSAGE, # Системное сообщение
-            "modalities": ["text", "audio"],# Поддерживаемые модальности
-            "temperature": 0.8,             # Температура генерации
+            "turn_detection": turn_detection,
+            "input_audio_format": "pcm16",      # Формат входящего аудио
+            "output_audio_format": "pcm16",     # Формат исходящего аудио
+            "voice": voice,                     # Голос ассистента
+            "instructions": SYSTEM_MESSAGE,     # Системное сообщение
+            "modalities": ["text", "audio"],    # Поддерживаемые модальности
+            "temperature": 0.7,                 # Температура генерации
         }
     }
-    logger.info(f"Отправка настроек сессии: {json.dumps(session_update)}")
+    
+    logger.info(f"Отправка настроек сессии с голосом {voice}")
     await openai_ws.send(json.dumps(session_update))
 
 if __name__ == "__main__":
