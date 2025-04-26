@@ -3,134 +3,256 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Джарвис - Голосовой GPT-4o</title>
+  <title>Claude Sonnet - Голосовой помощник</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #0d1117;
-      color: #c9d1d9;
+    :root {
+      --bg-color: #000000;
+      --primary-color: #8A2BE2;
+      --secondary-color: #5D3FD3;
+      --text-color: #FFFFFF;
+      --assistant-color: #3498db;
+      --user-color: #9b59b6; 
+      --panel-bg: rgba(30, 30, 30, 0.8);
+      --surface-bg: rgba(40, 40, 40, 0.7);
+    }
+    
+    /* Светлая тема */
+    [data-theme="light"] {
+      --bg-color: #F5F5F7;
+      --primary-color: #8C39FF;
+      --secondary-color: #A872FF;
+      --text-color: #1D1D1F;
+      --assistant-color: #0070e0;
+      --user-color: #9933CC;
+      --panel-bg: rgba(255, 255, 255, 0.8);
+      --surface-bg: rgba(240, 240, 240, 0.9);
+    }
+    
+    * {
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
+    }
+    
+    /* Градиентный фон */
+    .bg-gradient {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 50% 50%, var(--secondary-color) 0%, transparent 40%);
+      opacity: 0.15;
+      z-index: -1;
     }
     
     .container {
-      max-width: 800px;
+      max-width: 1200px;
+      width: 100%;
       margin: 0 auto;
       padding: 20px;
-      flex: 1;
-    }
-    
-    h1 {
-      text-align: center;
-      color: #58a6ff;
-      margin-bottom: 30px;
-    }
-    
-    .chat-container {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 220px);
-      background-color: #161b22;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      align-items: center;
+      justify-content: space-between;
+      height: 100%;
+      position: relative;
+      z-index: 1;
     }
     
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-    }
-    
-    .message {
-      margin-bottom: 15px;
-      padding: 10px 15px;
-      border-radius: 10px;
-      max-width: 80%;
-      line-height: 1.4;
-    }
-    
-    .user-message {
-      background-color: #1f6feb;
-      color: white;
-      align-self: flex-end;
-      margin-left: auto;
-    }
-    
-    .assistant-message {
-      background-color: #21262d;
-      color: #c9d1d9;
-      align-self: flex-start;
-    }
-    
-    .input-area {
+    /* Верхняя панель */
+    .top-bar {
       display: flex;
-      padding: 15px;
-      background-color: #21262d;
-      border-top: 1px solid #30363d;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 15px 0;
     }
     
-    #text-input {
-      flex: 1;
-      padding: 12px 15px;
-      border: 1px solid #30363d;
-      border-radius: 5px;
-      background-color: #0d1117;
-      color: #c9d1d9;
-      font-size: 16px;
-      outline: none;
-    }
-    
-    #text-input:focus {
-      border-color: #1f6feb;
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
     
     .controls {
       display: flex;
-      justify-content: space-between;
-      margin-top: 20px;
+      gap: 15px;
+      align-items: center;
     }
     
-    button {
-      padding: 12px 20px;
-      background-color: #238636;
-      color: white;
+    .control-button {
+      background: var(--surface-bg);
       border: none;
-      border-radius: 5px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: background-color 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-    
-    button:hover {
-      background-color: #2ea043;
-    }
-    
-    button:disabled {
-      background-color: #30363d;
-      cursor: not-allowed;
-    }
-    
-    .voice-button {
-      width: 60px;
-      height: 60px;
       border-radius: 50%;
-      background-color: #f85149;
+      width: 40px;
+      height: 40px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-left: 10px;
+      color: var(--text-color);
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: all 0.2s ease;
     }
     
-    .voice-button.listening {
+    .control-button:hover {
+      background: var(--primary-color);
+      color: white;
+      transform: scale(1.05);
+    }
+    
+    .voice-selector {
+      background: var(--surface-bg);
+      color: var(--text-color);
+      border: none;
+      border-radius: 20px;
+      padding: 8px 15px;
+      font-size: 14px;
+      outline: none;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    
+    .voice-selector:focus {
+      box-shadow: 0 0 0 2px var(--primary-color);
+    }
+    
+    /* Основная область */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      position: relative;
+    }
+    
+    /* Центральная анимированная сфера */
+    .sphere-container {
+      position: relative;
+      width: 250px;
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 30px;
+    }
+    
+    .sphere {
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 5px 30px rgba(138, 43, 226, 0.5);
+      transition: all 0.3s ease;
+    }
+    
+    .sphere::before {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      right: -5px;
+      bottom: -5px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      z-index: -1;
+      opacity: 0.7;
+      filter: blur(10px);
+    }
+    
+    .sphere-core {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      background: var(--bg-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .sphere-icon {
+      font-size: 40px;
+      color: var(--primary-color);
+      z-index: 1;
+    }
+    
+    .sphere.listening .sphere-icon {
       animation: pulse 1.5s infinite;
+    }
+    
+    .sphere.processing .sphere-icon {
+      animation: spin 2s infinite linear;
+    }
+    
+    .sphere-waves {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      height: 300px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .wave {
+      position: absolute;
+      border: 2px solid var(--primary-color);
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      opacity: 0;
+      animation: wave 3s infinite linear;
+    }
+    
+    .sphere.listening .wave {
+      opacity: 0.2;
+    }
+    
+    .wave:nth-child(2) {
+      animation-delay: 0.5s;
+    }
+    
+    .wave:nth-child(3) {
+      animation-delay: 1s;
+    }
+    
+    @keyframes wave {
+      0% {
+        transform: scale(0.2);
+        opacity: 0.7;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 0;
+      }
     }
     
     @keyframes pulse {
@@ -139,53 +261,236 @@
       100% { transform: scale(1); }
     }
     
-    .status {
-      text-align: center;
-      margin-top: 15px;
-      font-size: 14px;
-      color: #8b949e;
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
     
-    .visualization {
-      height: 60px;
-      width: 100%;
-      background-color: #161b22;
-      margin-bottom: 10px;
-      border-radius: 5px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
-    }
-    
-    .audio-bars {
+    /* Визуализация звука */
+    .audio-visualizer {
+      position: absolute;
+      bottom: -50px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       align-items: flex-end;
-      height: 40px;
-      gap: 3px;
-      position: absolute;
-      top: 10px;
-      left: 0;
-      width: 100%;
       justify-content: center;
+      height: 40px;
+      width: 200px;
+      gap: 3px;
     }
     
     .audio-bar {
-      width: 4px;
-      height: 10px;
-      background-color: #58a6ff;
-      border-radius: 2px;
+      width: 3px;
+      height: 3px;
+      background-color: var(--primary-color);
+      border-radius: 3px;
       transition: height 0.1s ease;
     }
     
-    .transcript {
-      font-style: italic;
-      margin-top: 10px;
-      color: #8b949e;
-      text-align: center;
+    /* Сообщения */
+    .messages-container {
+      position: absolute;
+      bottom: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 10px;
+      mask-image: linear-gradient(to bottom, transparent, black 20px, black calc(100% - 20px), transparent);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, black 20px, black calc(100% - 20px), transparent);
+      scrollbar-width: thin;
+      scrollbar-color: var(--primary-color) transparent;
     }
     
+    .messages-container::-webkit-scrollbar {
+      width: 5px;
+    }
+    
+    .messages-container::-webkit-scrollbar-thumb {
+      background-color: var(--primary-color);
+      border-radius: 10px;
+    }
+    
+    .message {
+      padding: 12px 20px;
+      border-radius: 20px;
+      max-width: 80%;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-size: 16px;
+      line-height: 1.5;
+      animation: fadeIn 0.3s forwards;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      word-break: break-word;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .user-message {
+      background: rgba(155, 89, 182, 0.2);
+      border: 1px solid var(--user-color);
+      color: var(--text-color);
+      align-self: flex-end;
+      margin-left: auto;
+    }
+    
+    .assistant-message {
+      background: rgba(52, 152, 219, 0.2);
+      border: 1px solid var(--assistant-color);
+      color: var(--text-color);
+      align-self: flex-start;
+      margin-right: auto;
+    }
+    
+    /* Статусное сообщение */
+    .status-message {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      font-size: 16px;
+      color: var(--text-color);
+      opacity: 0.8;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    
+    /* Настройки и информация */
+    .settings-panel {
+      position: fixed;
+      top: 0;
+      right: -350px;
+      width: 350px;
+      height: 100vh;
+      background: var(--panel-bg);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      z-index: 1000;
+      transition: right 0.3s ease;
+      padding: 30px;
+      overflow-y: auto;
+      box-shadow: -5px 0 20px rgba(0, 0, 0, 0.2);
+    }
+    
+    .settings-panel.open {
+      right: 0;
+    }
+    
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    
+    .settings-title {
+      font-size: 22px;
+      font-weight: 600;
+    }
+    
+    .close-settings {
+      background: none;
+      border: none;
+      color: var(--text-color);
+      font-size: 24px;
+      cursor: pointer;
+    }
+    
+    .settings-section {
+      margin-bottom: 30px;
+    }
+    
+    .settings-section-title {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 15px;
+      color: var(--primary-color);
+    }
+    
+    .settings-option {
+      margin-bottom: 20px;
+    }
+    
+    .settings-label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .settings-select {
+      width: 100%;
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--text-color);
+      font-size: 14px;
+      outline: none;
+    }
+    
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 30px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #444;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 22px;
+      width: 22px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: var(--primary-color);
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(30px);
+    }
+    
+    /* Модальное окно загрузки */
     .modal {
       position: fixed;
       top: 0;
@@ -196,191 +501,421 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 2000;
     }
     
     .modal-content {
-      background-color: #161b22;
+      background-color: var(--surface-bg);
       padding: 30px;
-      border-radius: 10px;
+      border-radius: 20px;
       max-width: 500px;
-      width: 100%;
+      width: 90%;
       text-align: center;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      animation: modalFadeIn 0.4s forwards;
+    }
+    
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     
     .modal h2 {
-      color: #58a6ff;
-      margin-top: 0;
+      color: var(--primary-color);
+      margin-bottom: 20px;
+      font-size: 24px;
+      font-weight: 600;
     }
     
     .modal p {
       margin-bottom: 20px;
-    }
-    
-    #loading-modal h2 {
-      margin-bottom: 20px;
+      line-height: 1.6;
+      font-size: 16px;
     }
     
     .spinner {
       display: inline-block;
       width: 50px;
       height: 50px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
+      border: 3px solid rgba(255, 255, 255, 0.2);
       border-radius: 50%;
-      border-top-color: #58a6ff;
+      border-top-color: var(--primary-color);
       animation: spin 1s linear infinite;
       margin-bottom: 20px;
     }
     
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    /* Подсказки */
+    .tooltip {
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-bg);
+      padding: 8px 15px;
+      border-radius: 10px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      white-space: nowrap;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
+    .sphere:hover .tooltip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-5px);
+    }
+    
+    /* Адаптивность */
+    @media (max-width: 768px) {
+      .sphere {
+        width: 150px;
+        height: 150px;
+      }
+      
+      .sphere-core {
+        width: 135px;
+        height: 135px;
+      }
+      
+      .sphere-icon {
+        font-size: 30px;
+      }
+      
+      .messages-container {
+        width: 95%;
+        bottom: 80px;
+      }
+      
+      .settings-panel {
+        width: 300px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .top-bar {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .sphere {
+        width: 120px;
+        height: 120px;
+      }
+      
+      .sphere-core {
+        width: 105px;
+        height: 105px;
+      }
+      
+      .sphere-icon {
+        font-size: 24px;
+      }
+      
+      .message {
+        max-width: 90%;
+        font-size: 14px;
+      }
+      
+      .settings-panel {
+        width: 100%;
+        right: -100%;
+      }
+    }
+    
+    /* Отладочная панель */
     .debug-panel {
-      background-color: #161b22;
-      border-radius: 5px;
+      position: fixed;
+      bottom: -300px;
+      left: 0;
+      width: 100%;
+      height: 300px;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 1000;
+      transition: bottom 0.3s ease;
       padding: 10px;
-      margin-top: 20px;
-      display: none;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    
+    .debug-panel.open {
+      bottom: 0;
+    }
+    
+    .debug-header {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px;
+      border-bottom: 1px solid #333;
+      margin-bottom: 10px;
+    }
+    
+    .debug-title {
+      font-weight: bold;
+    }
+    
+    .debug-close {
+      cursor: pointer;
     }
     
     .debug-log {
-      max-height: 200px;
+      height: 250px;
       overflow-y: auto;
-      font-family: monospace;
-      font-size: 12px;
-      background-color: #0d1117;
-      padding: 10px;
-      border-radius: 5px;
+      padding: 5px;
     }
     
     .log-entry {
-      margin-bottom: 5px;
-      line-height: 1.4;
+      margin-bottom: 3px;
+      line-height: 1.3;
     }
     
     .log-info { color: #58a6ff; }
     .log-error { color: #f85149; }
     .log-warn { color: #d29922; }
     .log-debug { color: #8b949e; }
+    
+    /* Транскрипты речи */
+    .transcript {
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 500px;
+      text-align: center;
+      font-size: 16px;
+      color: var(--text-color);
+      opacity: 0.8;
+      min-height: 24px;
+      font-style: italic;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
-  <!-- Модальное окно загрузки -->
-  <div id="loading-modal" class="modal">
-    <div class="modal-content">
-      <div class="spinner"></div>
-      <h2>Подключение к GPT-4o...</h2>
-      <p>Пожалуйста, подождите. Это может занять несколько секунд.</p>
-      <div id="loading-status">Инициализация...</div>
-    </div>
-  </div>
-
+  <!-- Градиентный фон -->
+  <div class="bg-gradient"></div>
+  
+  <!-- Основной контейнер -->
   <div class="container">
-    <h1>🤖 Джарвис - Голосовой GPT-4o</h1>
-    
-    <div class="visualization">
-      <div class="audio-bars" id="audio-visualization">
-        <!-- Аудио-бары будут добавлены с помощью JavaScript -->
+    <!-- Верхняя панель -->
+    <div class="top-bar">
+      <div class="logo">
+        <i class="fas fa-brain"></i>
+        Claude Sonnet
       </div>
-    </div>
-    
-    <div class="transcript" id="transcript"></div>
-    
-    <div class="chat-container">
-      <div class="messages" id="messages">
-        <div class="message assistant-message">
-          Здравствуйте! Я Джарвис, ваш голосовой помощник на базе GPT-4o. Чем могу помочь?
-        </div>
-      </div>
-      
-      <div class="input-area">
-        <input type="text" id="text-input" placeholder="Введите сообщение или нажмите кнопку микрофона...">
-        <button class="voice-button" id="voice-button">
-          <i class="mic-icon">🎤</i>
+      <div class="controls">
+        <select id="voice-selector" class="voice-selector">
+          <option value="alloy">Alloy (Ровный)</option>
+          <option value="echo">Echo (Эхо)</option>
+          <option value="fable">Fable (Сказка)</option>
+          <option value="onyx">Onyx (Оникс)</option>
+          <option value="nova">Nova (Нова)</option>
+          <option value="shimmer">Shimmer (Мерцание)</option>
+        </select>
+        <button id="settings-button" class="control-button" aria-label="Настройки">
+          <i class="fas fa-gear"></i>
+        </button>
+        <button id="theme-toggle-button" class="control-button" aria-label="Переключить тему">
+          <i class="fas fa-moon"></i>
         </button>
       </div>
     </div>
     
-    <div class="controls">
-      <button id="send-button">Отправить</button>
-      <div class="status" id="status">Не подключено</div>
+    <!-- Основная область с голосовым ассистентом -->
+    <div class="main-content">
+      <!-- Транскрипт распознанной речи -->
+      <div class="transcript" id="transcript"></div>
+      
+      <!-- Центральная сфера -->
+      <div class="sphere-container">
+        <div class="sphere" id="main-sphere">
+          <div class="sphere-core">
+            <i class="fas fa-microphone sphere-icon"></i>
+          </div>
+          <div class="tooltip">Нажмите для переключения режима прослушивания</div>
+          <div class="sphere-waves">
+            <div class="wave"></div>
+            <div class="wave"></div>
+            <div class="wave"></div>
+          </div>
+        </div>
+        <div class="audio-visualizer" id="audio-visualizer">
+          <!-- Аудио бары будут добавлены скриптом -->
+        </div>
+      </div>
+      
+      <!-- Контейнер сообщений -->
+      <div class="messages-container" id="messages">
+        <div class="message assistant-message">
+          Здравствуйте! Я голосовой помощник Claude. Чем могу помочь?
+        </div>
+      </div>
+      
+      <!-- Статусное сообщение -->
+      <div class="status-message" id="status-message">
+        Нажмите на сферу, чтобы активировать постоянное прослушивание
+      </div>
+    </div>
+  </div>
+  
+  <!-- Панель настроек -->
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">Настройки</div>
+      <button class="close-settings" id="close-settings">×</button>
     </div>
     
-    <!-- Отладочная панель, скрыта по умолчанию -->
-    <div class="debug-panel" id="debug-panel">
-      <h3>Отладочная информация</h3>
-      <div class="debug-log" id="debug-log"></div>
+    <div class="settings-section">
+      <div class="settings-section-title">Голосовой помощник</div>
+      
+      <div class="settings-option">
+        <label class="settings-label">Выбор голоса</label>
+        <select id="voice-selector-settings" class="settings-select">
+          <option value="alloy">Alloy (Ровный)</option>
+          <option value="echo">Echo (Эхо)</option>
+          <option value="fable">Fable (Сказка)</option>
+          <option value="onyx">Onyx (Оникс)</option>
+          <option value="nova">Nova (Нова)</option>
+          <option value="shimmer">Shimmer (Мерцание)</option>
+        </select>
+      </div>
+      
+      <div class="settings-option">
+        <label class="settings-label">Режим прослушивания</label>
+        <select id="listening-mode" class="settings-select">
+          <option value="manual">Ручной (нажатием на сферу)</option>
+          <option value="continuous">Постоянный (всегда активен)</option>
+          <option value="vad">Авто (определение речи)</option>
+        </select>
+      </div>
     </div>
+    
+    <div class="settings-section">
+      <div class="settings-section-title">Интерфейс</div>
+      
+      <div class="settings-option theme-toggle">
+        <span class="settings-label">Светлая тема</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="theme-toggle-settings">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+    
+    <div class="settings-section">
+      <div class="settings-section-title">О приложении</div>
+      <p style="font-size: 14px; line-height: 1.5;">
+        Claude Voice Assistant 1.0<br>
+        Использует OpenAI Realtime API и GPT-4o для обработки речи.
+      </p>
+    </div>
+  </div>
+  
+  <!-- Модальное окно загрузки -->
+  <div id="loading-modal" class="modal">
+    <div class="modal-content">
+      <div class="spinner"></div>
+      <h2>Инициализация помощника</h2>
+      <p>Устанавливаем соединение с нейросетью...</p>
+      <div id="loading-status">Загрузка компонентов...</div>
+    </div>
+  </div>
+  
+  <!-- Отладочная панель -->
+  <div class="debug-panel" id="debug-panel">
+    <div class="debug-header">
+      <div class="debug-title">Отладочная информация</div>
+      <div class="debug-close" id="debug-close">✕</div>
+    </div>
+    <div class="debug-log" id="debug-log"></div>
   </div>
 
   <script>
-    // НАСТРОЙКИ
-    
-    // Включить режим отладки (true - включить, false - выключить)
-    const DEBUG_MODE = true;
+    // Конфигурация и состояние
+    const config = {
+      debug: true,           // Включить отладку 
+      listeningMode: 'manual', // manual, continuous, vad
+      voice: 'alloy',        // Голос ассистента
+      theme: 'dark',         // Тема (dark/light)
+      vadTimeout: 2000,      // Таймаут для определения окончания речи (мс)
+      maxMessages: 10,       // Максимальное количество сообщений в истории
+      audioSampleRate: 24000 // Частота дискретизации аудио
+    };
     
     // Элементы UI
-    const voiceButton = document.getElementById('voice-button');
-    const textInput = document.getElementById('text-input');
-    const sendButton = document.getElementById('send-button');
-    const messagesContainer = document.getElementById('messages');
-    const statusElement = document.getElementById('status');
-    const transcriptElement = document.getElementById('transcript');
-    const loadingModal = document.getElementById('loading-modal');
-    const loadingStatus = document.getElementById('loading-status');
-    const audioVisualization = document.getElementById('audio-visualization');
-    const debugPanel = document.getElementById('debug-panel');
-    const debugLog = document.getElementById('debug-log');
+    const elements = {
+      sphere: document.getElementById('main-sphere'),
+      audioVisualizer: document.getElementById('audio-visualizer'),
+      transcript: document.getElementById('transcript'),
+      messages: document.getElementById('messages'),
+      statusMessage: document.getElementById('status-message'),
+      loadingModal: document.getElementById('loading-modal'),
+      loadingStatus: document.getElementById('loading-status'),
+      debugPanel: document.getElementById('debug-panel'),
+      debugLog: document.getElementById('debug-log'),
+      settingsPanel: document.getElementById('settings-panel'),
+      settingsButton: document.getElementById('settings-button'),
+      closeSettings: document.getElementById('close-settings'),
+      voiceSelector: document.getElementById('voice-selector'),
+      voiceSelectorSettings: document.getElementById('voice-selector-settings'),
+      listeningMode: document.getElementById('listening-mode'),
+      themeToggleButton: document.getElementById('theme-toggle-button'),
+      themeToggleSettings: document.getElementById('theme-toggle-settings'),
+      debugClose: document.getElementById('debug-close')
+    };
     
-    // Включение отладочной панели, если режим отладки активен
-    if (DEBUG_MODE) {
-      debugPanel.style.display = 'block';
+    // Стейт приложения
+    const state = {
+      isConnected: false,
+      isListening: false,
+      isProcessing: false,
+      websocket: null,
+      audioContext: null,
+      mediaStream: null,
+      audioProcessor: null,
+      vadTimer: null,
+      currentResponseText: "",
+      audioChunks: [],
+      shouldReconnect: true
+    };
+    
+    // Инициализация визуализатора аудио
+    function initAudioVisualizer() {
+      elements.audioVisualizer.innerHTML = '';
+      for (let i = 0; i < 30; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'audio-bar';
+        elements.audioVisualizer.appendChild(bar);
+      }
     }
+    initAudioVisualizer();
     
-    // Функция логирования
+    // Управление отладочными сообщениями
     function log(message, level = 'info') {
       const timestamp = new Date().toLocaleTimeString();
       console.log(`[${level.toUpperCase()}] ${message}`);
       
-      if (DEBUG_MODE) {
+      if (config.debug) {
         const logEntry = document.createElement('div');
         logEntry.className = `log-entry log-${level}`;
         logEntry.textContent = `[${timestamp}] ${message}`;
-        debugLog.appendChild(logEntry);
-        debugLog.scrollTop = debugLog.scrollHeight;
+        elements.debugLog.appendChild(logEntry);
+        elements.debugLog.scrollTop = elements.debugLog.scrollHeight;
       }
       
       // Обновляем статус загрузки, если это информационное сообщение
-      if (level === 'info' && loadingModal.style.display !== 'none') {
-        loadingStatus.textContent = message;
+      if (level === 'info' && elements.loadingModal.style.display !== 'none') {
+        elements.loadingStatus.textContent = message;
       }
     }
     
-    // Создаем аудио-бары для визуализации
-    function createAudioBars(count = 30) {
-      audioVisualization.innerHTML = '';
-      for (let i = 0; i < count; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'audio-bar';
-        audioVisualization.appendChild(bar);
-      }
-    }
-    createAudioBars();
-    
-    // Состояние
-    let isConnected = false;
-    let isListening = false;
-    let isProcessing = false;
-    let websocket = null;
-    let audioContext = null;
-    let mediaStream = null;
-    let audioProcessor = null;
-    
-    // Создаем тестовый аудио-элемент для проверки форматов
-    const audioTestElement = new Audio();
-    
-    // Инициализация микрофона и AudioContext
+    // Инициализация аудио
     async function initAudio() {
       try {
         log("Запрос разрешения на доступ к микрофону...");
@@ -391,93 +926,126 @@
         }
         
         // Запрашиваем доступ к микрофону
-        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        state.mediaStream = await navigator.mediaDevices.getUserMedia({ 
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
-            sampleRate: 24000
+            sampleRate: config.audioSampleRate
           } 
         });
         
         log("Доступ к микрофону получен");
         
         // Создаем AudioContext с нужной частотой дискретизации
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-        log(`AudioContext создан с частотой ${audioContext.sampleRate} Гц`);
+        state.audioContext = new (window.AudioContext || window.webkitAudioContext)({ 
+          sampleRate: config.audioSampleRate 
+        });
+        
+        log(`AudioContext создан с частотой ${state.audioContext.sampleRate} Гц`);
         
         // Создаем обработчик аудиопотока
-        const streamSource = audioContext.createMediaStreamSource(mediaStream);
+        const streamSource = state.audioContext.createMediaStreamSource(state.mediaStream);
         
         // Выбираем размер буфера
         const bufferSize = 4096;
         
         // Проверяем, доступен ли ScriptProcessorNode
-        if (audioContext.createScriptProcessor) {
-          audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+        if (state.audioContext.createScriptProcessor) {
+          state.audioProcessor = state.audioContext.createScriptProcessor(bufferSize, 1, 1);
           log("Создан ScriptProcessorNode для обработки аудио");
         } else {
           throw new Error("Ваш браузер не поддерживает ScriptProcessorNode");
         }
         
         // Обработчик аудио
-        audioProcessor.onaudioprocess = function(e) {
-          if (isListening && websocket && websocket.readyState === WebSocket.OPEN) {
-            // Получаем данные с микрофона
-            const inputData = e.inputBuffer.getChannelData(0);
-            
-            // Проверяем, есть ли звук (чтобы не отправлять тишину)
-            let hasSound = false;
-            let maxAmplitude = 0;
-            
-            for (let i = 0; i < inputData.length; i++) {
-              const absValue = Math.abs(inputData[i]);
-              maxAmplitude = Math.max(maxAmplitude, absValue);
-              if (absValue > 0.01) { // Порог обнаружения звука
-                hasSound = true;
-                break;
-              }
-            }
-            
-            // Обновляем визуализацию в любом случае
-            updateAudioVisualization(inputData);
-            
-            // Отправляем только если есть звук или если прошло определенное время
-            if (hasSound) {
-              // Преобразуем float32 в int16
-              const pcm16Data = new Int16Array(inputData.length);
-              for (let i = 0; i < inputData.length; i++) {
-                // Конвертируем float32 (-1.0 до 1.0) в int16 (-32768 до 32767)
-                pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
-              }
-              
-              // Отправляем данные через WebSocket
-              try {
-                const message = JSON.stringify({
-                  type: "input_audio_buffer.append",
-                  event_id: `audio_${Date.now()}`,
-                  audio: arrayBufferToBase64(pcm16Data.buffer)
-                });
-                
-                websocket.send(message);
-              } catch (error) {
-                log(`Ошибка отправки аудио: ${error.message}`, "error");
-              }
-            }
-          }
-        };
+        state.audioProcessor.onaudioprocess = handleAudioProcess;
         
         // Подключаем обработчик
-        streamSource.connect(audioProcessor);
-        audioProcessor.connect(audioContext.destination);
+        streamSource.connect(state.audioProcessor);
+        state.audioProcessor.connect(state.audioContext.destination);
         
         log("Аудио инициализировано успешно");
         return true;
       } catch (error) {
         log(`Ошибка инициализации аудио: ${error.message}`, "error");
-        statusElement.textContent = "Ошибка доступа к микрофону";
+        elements.statusMessage.textContent = "Ошибка доступа к микрофону";
         return false;
       }
+    }
+    
+    // Обработка аудио с микрофона
+    function handleAudioProcess(e) {
+      if ((state.isListening || config.listeningMode === 'continuous') && 
+          state.websocket && 
+          state.websocket.readyState === WebSocket.OPEN && 
+          !state.isProcessing) {
+            
+        // Получаем данные с микрофона
+        const inputData = e.inputBuffer.getChannelData(0);
+        
+        // Проверяем, есть ли звук
+        let hasSound = false;
+        let maxAmplitude = 0;
+        
+        for (let i = 0; i < inputData.length; i++) {
+          const absValue = Math.abs(inputData[i]);
+          maxAmplitude = Math.max(maxAmplitude, absValue);
+          if (absValue > 0.01) { // Порог обнаружения звука
+            hasSound = true;
+            break;
+          }
+        }
+        
+        // Обновляем визуализацию в любом случае
+        updateAudioVisualization(inputData);
+        
+        // Если режим VAD и обнаружен звук, сбрасываем таймер
+        if (config.listeningMode === 'vad' && hasSound && state.isListening) {
+          resetVadTimer();
+        }
+        
+        // Если обнаружен звук или мы в режиме непрерывного захвата
+        if (hasSound || config.listeningMode === 'continuous') {
+          // Преобразуем float32 в int16
+          const pcm16Data = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
+          }
+          
+          // Отправляем данные через WebSocket
+          try {
+            const message = JSON.stringify({
+              type: "input_audio_buffer.append",
+              event_id: `audio_${Date.now()}`,
+              audio: arrayBufferToBase64(pcm16Data.buffer)
+            });
+            
+            state.websocket.send(message);
+          } catch (error) {
+            log(`Ошибка отправки аудио: ${error.message}`, "error");
+          }
+          
+          // Если режим VAD и обнаружена речь, начинаем слушать если еще не слушаем
+          if (config.listeningMode === 'vad' && hasSound && !state.isListening) {
+            startListening();
+          }
+        }
+      }
+    }
+    
+    // Сброс VAD таймера
+    function resetVadTimer() {
+      if (state.vadTimer) {
+        clearTimeout(state.vadTimer);
+      }
+      
+      state.vadTimer = setTimeout(() => {
+        if (state.isListening && config.listeningMode === 'vad') {
+          log("VAD: Обнаружена пауза в речи", "info");
+          stopListening();
+        }
+      }, config.vadTimeout);
     }
     
     // Преобразование ArrayBuffer в Base64
@@ -507,11 +1075,10 @@
     
     // Обновление визуализации аудио
     function updateAudioVisualization(audioData) {
-      const bars = audioVisualization.querySelectorAll('.audio-bar');
+      const bars = elements.audioVisualizer.querySelectorAll('.audio-bar');
       const step = Math.floor(audioData.length / bars.length);
       
       for (let i = 0; i < bars.length; i++) {
-        // Вычисляем среднее значение амплитуды для этого "отрезка" аудиоданных
         let sum = 0;
         for (let j = 0; j < step; j++) {
           const index = i * step + j;
@@ -521,17 +1088,17 @@
         }
         const average = sum / step;
         
-        // Нормализуем значение для высоты полосы (от 2px до 40px)
-        const height = 2 + Math.min(38, Math.floor(average * 100));
+        // Нормализуем значение для высоты полосы (от 3px до 40px)
+        const height = 3 + Math.min(35, Math.floor(average * 150));
         bars[i].style.height = `${height}px`;
       }
     }
     
     // Сброс визуализации аудио
     function resetAudioVisualization() {
-      const bars = audioVisualization.querySelectorAll('.audio-bar');
+      const bars = elements.audioVisualizer.querySelectorAll('.audio-bar');
       bars.forEach(bar => {
-        bar.style.height = '2px';
+        bar.style.height = '3px';
       });
     }
     
@@ -607,7 +1174,7 @@
         
         log(`Получено ${audioData.byteLength} байт аудио данных`);
         
-        // Предполагаем, что данные в формате PCM16, конвертируем в WAV для воспроизведения
+        // Конвертируем PCM16 в WAV для воспроизведения
         const wavBuffer = createWavFromPcm(audioData);
         const blob = new Blob([wavBuffer], { type: 'audio/wav' });
         const audioUrl = URL.createObjectURL(blob);
@@ -615,7 +1182,7 @@
         // Воспроизводим звук
         const audio = new Audio(audioUrl);
         audio.onerror = function(e) {
-          log(`Ошибка воспроизведения аудио: ${e.target.error.message || 'Неизвестная ошибка'}`, "error");
+          log(`Ошибка воспроизведения аудио: ${e.target.error?.message || 'Неизвестная ошибка'}`, "error");
         };
         
         audio.oncanplaythrough = function() {
@@ -635,59 +1202,82 @@
     }
     
     // Добавление сообщения в чат
-    function addMessage(text, isUser) {
+    function addMessage(text, isUser = false) {
       const messageElement = document.createElement('div');
       messageElement.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
       messageElement.textContent = text;
-      messagesContainer.appendChild(messageElement);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      elements.messages.appendChild(messageElement);
+      
+      // Прокручиваем к последнему сообщению
+      elements.messages.scrollTop = elements.messages.scrollHeight;
+      
+      // Ограничиваем количество сообщений
+      const messages = elements.messages.querySelectorAll('.message');
+      if (messages.length > config.maxMessages) {
+        const firstUserMessage = elements.messages.querySelector('.user-message');
+        if (firstUserMessage && firstUserMessage !== messages[0]) {
+          elements.messages.removeChild(firstUserMessage);
+        }
+      }
     }
     
-    // Подключение к WebSocket серверу (локальный прокси)
+    // Подключение к WebSocket серверу
     async function connectWebSocket() {
       return new Promise((resolve, reject) => {
         try {
-          loadingModal.style.display = 'flex';
-          statusElement.textContent = "Подключение...";
+          elements.loadingModal.style.display = 'flex';
+          elements.statusMessage.textContent = "Подключение...";
           log("Подключение к WebSocket серверу...");
           
-          // Используем WebSocket-соединение с нашим локальным прокси
+          // Используем WebSocket-соединение с нашим сервером
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
           const wsUrl = `${protocol}//${window.location.host}/ws`;
           log(`WebSocket URL: ${wsUrl}`);
           
           // Создаем новое WebSocket соединение
-          websocket = new WebSocket(wsUrl);
+          state.websocket = new WebSocket(wsUrl);
           
           // Устанавливаем таймаут на открытие соединения
           const connectionTimeout = setTimeout(() => {
             log("Превышено время ожидания соединения WebSocket", "error");
-            websocket.close();
+            state.websocket.close();
             reject(new Error("Таймаут соединения"));
           }, 15000);
           
-          websocket.onopen = function() {
+          state.websocket.onopen = function() {
             clearTimeout(connectionTimeout);
             log("WebSocket соединение установлено");
-            statusElement.textContent = "Подключено";
-            statusElement.style.color = "#4caf50";
-            isConnected = true;
-            loadingModal.style.display = 'none';
+            elements.statusMessage.textContent = "Подключено. Готов к работе";
+            state.isConnected = true;
+            elements.loadingModal.style.display = 'none';
+            
+            // Отправляем обновление настроек с выбранным голосом
+            updateVoice(config.voice);
+            
+            // Если режим постоянного прослушивания, сразу начинаем
+            if (config.listeningMode === 'continuous') {
+              elements.sphere.classList.add('listening');
+              elements.statusMessage.textContent = "Слушаю вас...";
+              state.isListening = true;
+            }
+            
             resolve(true);
           };
           
-          websocket.onmessage = function(event) {
+          state.websocket.onmessage = function(event) {
             handleWebSocketMessage(event.data);
           };
           
-          websocket.onclose = function(event) {
+          state.websocket.onclose = function(event) {
             log(`WebSocket соединение закрыто: код ${event.code}, причина: ${event.reason || 'не указана'}`, event.wasClean ? "info" : "error");
-            statusElement.textContent = `Соединение закрыто: ${event.reason || 'Неизвестная причина'}`;
-            statusElement.style.color = "#f44336";
-            isConnected = false;
+            elements.statusMessage.textContent = `Соединение закрыто`;
+            elements.sphere.classList.remove('listening');
+            elements.sphere.classList.remove('processing');
+            state.isConnected = false;
+            state.isListening = false;
             
-            // Пытаемся переподключиться, если соединение было разорвано не чисто
-            if (!event.wasClean) {
+            // Пытаемся переподключиться, если соединение было разорвано не чисто и флаг shouldReconnect активен
+            if (!event.wasClean && state.shouldReconnect) {
               log(`Попытка переподключения через 3 секунды...`, "warn");
               
               setTimeout(() => {
@@ -700,11 +1290,10 @@
             reject(new Error(`Соединение закрыто: ${event.reason || 'Неизвестная причина'}`));
           };
           
-          websocket.onerror = function(error) {
+          state.websocket.onerror = function(error) {
             log(`WebSocket ошибка: ${error.message || 'Неизвестная ошибка'}`, "error");
-            statusElement.textContent = "Ошибка соединения";
-            statusElement.style.color = "#f44336";
-            isConnected = false;
+            elements.statusMessage.textContent = "Ошибка соединения";
+            state.isConnected = false;
             reject(error);
           };
         } catch (error) {
@@ -745,12 +1334,6 @@
     }
     
     // Обработка событий от сервера
-    let currentResponseText = "";
-    let lastAudioTimestamp = 0;
-    let currentResponseId = null;
-    let currentItemId = null;
-    const audioChunks = [];
-    
     function processServerEvent(event) {
       if (!event || !event.type) {
         log("Получено некорректное событие без типа", "warn");
@@ -759,19 +1342,10 @@
       
       log(`Событие от сервера: ${event.type}`, "debug");
       
-      // Сохраняем ID текущего ответа и элемента, если они есть
-      if (event.response_id && !currentResponseId) {
-        currentResponseId = event.response_id;
-      }
-      
-      if (event.item_id && !currentItemId) {
-        currentItemId = event.item_id;
-      }
-      
       switch (event.type) {
         case "error":
           log(`Ошибка от сервера: ${event.error ? event.error.message : 'Неизвестная ошибка'}`, "error");
-          statusElement.textContent = `Ошибка: ${event.error ? event.error.message : 'Неизвестная ошибка'}`;
+          elements.statusMessage.textContent = `Ошибка: ${event.error ? event.error.message : 'Неизвестная ошибка'}`;
           break;
           
         case "conversation.item.input_audio_transcription.delta":
@@ -779,12 +1353,12 @@
           // Обновляем транскрипцию распознанной речи пользователя
           if (event.transcript || event.delta) {
             const transcript = event.transcript || event.delta;
-            transcriptElement.textContent = transcript;
+            elements.transcript.textContent = transcript;
             log(`Транскрипция: ${transcript}`, "info");
             
             if (event.type === "conversation.item.input_audio_transcription.completed") {
               addMessage(transcript, true);
-              transcriptElement.textContent = "";
+              elements.transcript.textContent = "";
             }
           }
           break;
@@ -792,15 +1366,15 @@
         case "response.text.delta":
           // Обрабатываем текстовый ответ по частям
           if (event.delta) {
-            currentResponseText += event.delta;
+            state.currentResponseText += event.delta;
             
             // Обновляем текущее сообщение или создаем новое
-            const lastMessage = messagesContainer.lastElementChild;
+            const lastMessage = elements.messages.lastElementChild;
             if (lastMessage && lastMessage.classList.contains('assistant-message') && 
-                lastMessage !== messagesContainer.firstElementChild) {
-              lastMessage.textContent = currentResponseText;
+                lastMessage !== elements.messages.firstElementChild) {
+              lastMessage.textContent = state.currentResponseText;
             } else {
-              addMessage(currentResponseText, false);
+              addMessage(state.currentResponseText, false);
             }
           }
           break;
@@ -808,16 +1382,16 @@
         case "response.text.done":
           // Текстовый ответ завершен
           if (event.text) {
-            currentResponseText = event.text;
-            log(`Текстовый ответ завершен: ${currentResponseText.substring(0, 50)}...`, "info");
+            state.currentResponseText = event.text;
+            log(`Текстовый ответ завершен: ${state.currentResponseText.substring(0, 50)}...`, "info");
             
             // Обновляем текущее сообщение или создаем новое
-            const lastMessage = messagesContainer.lastElementChild;
+            const lastMessage = elements.messages.lastElementChild;
             if (lastMessage && lastMessage.classList.contains('assistant-message') && 
-                lastMessage !== messagesContainer.firstElementChild) {
-              lastMessage.textContent = currentResponseText;
+                lastMessage !== elements.messages.firstElementChild) {
+              lastMessage.textContent = state.currentResponseText;
             } else {
-              addMessage(currentResponseText, false);
+              addMessage(state.currentResponseText, false);
             }
           }
           break;
@@ -825,66 +1399,52 @@
         case "response.audio.delta":
           // Обрабатываем аудиоответ по частям
           if (event.delta) {
-            audioChunks.push(event.delta);
-            log(`Получен фрагмент аудио: ${event.delta.length} символов`, "debug");
+            state.audioChunks.push(event.delta);
           }
           break;
           
         case "response.audio.done":
           // Аудиоответ завершен, воспроизводим его
-          if (audioChunks.length > 0) {
-            log(`Аудиоответ завершен, ${audioChunks.length} фрагментов`, "info");
-            const fullAudio = audioChunks.join('');
-            // Дамп первых 100 символов для отладки
-            if (fullAudio.length > 0) {
-              log(`Аудио данные (первые 50 символов): ${fullAudio.substring(0, 50)}...`, "debug");
-            }
+          if (state.audioChunks.length > 0) {
+            log(`Аудиоответ завершен, ${state.audioChunks.length} фрагментов`, "info");
+            const fullAudio = state.audioChunks.join('');
             playAudio(fullAudio);
-            audioChunks.length = 0; // Очищаем массив
+            state.audioChunks = [];
           }
           break;
           
         // Обработка дополнительных типов событий
         case "response.audio_transcript.delta":
-          log(`Транскрипция аудио ответа: ${event.delta || 'нет текста'}`, "debug");
-          break;
-          
         case "response.audio_transcript.done":
-          log(`Транскрипция аудио завершена: ${event.transcript || 'нет текста'}`, "debug");
-          break;
-          
         case "response.content_part.added":
-          log(`Добавлена часть контента к ответу: ${event.content_index}`, "debug");
-          break;
-          
         case "response.content_part.done":
-          log(`Завершена часть контента ответа: ${event.content_index}`, "debug");
-          break;
-          
         case "response.output_item.added":
-          log(`Добавлен элемент ответа: ${event.output_index}`, "debug");
-          break;
-          
         case "response.output_item.done":
-          log(`Завершен элемент ответа: ${event.output_index}`, "debug");
+          // Просто логируем эти события
+          log(`Получено событие ${event.type}`, "debug");
           break;
           
         case "response.done":
           // Ответ полностью завершен
           log("Ответ полностью завершен", "info");
-          isProcessing = false;
+          state.isProcessing = false;
+          elements.sphere.classList.remove('processing');
           
           // Сбрасываем состояние
-          currentResponseText = "";
-          audioChunks.length = 0;
-          currentResponseId = null;
-          currentItemId = null;
+          state.currentResponseText = "";
+          state.audioChunks = [];
           resetAudioVisualization();
           
-          // Активируем кнопки
-          voiceButton.disabled = false;
-          sendButton.disabled = false;
-          textInput.disabled = false;
+          // Если режим непрерывного прослушивания, продолжаем слушать
+          if (config.listeningMode === 'continuous') {
+            elements.statusMessage.textContent = "Слушаю вас...";
+            elements.sphere.classList.add('listening');
+            state.isListening = true;
+          } else {
+            elements.statusMessage.textContent = "Готов к работе";
+            elements.sphere.classList.remove('listening');
+            state.isListening = false;
+          }
           break;
           
         case "session.created":
@@ -918,107 +1478,146 @@
     
     // Начало записи голоса
     function startListening() {
-      if (!isConnected || isProcessing) {
-        log("Невозможно начать запись: " + (!isConnected ? "не подключено" : "идет обработка"), "warn");
+      if (!state.isConnected || state.isProcessing) {
+        log("Невозможно начать запись: " + (!state.isConnected ? "не подключено" : "идет обработка"), "warn");
         return;
       }
       
-      isListening = true;
-      isProcessing = false;
-      voiceButton.classList.add('listening');
-      transcriptElement.textContent = "Говорите...";
+      state.isListening = true;
+      elements.sphere.classList.add('listening');
+      elements.statusMessage.textContent = "Слушаю вас...";
+      elements.transcript.textContent = "";
       log("Начало записи голоса", "info");
       
       // Отправляем команду для очистки буфера ввода
-      websocket.send(JSON.stringify({
+      state.websocket.send(JSON.stringify({
         type: "input_audio_buffer.clear",
         event_id: `clear_${Date.now()}`
       }));
       
       // Возобновляем AudioContext если он был приостановлен
-      if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume();
+      if (state.audioContext && state.audioContext.state === 'suspended') {
+        state.audioContext.resume();
+      }
+      
+      // Если VAD режим, запускаем таймер
+      if (config.listeningMode === 'vad') {
+        resetVadTimer();
       }
     }
     
     // Окончание записи голоса
     function stopListening() {
-      isListening = false;
-      voiceButton.classList.remove('listening');
-      transcriptElement.textContent = "Обработка...";
+      if (!state.isListening) return;
+      
+      state.isListening = false;
+      elements.sphere.classList.remove('listening');
+      elements.sphere.classList.add('processing');
+      elements.statusMessage.textContent = "Обработка...";
       log("Завершение записи голоса", "info");
       
       // Отправляем команду для завершения записи
-      websocket.send(JSON.stringify({
+      state.websocket.send(JSON.stringify({
         type: "input_audio_buffer.commit",
         event_id: `commit_${Date.now()}`
       }));
       
       // Отправляем команду для создания ответа
-      websocket.send(JSON.stringify({
+      state.websocket.send(JSON.stringify({
         type: "response.create",
         event_id: `response_${Date.now()}`,
         response: {}
       }));
       
-      isProcessing = true;
+      state.isProcessing = true;
       resetAudioVisualization();
       
-      // Деактивируем кнопки на время обработки
-      voiceButton.disabled = true;
-      sendButton.disabled = true;
-      textInput.disabled = true;
+      // Очищаем VAD таймер если он есть
+      if (state.vadTimer) {
+        clearTimeout(state.vadTimer);
+        state.vadTimer = null;
+      }
     }
     
-    // Отправка текстового сообщения
-    function sendTextMessage() {
-      if (!isConnected || isProcessing) {
-        log("Невозможно отправить сообщение: " + (!isConnected ? "не подключено" : "идет обработка"), "warn");
-        return;
+    // Переключение режима прослушивания
+    function toggleListening() {
+      if (config.listeningMode !== 'manual') return;
+      
+      if (state.isListening) {
+        stopListening();
+      } else if (!state.isProcessing) {
+        startListening();
       }
+    }
+    
+    // Обновление голоса ассистента
+    function updateVoice(voiceId) {
+      if (!state.isConnected || !state.websocket) return;
       
-      const text = textInput.value.trim();
-      if (!text) {
-        log("Попытка отправить пустое сообщение", "warn");
-        return;
-      }
+      log(`Смена голоса на ${voiceId}`, "info");
       
-      log(`Отправка текстового сообщения: ${text}`, "info");
-      
-      // Добавляем сообщение пользователя в чат
-      addMessage(text, true);
-      
-      // Отправляем сообщение через WebSocket
-      websocket.send(JSON.stringify({
-        type: "conversation.item.create",
-        event_id: `msg_${Date.now()}`,
-        item: {
-          type: "message",
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: text
-            }
-          ]
+      // Отправляем обновление сессии
+      state.websocket.send(JSON.stringify({
+        type: "session.update",
+        event_id: `voice_${Date.now()}`,
+        session: {
+          voice: voiceId
         }
       }));
       
-      // Отправляем команду для создания ответа
-      websocket.send(JSON.stringify({
-        type: "response.create",
-        event_id: `response_${Date.now()}`,
-        response: {}
-      }));
+      // Обновляем конфигурацию
+      config.voice = voiceId;
+    }
+    
+    // Переключение режима прослушивания
+    function setListeningMode(mode) {
+      log(`Переключение режима прослушивания на ${mode}`, "info");
       
-      // Сбрасываем поле ввода и состояние
-      textInput.value = "";
-      isProcessing = true;
+      // Останавливаем текущее прослушивание
+      if (state.isListening) {
+        stopListening();
+      }
       
-      // Деактивируем кнопки на время обработки
-      voiceButton.disabled = true;
-      sendButton.disabled = true;
-      textInput.disabled = true;
+      config.listeningMode = mode;
+      
+      // Обновляем интерфейс и поведение
+      switch (mode) {
+        case 'continuous':
+          elements.statusMessage.textContent = "Постоянное прослушивание активно";
+          if (state.isConnected && !state.isProcessing) {
+            state.isListening = true;
+            elements.sphere.classList.add('listening');
+          }
+          break;
+          
+        case 'vad':
+          elements.statusMessage.textContent = "Автоматическое определение речи активно";
+          break;
+          
+        case 'manual':
+        default:
+          elements.statusMessage.textContent = "Нажмите на сферу для активации микрофона";
+          elements.sphere.classList.remove('listening');
+          state.isListening = false;
+          break;
+      }
+    }
+    
+    // Переключение темы
+    function toggleTheme() {
+      if (config.theme === 'dark') {
+        config.theme = 'light';
+        document.body.setAttribute('data-theme', 'light');
+        elements.themeToggleButton.innerHTML = '<i class="fas fa-sun"></i>';
+        elements.themeToggleSettings.checked = true;
+      } else {
+        config.theme = 'dark';
+        document.body.setAttribute('data-theme', 'dark');
+        elements.themeToggleButton.innerHTML = '<i class="fas fa-moon"></i>';
+        elements.themeToggleSettings.checked = false;
+      }
+      
+      log(`Тема изменена на ${config.theme}`, "info");
     }
     
     // Инициализация всего приложения
@@ -1038,83 +1637,108 @@
           if (connected) {
             log("Подключение к WebSocket установлено", "info");
             
-            // Обработчики событий UI
-            voiceButton.addEventListener('mousedown', event => {
-              event.preventDefault();
-              startListening();
-            });
-            voiceButton.addEventListener('touchstart', event => {
-              event.preventDefault();
-              startListening();
-            });
+            // Настраиваем обработчики событий UI
+            setupEventListeners();
             
-            voiceButton.addEventListener('mouseup', event => {
-              event.preventDefault();
-              stopListening();
-            });
-            voiceButton.addEventListener('touchend', event => {
-              event.preventDefault();
-              stopListening();
-            });
+            // Синхронизируем селекторы голоса
+            elements.voiceSelector.value = config.voice;
+            elements.voiceSelectorSettings.value = config.voice;
             
-            // Если пользователь перетащил палец за пределы кнопки
-            voiceButton.addEventListener('mouseleave', event => {
-              if (isListening) {
-                event.preventDefault();
-                stopListening();
-              }
-            });
-            
-            // Если страница теряет фокус, останавливаем запись
-            window.addEventListener('blur', () => {
-              if (isListening) {
-                log("Страница потеряла фокус, остановка записи", "info");
-                stopListening();
-              }
-            });
-            
-            sendButton.addEventListener('click', event => {
-              event.preventDefault();
-              sendTextMessage();
-            });
-            
-            textInput.addEventListener('keypress', function(e) {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                sendTextMessage();
-              }
-            });
+            // Устанавливаем режим прослушивания
+            elements.listeningMode.value = config.listeningMode;
             
             log("Обработчики событий установлены", "info");
           } else {
             log("Не удалось установить подключение к WebSocket", "error");
-            loadingModal.style.display = 'none';
+            elements.loadingModal.style.display = 'none';
             alert("Не удалось подключиться к серверу. Проверьте консоль для получения дополнительной информации.");
           }
         } else {
           log("Не удалось инициализировать аудио", "error");
-          loadingModal.style.display = 'none';
+          elements.loadingModal.style.display = 'none';
           alert("Не удалось инициализировать аудио. Пожалуйста, разрешите доступ к микрофону и перезагрузите страницу.");
         }
       } catch (error) {
         log(`Ошибка инициализации: ${error.message}`, "error");
-        loadingModal.style.display = 'none';
+        elements.loadingModal.style.display = 'none';
         alert(`Произошла ошибка: ${error.message}`);
       }
     }
     
+    // Настройка обработчиков событий
+    function setupEventListeners() {
+      // Обработка клика по сфере
+      elements.sphere.addEventListener('click', toggleListening);
+      
+      // Взаимодействие с панелью настроек
+      elements.settingsButton.addEventListener('click', () => {
+        elements.settingsPanel.classList.add('open');
+      });
+      
+      elements.closeSettings.addEventListener('click', () => {
+        elements.settingsPanel.classList.remove('open');
+      });
+      
+      // Переключение темы
+      elements.themeToggleButton.addEventListener('click', toggleTheme);
+      elements.themeToggleSettings.addEventListener('change', toggleTheme);
+      
+      // Изменение голоса
+      elements.voiceSelector.addEventListener('change', (e) => {
+        updateVoice(e.target.value);
+        elements.voiceSelectorSettings.value = e.target.value;
+      });
+      
+      elements.voiceSelectorSettings.addEventListener('change', (e) => {
+        updateVoice(e.target.value);
+        elements.voiceSelector.value = e.target.value;
+      });
+      
+      // Изменение режима прослушивания
+      elements.listeningMode.addEventListener('change', (e) => {
+        setListeningMode(e.target.value);
+      });
+      
+      // Отладочная панель
+      document.addEventListener('keydown', (e) => {
+        // Alt+D для отображения/скрытия отладочной панели
+        if (e.altKey && e.key === 'd') {
+          elements.debugPanel.classList.toggle('open');
+        }
+      });
+      
+      elements.debugClose.addEventListener('click', () => {
+        elements.debugPanel.classList.remove('open');
+      });
+      
+      // Закрытие панелей по клику вне их области
+      document.addEventListener('click', (e) => {
+        if (elements.settingsPanel.classList.contains('open') && 
+            !elements.settingsPanel.contains(e.target) && 
+            e.target !== elements.settingsButton) {
+          elements.settingsPanel.classList.remove('open');
+        }
+      });
+      
+      // Обработка перед закрытием страницы
+      window.addEventListener('beforeunload', () => {
+        // Останавливаем переподключение при закрытии страницы
+        state.shouldReconnect = false;
+        
+        // Закрываем соединение
+        if (state.websocket && state.websocket.readyState === WebSocket.OPEN) {
+          state.websocket.close();
+        }
+        
+        // Останавливаем аудио
+        if (state.mediaStream) {
+          state.mediaStream.getTracks().forEach(track => track.stop());
+        }
+      });
+    }
+    
     // Запускаем инициализацию после загрузки страницы
     window.addEventListener('load', init);
-    
-    // Обработка ошибок на уровне окна
-    window.addEventListener('error', function(event) {
-      log(`Глобальная ошибка: ${event.message} в ${event.filename}:${event.lineno}`, "error");
-    });
-    
-    // Double-click на статус для отображения отладочной информации
-    statusElement.addEventListener('dblclick', function() {
-      debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
-    });
   </script>
 </body>
 </html>
