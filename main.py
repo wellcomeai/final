@@ -1,19 +1,30 @@
 import os
-import asyncio
 import json
-import logging
-import traceback
-import urllib.parse
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-import httpx
+import base64
+import asyncio
+import websockets
+from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import logging
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("jarvis")
-logger.setLevel(logging.DEBUG)
+
+# Загружаем переменные окружения
+load_dotenv()
+
+# Конфигурация
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+PORT = int(os.getenv('PORT', 5050))
+REALTIME_WS_URL = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01'
+SYSTEM_MESSAGE = (
+    "Ты Джарвис - умный голосовой помощник. Отвечай коротко и по существу. "
+    "Ты готов помочь пользователю с любыми вопросами и задачами."
+)
+VOICE = 'alloy'  # Доступные голоса: alloy, echo, fable, onyx, nova, shimmer
 
 app = FastAPI()
 
@@ -37,76 +48,55 @@ if not os.path.exists(static_dir):
 # Монтируем статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Получаем API ключ из переменных окружения
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
-    logger.error("OPENAI_API_KEY не задан в переменных окружения")
-    raise ValueError("OPENAI_API_KEY не задан в переменных окружения")
-else:
-    # Маскируем ключ для логов, показывая только первые и последние 4 символа
-    masked_key = OPENAI_API_KEY[:4] + "..." + OPENAI_API_KEY[-4:]
-    logger.info(f"OPENAI_API_KEY получен: {masked_key}")
+    raise ValueError('Отсутствует ключ API OpenAI. Пожалуйста, укажите его в .env файле.')
 
-# URL для создания сессии Realtime API
-REALTIME_SESSION_URL = "https://api.openai.com/v1/realtime/sessions"
-REALTIME_WEBSOCKET_URL = "wss://api.openai.com/v1/realtime/conversations"
+# Отслеживаемые события от OpenAI для логирования
+LOG_EVENT_TYPES = [
+    'response.content.done', 'rate_limits.updated', 'response.done',
+    'input_audio_buffer.committed', 'input_audio_buffer.speech_stopped',
+    'input_audio_buffer.speech_started', 'session.created'
+]
 
-# Глобальный кеш для хранения созданных сессий
-sessions = {}
-
-# Ошибка для клиента при неправильных заголовках
-@app.exception_handler(Exception)
-async def handle_exception(request: Request, exc: Exception):
-    logger.error(f"Необработанное исключение: {exc}")
-    logger.error(traceback.format_exc())
-    return JSONResponse(
-        status_code=500,
-        content={"message": f"Внутренняя ошибка сервера: {str(exc)}"}
-    )
+# Хранилище активных соединений клиент <-> OpenAI
+client_connections = {}
 
 @app.get("/")
-async def root():
-    """Корневой маршрут, возвращает HTML-страницу"""
+async def index_page():
+    """Возвращает HTML страницу с интерфейсом голосового помощника"""
     try:
         index_path = os.path.join(static_dir, "index.html")
         if os.path.exists(index_path):
-            logger.info("Запрошена главная страница")
-            return FileResponse(index_path)
+            with open(index_path, "r") as file:
+                content = file.read()
+            return HTMLResponse(content=content)
         else:
             logger.warning(f"Файл {index_path} не найден")
             return {"message": "Файл index.html не найден в директории static"}
     except Exception as e:
         logger.error(f"Ошибка при отдаче главной страницы: {str(e)}")
-        raise
+        return JSONResponse(
+            status_code=500,
+            content={"message": f"Ошибка сервера: {str(e)}"}
+        )
 
 @app.get("/api/check")
 async def check_api():
-    """Маршрут для проверки доступности API и валидности ключа"""
+    """Проверка состояния API и доступности OpenAI"""
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                "https://api.openai.com/v1/models",
-                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"}
-            )
+        # Проверим, что ключ API существует
+        if not OPENAI_API_KEY:
+            return {
+                "status": "error",
+                "message": "API ключ не настроен на сервере"
+            }
             
-            if response.status_code == 200:
-                models = response.json()
-                # Проверяем наличие модели gpt-4o-realtime-preview в списке
-                has_realtime = any("gpt-4o-realtime-preview" in model.get("id", "") for model in models.get("data", []))
-                
-                return {
-                    "status": "success",
-                    "api_key_valid": True,
-                    "has_realtime_access": has_realtime,
-                    "models_count": len(models.get("data", []))
-                }
-            else:
-                logger.warning(f"Ошибка проверки API: {response.status_code} - {response.text}")
-                return {
-                    "status": "error",
-                    "api_key_valid": False,
-                    "error": response.text
-                }
+        # Возвращаем успешный статус
+        return {
+            "status": "success",
+            "api_key_valid": True,
+            "openai_api_version": "Realtime API"
+        }
     except Exception as e:
         logger.error(f"Ошибка при проверке API: {str(e)}")
         return {
@@ -114,190 +104,160 @@ async def check_api():
             "message": str(e)
         }
 
-@app.get("/create-session")
-async def create_session():
-    """Создает новую сессию в OpenAI Realtime API и возвращает токен клиенту"""
-    try:
-        logger.info("Запрос на создание новой сессии")
-        
-        # Проверяем наличие ключа API
-        if not OPENAI_API_KEY:
-            logger.error("OPENAI_API_KEY не задан")
-            raise HTTPException(status_code=500, detail="API ключ не настроен на сервере")
-        
-        # Параметры сессии
-        session_params = {
-            "model": "gpt-4o-realtime-preview",
-            "modalities": ["audio", "text"],
-            "voice": "alloy",
-            "instructions": "Ты Джарвис - умный голосовой помощник. Отвечай коротко и по существу.",
-            "input_audio_format": "pcm16",
-            "output_audio_format": "pcm16",
-            "input_audio_transcription": {
-                "model": "whisper-1"
-            },
-            "turn_detection": {
-                "type": "server_vad",
-                "threshold": 0.5,
-                "prefix_padding_ms": 300,
-                "silence_duration_ms": 500
-            }
-        }
-        
-        logger.debug(f"Параметры сессии: {json.dumps(session_params)}")
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            logger.debug("Отправка запроса на создание сессии в OpenAI...")
-            response = await client.post(
-                REALTIME_SESSION_URL,
-                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                json=session_params
-            )
-            
-            logger.debug(f"Получен ответ от OpenAI: статус {response.status_code}")
-            
-            if response.status_code != 200:
-                error_text = response.text
-                logger.error(f"Ошибка создания сессии в OpenAI: {response.status_code} - {error_text}")
-                raise HTTPException(
-                    status_code=response.status_code, 
-                    detail=f"Ошибка создания сессии в OpenAI: {error_text}"
-                )
-            
-            session_data = response.json()
-            logger.debug(f"Данные сессии: {json.dumps(session_data)}")
-            
-            session_id = session_data["id"]
-            client_secret = session_data["client_secret"]["value"]
-            
-            # Сохраняем сессию в кеше
-            sessions[session_id] = {
-                "client_secret": client_secret,
-                "session_data": session_data,
-                "created_at": asyncio.get_event_loop().time()
-            }
-            
-            logger.info(f"Сессия создана успешно, ID: {session_id}")
-            
-            return {
-                "session_id": session_id,
-                "client_secret": client_secret
-            }
-    except HTTPException as he:
-        # Пробрасываем HTTP исключения дальше
-        logger.error(f"HTTP ошибка при создании сессии: {str(he)}")
-        raise he
-    except Exception as e:
-        logger.error(f"Неожиданная ошибка при создании сессии: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Ошибка при создании сессии: {str(e)}")
-
-@app.get("/direct-connect/{session_id}")
-async def direct_connect(session_id: str):
-    """Возвращает URL и токен для прямого подключения к API OpenAI (обходной путь)"""
-    if session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Сессия не найдена")
-    
-    session_info = sessions[session_id]
-    client_secret = session_info["client_secret"]
-    
-    return {
-        "websocket_url": f"{REALTIME_WEBSOCKET_URL}/{session_id}",
-        "authorization": f"Bearer {client_secret}"
-    }
-
-@app.websocket("/ws-proxy/{session_id}")
-async def websocket_proxy(websocket: WebSocket, session_id: str):
-    """
-    Прокси для WebSocket соединения между клиентом и OpenAI Realtime API
-    Этот подход избегает прямого использования библиотеки websockets для соединения с OpenAI
-    """
-    client_ip = websocket.client.host
-    logger.info(f"Новое WebSocket соединение от {client_ip} для сессии {session_id}")
-    
-    # Проверка наличия сессии
-    if session_id not in sessions:
-        logger.warning(f"Сессия {session_id} не найдена в кеше")
-        await websocket.accept()
-        await websocket.send_text(json.dumps({
-            "type": "error",
-            "error": {
-                "message": "Сессия не найдена или истекла. Пожалуйста, создайте новую сессию."
-            }
-        }))
-        await websocket.close(code=1008, reason="Сессия не найдена")
-        return
-    
-    # Получаем данные сессии
-    session_info = sessions[session_id]
-    client_secret = session_info["client_secret"]
-    
-    # Принимаем соединение
-    await websocket.accept()
-    logger.info(f"WebSocket соединение принято для сессии {session_id}")
-    
-    # Отправляем инструкции клиенту для прямого подключения к OpenAI
-    await websocket.send_text(json.dumps({
-        "type": "connection_info",
-        "websocket_url": f"{REALTIME_WEBSOCKET_URL}/{session_id}",
-        "authorization": f"Bearer {client_secret}"
-    }))
-    
-    # Сообщаем клиенту, что нужно использовать прямое подключение
-    await websocket.send_text(json.dumps({
-        "type": "error",
-        "error": {
-            "code": "direct_connection_required",
-            "message": "Пожалуйста, используйте прямое подключение к OpenAI API. Смотрите инструкции в консоли."
-        }
-    }))
-    
-    # Поддерживаем соединение открытым для отладки
-    try:
-        while True:
-            data = await websocket.receive_text()
-            logger.debug(f"Получено сообщение от клиента: {data[:100]}...")
-            # Эхо-ответ для подтверждения работы соединения
-            await websocket.send_text(json.dumps({
-                "type": "echo",
-                "message": "Сервер получил сообщение, но работает в режиме прямого подключения"
-            }))
-    except WebSocketDisconnect:
-        logger.info(f"Клиент отключился от сессии {session_id}")
-    except Exception as e:
-        logger.error(f"Ошибка в WebSocket: {str(e)}")
-        logger.error(traceback.format_exc())
-    finally:
-        await websocket.close()
-        logger.info(f"WebSocket соединение закрыто для сессии {session_id}")
-
-# Для обратной совместимости с предыдущей версией
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """Обработчик для совместимости со старым интерфейсом"""
-    client_ip = websocket.client.host
-    logger.info(f"Подключение к старому WebSocket эндпоинту от {client_ip}")
+    """
+    Основной WebSocket-эндпоинт для голосового взаимодействия
+    Устанавливает два соединения: с клиентом и с OpenAI Realtime API
+    """
+    client_id = id(websocket)
+    logger.info(f"Новое клиентское соединение: {client_id}")
+    
+    await websocket.accept()
+    
+    # Хранение информации об этом клиенте
+    client_connections[client_id] = {
+        "client_ws": websocket,
+        "openai_ws": None,
+        "active": True
+    }
     
     try:
-        await websocket.accept()
-        logger.info(f"Соединение со старым WebSocket принято")
+        # Устанавливаем соединение с OpenAI
+        openai_ws = await websockets.connect(
+            REALTIME_WS_URL,
+            extra_headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "OpenAI-Beta": "realtime=v1"
+            }
+        )
         
-        # Отправляем сообщение о необходимости обновления
-        await websocket.send_text("Эта версия API обновлена. Пожалуйста, используйте новый голосовой интерфейс на главной странице.")
+        client_connections[client_id]["openai_ws"] = openai_ws
+        logger.info(f"Соединение с OpenAI установлено для клиента {client_id}")
         
-        # Ждем немного перед закрытием
-        await asyncio.sleep(1)
-        await websocket.close()
+        # Отправляем настройки сессии в OpenAI
+        await send_session_update(openai_ws)
         
-    except WebSocketDisconnect:
-        logger.info("Клиент отключился от старого WebSocket")
+        # Создаем две задачи для двустороннего обмена сообщениями
+        client_to_openai = asyncio.create_task(forward_client_to_openai(websocket, openai_ws, client_id))
+        openai_to_client = asyncio.create_task(forward_openai_to_client(openai_ws, websocket, client_id))
+        
+        # Ждем, пока одна из задач не завершится
+        _, pending = await asyncio.wait(
+            [client_to_openai, openai_to_client],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+        
+        # Отменяем оставшиеся задачи
+        for task in pending:
+            task.cancel()
+        
     except Exception as e:
-        logger.error(f"Ошибка в старом WebSocket: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(f"Ошибка при обработке WebSocket соединения: {str(e)}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "error": {
+                    "message": f"Произошла ошибка: {str(e)}"
+                }
+            })
+        except:
+            pass
+    finally:
+        # Закрываем соединение с OpenAI, если оно существует
+        if client_id in client_connections and client_connections[client_id]["openai_ws"]:
+            try:
+                await client_connections[client_id]["openai_ws"].close()
+            except:
+                pass
+        
+        # Удаляем информацию о клиенте
+        if client_id in client_connections:
+            client_connections[client_id]["active"] = False
+            del client_connections[client_id]
+        
+        logger.info(f"Соединение с клиентом {client_id} закрыто")
 
-# Запускаем приложение с uvicorn
+async def forward_client_to_openai(client_ws: WebSocket, openai_ws, client_id: int):
+    """Пересылает сообщения от клиента (браузера) к API OpenAI"""
+    try:
+        while client_id in client_connections and client_connections[client_id]["active"]:
+            # Получаем сообщение от клиента
+            message = await client_ws.receive_text()
+            
+            # Парсим JSON
+            try:
+                data = json.loads(message)
+                msg_type = data.get("type", "unknown")
+                
+                # Выводим информацию о сообщении в логи
+                logger.debug(f"[Клиент -> OpenAI] {msg_type}")
+                
+                # Отправляем сообщение в OpenAI
+                await openai_ws.send(message)
+                
+            except json.JSONDecodeError:
+                logger.error(f"Получены некорректные данные от клиента: {message[:100]}...")
+    
+    except WebSocketDisconnect:
+        logger.info(f"Клиент {client_id} отключился")
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке данных от клиента к OpenAI: {str(e)}")
+
+async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: int):
+    """Пересылает сообщения от API OpenAI клиенту (браузеру)"""
+    try:
+        async for openai_message in openai_ws:
+            if client_id not in client_connections or not client_connections[client_id]["active"]:
+                break
+                
+            try:
+                # Парсим JSON от OpenAI
+                response = json.loads(openai_message)
+                
+                # Логируем определенные типы событий
+                if response.get('type') in LOG_EVENT_TYPES:
+                    logger.info(f"[OpenAI -> Клиент] {response.get('type')}")
+                
+                # Пересылаем сообщение клиенту
+                await client_ws.send_text(openai_message)
+                
+            except json.JSONDecodeError:
+                logger.error(f"Получены некорректные данные от OpenAI: {openai_message[:100]}...")
+    
+    except websockets.exceptions.ConnectionClosed as e:
+        logger.info(f"Соединение с OpenAI закрыто для клиента {client_id}: {e.code}, {e.reason}")
+        try:
+            # Сообщаем клиенту о закрытии соединения
+            await client_ws.send_json({
+                "type": "error",
+                "error": {
+                    "message": f"Соединение с OpenAI закрыто: {e.reason}"
+                }
+            })
+        except:
+            pass
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке данных от OpenAI к клиенту: {str(e)}")
+
+async def send_session_update(openai_ws):
+    """Отправляет настройки сессии в WebSocket OpenAI"""
+    session_update = {
+        "type": "session.update",
+        "session": {
+            "turn_detection": {"type": "server_vad"},
+            "input_audio_format": "pcm16",  # Формат входящего аудио
+            "output_audio_format": "pcm16", # Формат исходящего аудио
+            "voice": VOICE,                 # Голос ассистента
+            "instructions": SYSTEM_MESSAGE, # Системное сообщение
+            "modalities": ["text", "audio"],# Поддерживаемые модальности
+            "temperature": 0.8,             # Температура генерации
+        }
+    }
+    logger.info(f"Отправка настроек сессии: {json.dumps(session_update)}")
+    await openai_ws.send(json.dumps(session_update))
+
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    logger.info(f"Запуск сервера на порту {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    logger.info(f"Запуск сервера на порту {PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
