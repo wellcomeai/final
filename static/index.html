@@ -290,6 +290,9 @@
     const loadingModal = document.getElementById('loading-modal');
     const audioVisualization = document.getElementById('audio-visualization');
     
+    // АДРЕС ВАШЕГО СЕРВЕРА НА RENDER - ИЗМЕНИТЕ ЭТО!
+    const SERVER_URL = "final-yfqd.onrender.com";
+    
     // Создаем аудио-бары для визуализации
     function createAudioBars(count = 30) {
       audioVisualization.innerHTML = '';
@@ -440,9 +443,8 @@
         loadingModal.style.display = 'flex';
         statusElement.textContent = "Создание сессии...";
         
-        // ВАЖНО: Замените URL на адрес вашего существующего сервиса на Render
-        const serverUrl = "https://final-yfqd.onrender.com"; // ВАШ ТЕКУЩИЙ СЕРВЕР
-        const response = await fetch(`${serverUrl}/create-session`);
+        // Используем протокол HTTPS для вызова REST API
+        const response = await fetch(`https://${SERVER_URL}/create-session`);
         if (!response.ok) {
           throw new Error(`Ошибка HTTP: ${response.status}`);
         }
@@ -466,9 +468,8 @@
     function connectWebSocket(sessionId) {
       statusElement.textContent = "Подключение к WebSocket...";
       
-      // ВАЖНО: Замените URL на адрес вашего существующего сервиса на Render
-      const serverUrl = "final-yfqd.onrender.com"; // ВАШ ТЕКУЩИЙ СЕРВЕР
-      websocket = new WebSocket(`wss://${serverUrl}/ws-proxy/${sessionId}`);
+      // Используем защищенный WSS протокол
+      websocket = new WebSocket(`wss://${SERVER_URL}/ws-proxy/${sessionId}`);
       
       websocket.onopen = function() {
         console.log("WebSocket соединение установлено");
@@ -498,7 +499,6 @@
     function handleWebSocketMessage(data) {
       try {
         // Если данные в бинарном формате, преобразуем их в текст
-        let message;
         if (data instanceof Blob) {
           const reader = new FileReader();
           reader.onload = function() {
@@ -513,7 +513,7 @@
           reader.readAsText(data);
         } else {
           try {
-            const json = JSON.parse(data);
+            const json = typeof data === 'string' ? JSON.parse(data) : data;
             processServerEvent(json);
           } catch (e) {
             console.error("Ошибка парсинга JSON:", e);
