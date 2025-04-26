@@ -377,6 +377,9 @@
     let mediaStream = null;
     let audioProcessor = null;
     
+    // Создаем тестовый аудио-элемент для проверки форматов
+    const audioTestElement = new Audio();
+    
     // Инициализация микрофона и AudioContext
     async function initAudio() {
       try {
@@ -489,12 +492,17 @@
     
     // Преобразование Base64 в ArrayBuffer
     function base64ToArrayBuffer(base64) {
-      const binaryString = atob(base64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      try {
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      } catch (e) {
+        log(`Ошибка при декодировании base64: ${e.message}`, "error");
+        return new ArrayBuffer(0);
       }
-      return bytes.buffer;
     }
     
     // Обновление визуализации аудио
@@ -527,24 +535,100 @@
       });
     }
     
+    // Создаём простой WAV из PCM данных
+    function createWavFromPcm(pcmBuffer, sampleRate = 24000) {
+      // Создаём заголовок WAV
+      const wavHeader = new ArrayBuffer(44);
+      const view = new DataView(wavHeader);
+      
+      // "RIFF" chunk descriptor
+      view.setUint8(0, 'R'.charCodeAt(0));
+      view.setUint8(1, 'I'.charCodeAt(0));
+      view.setUint8(2, 'F'.charCodeAt(0));
+      view.setUint8(3, 'F'.charCodeAt(0));
+      
+      view.setUint32(4, 36 + pcmBuffer.byteLength, true); // Размер всего файла - 8
+      
+      // "WAVE" формат
+      view.setUint8(8, 'W'.charCodeAt(0));
+      view.setUint8(9, 'A'.charCodeAt(0));
+      view.setUint8(10, 'V'.charCodeAt(0));
+      view.setUint8(11, 'E'.charCodeAt(0));
+      
+      // "fmt " субчанк
+      view.setUint8(12, 'f'.charCodeAt(0));
+      view.setUint8(13, 'm'.charCodeAt(0));
+      view.setUint8(14, 't'.charCodeAt(0));
+      view.setUint8(15, ' '.charCodeAt(0));
+      
+      view.setUint32(16, 16, true); // Размер fmt субчанка
+      view.setUint16(20, 1, true);  // Формат аудио (1 = PCM)
+      view.setUint16(22, 1, true);  // Число каналов (1 = моно)
+      view.setUint32(24, sampleRate, true); // Частота дискретизации
+      view.setUint32(28, sampleRate * 2, true); // Байт в секунду (SampleRate * NumChannels * BitsPerSample/8)
+      view.setUint16(32, 2, true);  // Байт на сэмпл (NumChannels * BitsPerSample/8)
+      view.setUint16(34, 16, true); // Бит на сэмпл
+      
+      // "data" субчанк
+      view.setUint8(36, 'd'.charCodeAt(0));
+      view.setUint8(37, 'a'.charCodeAt(0));
+      view.setUint8(38, 't'.charCodeAt(0));
+      view.setUint8(39, 'a'.charCodeAt(0));
+      
+      view.setUint32(40, pcmBuffer.byteLength, true); // Размер данных
+      
+      // Объединяем заголовок и PCM данные
+      const wavBuffer = new ArrayBuffer(wavHeader.byteLength + pcmBuffer.byteLength);
+      const wavBytes = new Uint8Array(wavBuffer);
+      
+      wavBytes.set(new Uint8Array(wavHeader), 0);
+      wavBytes.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+      
+      return wavBuffer;
+    }
+    
     // Воспроизведение аудио из Base64
     function playAudio(audioBase64) {
       try {
+        // Проверяем непустую строку
+        if (!audioBase64 || typeof audioBase64 !== 'string') {
+          log("Получены пустые аудио данные", "warn");
+          return;
+        }
+        
+        // Декодируем Base64 в ArrayBuffer
         const audioData = base64ToArrayBuffer(audioBase64);
         
-        // Создаем новый AudioContext для воспроизведения
-        const playbackContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Проверяем размер данных
+        if (audioData.byteLength === 0) {
+          log("Аудио данные имеют нулевую длину", "warn");
+          return;
+        }
         
-        playbackContext.decodeAudioData(audioData).then(buffer => {
-          const source = playbackContext.createBufferSource();
-          source.buffer = buffer;
-          source.connect(playbackContext.destination);
-          source.start(0);
-          
-          log(`Воспроизведение аудио: ${(buffer.duration * 1000).toFixed(0)} мс`);
-        }).catch(error => {
-          log(`Ошибка декодирования аудио: ${error.message}`, "error");
-        });
+        log(`Получено ${audioData.byteLength} байт аудио данных`);
+        
+        // Предполагаем, что данные в формате PCM16, конвертируем в WAV для воспроизведения
+        const wavBuffer = createWavFromPcm(audioData);
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(blob);
+        
+        // Воспроизводим звук
+        const audio = new Audio(audioUrl);
+        audio.onerror = function(e) {
+          log(`Ошибка воспроизведения аудио: ${e.target.error.message || 'Неизвестная ошибка'}`, "error");
+        };
+        
+        audio.oncanplaythrough = function() {
+          log(`Готов к воспроизведению аудио: ${audio.duration.toFixed(2)} секунд`);
+          audio.play().catch(err => {
+            log(`Ошибка при воспроизведении: ${err.message}`, "error");
+          });
+        };
+        
+        // Освобождаем ресурсы после воспроизведения
+        audio.onended = function() {
+          URL.revokeObjectURL(audioUrl);
+        };
       } catch (error) {
         log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
       }
@@ -663,6 +747,8 @@
     // Обработка событий от сервера
     let currentResponseText = "";
     let lastAudioTimestamp = 0;
+    let currentResponseId = null;
+    let currentItemId = null;
     const audioChunks = [];
     
     function processServerEvent(event) {
@@ -672,6 +758,15 @@
       }
       
       log(`Событие от сервера: ${event.type}`, "debug");
+      
+      // Сохраняем ID текущего ответа и элемента, если они есть
+      if (event.response_id && !currentResponseId) {
+        currentResponseId = event.response_id;
+      }
+      
+      if (event.item_id && !currentItemId) {
+        currentItemId = event.item_id;
+      }
       
       switch (event.type) {
         case "error":
@@ -740,9 +835,38 @@
           if (audioChunks.length > 0) {
             log(`Аудиоответ завершен, ${audioChunks.length} фрагментов`, "info");
             const fullAudio = audioChunks.join('');
+            // Дамп первых 100 символов для отладки
+            if (fullAudio.length > 0) {
+              log(`Аудио данные (первые 50 символов): ${fullAudio.substring(0, 50)}...`, "debug");
+            }
             playAudio(fullAudio);
             audioChunks.length = 0; // Очищаем массив
           }
+          break;
+          
+        // Обработка дополнительных типов событий
+        case "response.audio_transcript.delta":
+          log(`Транскрипция аудио ответа: ${event.delta || 'нет текста'}`, "debug");
+          break;
+          
+        case "response.audio_transcript.done":
+          log(`Транскрипция аудио завершена: ${event.transcript || 'нет текста'}`, "debug");
+          break;
+          
+        case "response.content_part.added":
+          log(`Добавлена часть контента к ответу: ${event.content_index}`, "debug");
+          break;
+          
+        case "response.content_part.done":
+          log(`Завершена часть контента ответа: ${event.content_index}`, "debug");
+          break;
+          
+        case "response.output_item.added":
+          log(`Добавлен элемент ответа: ${event.output_index}`, "debug");
+          break;
+          
+        case "response.output_item.done":
+          log(`Завершен элемент ответа: ${event.output_index}`, "debug");
           break;
           
         case "response.done":
@@ -753,6 +877,8 @@
           // Сбрасываем состояние
           currentResponseText = "";
           audioChunks.length = 0;
+          currentResponseId = null;
+          currentItemId = null;
           resetAudioVisualization();
           
           // Активируем кнопки
