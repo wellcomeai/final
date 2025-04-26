@@ -317,9 +317,6 @@
   <script>
     // НАСТРОЙКИ
     
-    // АДРЕС ВАШЕГО СЕРВЕРА НА RENDER - ИЗМЕНИТЕ ЭТО!
-    const SERVER_URL = "final-yfqd.onrender.com";
-    
     // Включить режим отладки (true - включить, false - выключить)
     const DEBUG_MODE = true;
     
@@ -376,13 +373,9 @@
     let isListening = false;
     let isProcessing = false;
     let websocket = null;
-    let sessionData = null;
     let audioContext = null;
     let mediaStream = null;
     let audioProcessor = null;
-    let retryCount = 0;
-    let maxRetries = 3;
-    let directConnectionInfo = null;
     
     // Инициализация микрофона и AudioContext
     async function initAudio() {
@@ -566,79 +559,37 @@
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
     
-    // Создание сессии и получение инструкций для прямого подключения
-    async function getDirectConnectionInfo() {
-      try {
-        loadingModal.style.display = 'flex';
-        statusElement.textContent = "Создание сессии...";
-        log("Запрос на создание новой сессии");
-        
-        // Используем протокол HTTPS для вызова REST API
-        const response = await fetch(`https://${SERVER_URL}/create-session`);
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Ошибка HTTP: ${response.status} - ${errorText}`);
-        }
-        
-        sessionData = await response.json();
-        log(`Сессия создана успешно, ID: ${sessionData.session_id}`);
-        
-        // Получаем информацию для прямого подключения
-        const directConnectionResponse = await fetch(`https://${SERVER_URL}/direct-connect/${sessionData.session_id}`);
-        if (!directConnectionResponse.ok) {
-          const errorText = await directConnectionResponse.text();
-          throw new Error(`Ошибка получения информации для прямого подключения: ${directConnectionResponse.status} - ${errorText}`);
-        }
-        
-        const connectionInfo = await directConnectionResponse.json();
-        log(`Получена информация для прямого подключения: ${connectionInfo.websocket_url}`);
-        
-        return connectionInfo;
-      } catch (error) {
-        log(`Ошибка получения информации для прямого подключения: ${error.message}`, "error");
-        statusElement.textContent = `Ошибка: ${error.message}`;
-        loadingModal.style.display = 'none';
-        return null;
-      }
-    }
-    
-    // Подключение к WebSocket серверу OpenAI напрямую
-    async function connectDirectWebSocket(connectionInfo) {
+    // Подключение к WebSocket серверу (локальный прокси)
+    async function connectWebSocket() {
       return new Promise((resolve, reject) => {
         try {
-          log(`Прямое подключение к WebSocket API OpenAI...`);
-          statusElement.textContent = "Подключение к OpenAI...";
+          loadingModal.style.display = 'flex';
+          statusElement.textContent = "Подключение...";
+          log("Подключение к WebSocket серверу...");
           
-          // Используем URL и токен из информации о прямом подключении
-          const wsUrl = connectionInfo.websocket_url;
+          // Используем WebSocket-соединение с нашим локальным прокси
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const wsUrl = `${protocol}//${window.location.host}/ws`;
           log(`WebSocket URL: ${wsUrl}`);
           
           // Создаем новое WebSocket соединение
           websocket = new WebSocket(wsUrl);
           
-          // При открытии соединения отправляем заголовок авторизации
+          // Устанавливаем таймаут на открытие соединения
+          const connectionTimeout = setTimeout(() => {
+            log("Превышено время ожидания соединения WebSocket", "error");
+            websocket.close();
+            reject(new Error("Таймаут соединения"));
+          }, 15000);
+          
           websocket.onopen = function() {
-            log("WebSocket соединение установлено с OpenAI");
-            
-            // Отправляем заголовок авторизации
-            const authMessage = {
-              type: "authorization",
-              authorization: connectionInfo.authorization
-            };
-            
-            try {
-              websocket.send(JSON.stringify(authMessage));
-              log("Отправлены данные авторизации");
-              
-              statusElement.textContent = "Подключено к OpenAI";
-              statusElement.style.color = "#4caf50";
-              isConnected = true;
-              loadingModal.style.display = 'none';
-              resolve(true);
-            } catch (error) {
-              log(`Ошибка отправки авторизации: ${error.message}`, "error");
-              reject(error);
-            }
+            clearTimeout(connectionTimeout);
+            log("WebSocket соединение установлено");
+            statusElement.textContent = "Подключено";
+            statusElement.style.color = "#4caf50";
+            isConnected = true;
+            loadingModal.style.display = 'none';
+            resolve(true);
           };
           
           websocket.onmessage = function(event) {
@@ -652,25 +603,14 @@
             isConnected = false;
             
             // Пытаемся переподключиться, если соединение было разорвано не чисто
-            if (!event.wasClean && retryCount < maxRetries) {
-              retryCount++;
-              log(`Попытка переподключения ${retryCount}/${maxRetries}...`, "warn");
+            if (!event.wasClean) {
+              log(`Попытка переподключения через 3 секунды...`, "warn");
               
-              setTimeout(async () => {
-                try {
-                  // Получаем новую информацию для прямого подключения
-                  const newConnectionInfo = await getDirectConnectionInfo();
-                  if (newConnectionInfo) {
-                    await connectDirectWebSocket(newConnectionInfo);
-                  } else {
-                    log("Не удалось получить новую информацию для подключения", "error");
-                  }
-                } catch (err) {
+              setTimeout(() => {
+                connectWebSocket().catch(err => {
                   log(`Ошибка при переподключении: ${err.message}`, "error");
-                }
+                });
               }, 3000);
-            } else if (retryCount >= maxRetries) {
-              log("Достигнуто максимальное количество попыток переподключения", "error");
             }
             
             reject(new Error(`Соединение закрыто: ${event.reason || 'Неизвестная причина'}`));
@@ -733,34 +673,10 @@
       
       log(`Событие от сервера: ${event.type}`, "debug");
       
-      // Если получена информация для прямого подключения
-      if (event.type === "connection_info") {
-        log("Получены данные для прямого подключения", "info");
-        directConnectionInfo = {
-          websocket_url: event.websocket_url,
-          authorization: event.authorization
-        };
-        
-        // Пытаемся установить прямое соединение
-        connectDirectWebSocket(directConnectionInfo)
-          .then(() => log("Прямое соединение с OpenAI установлено успешно", "info"))
-          .catch(err => log(`Ошибка прямого соединения: ${err.message}`, "error"));
-        
-        return;
-      }
-      
       switch (event.type) {
         case "error":
           log(`Ошибка от сервера: ${event.error ? event.error.message : 'Неизвестная ошибка'}`, "error");
           statusElement.textContent = `Ошибка: ${event.error ? event.error.message : 'Неизвестная ошибка'}`;
-          
-          // Если код ошибки указывает на необходимость прямого подключения, пробуем подключиться напрямую
-          if (event.error && event.error.code === "direct_connection_required" && directConnectionInfo) {
-            log("Требуется прямое подключение к OpenAI", "info");
-            connectDirectWebSocket(directConnectionInfo)
-              .then(() => log("Прямое соединение с OpenAI установлено успешно", "info"))
-              .catch(err => log(`Ошибка прямого соединения: ${err.message}`, "error"));
-          }
           break;
           
         case "conversation.item.input_audio_transcription.delta":
@@ -785,7 +701,8 @@
             
             // Обновляем текущее сообщение или создаем новое
             const lastMessage = messagesContainer.lastElementChild;
-            if (lastMessage && lastMessage.classList.contains('assistant-message')) {
+            if (lastMessage && lastMessage.classList.contains('assistant-message') && 
+                lastMessage !== messagesContainer.firstElementChild) {
               lastMessage.textContent = currentResponseText;
             } else {
               addMessage(currentResponseText, false);
@@ -801,7 +718,8 @@
             
             // Обновляем текущее сообщение или создаем новое
             const lastMessage = messagesContainer.lastElementChild;
-            if (lastMessage && lastMessage.classList.contains('assistant-message')) {
+            if (lastMessage && lastMessage.classList.contains('assistant-message') && 
+                lastMessage !== messagesContainer.firstElementChild) {
               lastMessage.textContent = currentResponseText;
             } else {
               addMessage(currentResponseText, false);
@@ -865,10 +783,6 @@
           
         case "input_audio_buffer.speech_stopped":
           log("Речь завершена", "info");
-          break;
-          
-        case "echo":
-          log(`Эхо от сервера: ${event.message}`, "debug");
           break;
           
         default:
@@ -992,75 +906,64 @@
         if (audioInitialized) {
           log("Аудио инициализировано успешно", "info");
           
-          // Получаем информацию для прямого подключения
-          const connectionInfo = await getDirectConnectionInfo();
+          // Подключаемся к WebSocket серверу
+          const connected = await connectWebSocket();
           
-          if (connectionInfo) {
-            log("Информация для прямого подключения получена", "info");
+          if (connected) {
+            log("Подключение к WebSocket установлено", "info");
             
-            // Устанавливаем прямое соединение с OpenAI
-            const connected = await connectDirectWebSocket(connectionInfo);
+            // Обработчики событий UI
+            voiceButton.addEventListener('mousedown', event => {
+              event.preventDefault();
+              startListening();
+            });
+            voiceButton.addEventListener('touchstart', event => {
+              event.preventDefault();
+              startListening();
+            });
             
-            if (connected) {
-              log("Прямое соединение с OpenAI установлено", "info");
-              
-              // Обработчики событий UI
-              voiceButton.addEventListener('mousedown', event => {
-                event.preventDefault();
-                startListening();
-              });
-              voiceButton.addEventListener('touchstart', event => {
-                event.preventDefault();
-                startListening();
-              });
-              
-              voiceButton.addEventListener('mouseup', event => {
+            voiceButton.addEventListener('mouseup', event => {
+              event.preventDefault();
+              stopListening();
+            });
+            voiceButton.addEventListener('touchend', event => {
+              event.preventDefault();
+              stopListening();
+            });
+            
+            // Если пользователь перетащил палец за пределы кнопки
+            voiceButton.addEventListener('mouseleave', event => {
+              if (isListening) {
                 event.preventDefault();
                 stopListening();
-              });
-              voiceButton.addEventListener('touchend', event => {
-                event.preventDefault();
+              }
+            });
+            
+            // Если страница теряет фокус, останавливаем запись
+            window.addEventListener('blur', () => {
+              if (isListening) {
+                log("Страница потеряла фокус, остановка записи", "info");
                 stopListening();
-              });
-              
-              // Если пользователь перетащил палец за пределы кнопки
-              voiceButton.addEventListener('mouseleave', event => {
-                if (isListening) {
-                  event.preventDefault();
-                  stopListening();
-                }
-              });
-              
-              // Если страница теряет фокус, останавливаем запись
-              window.addEventListener('blur', () => {
-                if (isListening) {
-                  log("Страница потеряла фокус, остановка записи", "info");
-                  stopListening();
-                }
-              });
-              
-              sendButton.addEventListener('click', event => {
-                event.preventDefault();
+              }
+            });
+            
+            sendButton.addEventListener('click', event => {
+              event.preventDefault();
+              sendTextMessage();
+            });
+            
+            textInput.addEventListener('keypress', function(e) {
+              if (e.key === 'Enter') {
+                e.preventDefault();
                 sendTextMessage();
-              });
-              
-              textInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  sendTextMessage();
-                }
-              });
-              
-              log("Обработчики событий установлены", "info");
-            } else {
-              log("Не удалось установить прямое соединение с OpenAI", "error");
-              loadingModal.style.display = 'none';
-              alert("Не удалось подключиться к OpenAI. Пожалуйста, проверьте консоль для получения дополнительной информации.");
-            }
+              }
+            });
+            
+            log("Обработчики событий установлены", "info");
           } else {
-            log("Не удалось получить информацию для прямого подключения", "error");
+            log("Не удалось установить подключение к WebSocket", "error");
             loadingModal.style.display = 'none';
-            alert("Не удалось получить информацию для подключения к GPT-4o. Пожалуйста, проверьте доступность сервера и API-ключ.");
+            alert("Не удалось подключиться к серверу. Проверьте консоль для получения дополнительной информации.");
           }
         } else {
           log("Не удалось инициализировать аудио", "error");
