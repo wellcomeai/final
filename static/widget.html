@@ -191,13 +191,13 @@
       border-bottom-right-radius: 5px !important;
     }
     
-    /* Круг голосового помощника */
-    .voice-circle {
-      width: 120px !important;
-      height: 120px !important;
+    /* Основной элемент - круг, идентичный основной странице */
+    .main-circle {
+      width: 200px !important;
+      height: 200px !important;
       border-radius: 50% !important;
       background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8) !important;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
       position: relative !important;
       overflow: hidden !important;
       display: flex !important;
@@ -206,11 +206,10 @@
       transition: all 0.3s ease !important;
       z-index: 5 !important;
       cursor: pointer !important;
-      border: none !important;
-      margin-bottom: 10px !important;
+      margin-bottom: 20px !important;
     }
     
-    .voice-circle::before {
+    .main-circle::before {
       content: '' !important;
       position: absolute !important;
       width: 140% !important;
@@ -221,17 +220,18 @@
     }
     
     /* Состояние прослушивания */
-    .voice-circle.listening {
+    .main-circle.listening {
       background: linear-gradient(135deg, #ffffff, #e3f2fd, #2196f3) !important;
       box-shadow: 0 0 30px rgba(33, 150, 243, 0.6) !important;
     }
     
-    .voice-circle.listening::before {
+    .main-circle.listening::before {
       animation: wave 4s linear infinite !important;
       background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(33, 150, 243, 0.3)) !important;
     }
     
-    .voice-circle.listening::after {
+    /* Дополнительный эффект пульсации для прослушивания */
+    .main-circle.listening::after {
       content: '' !important;
       position: absolute !important;
       width: 100% !important;
@@ -242,23 +242,33 @@
     }
     
     @keyframes pulse {
-      0% { transform: scale(0.95) !important; opacity: 0.7 !important; }
-      50% { transform: scale(1.05) !important; opacity: 0.3 !important; }
-      100% { transform: scale(0.95) !important; opacity: 0.7 !important; }
+      0% { 
+        transform: scale(0.95) !important;
+        opacity: 0.7 !important;
+      }
+      50% { 
+        transform: scale(1.05) !important;
+        opacity: 0.3 !important;
+      }
+      100% { 
+        transform: scale(0.95) !important;
+        opacity: 0.7 !important;
+      }
     }
     
     /* Состояние говорения */
-    .voice-circle.speaking {
+    .main-circle.speaking {
       background: linear-gradient(135deg, #ffffff, #e8f5e9, #4caf50) !important;
       box-shadow: 0 0 30px rgba(76, 175, 80, 0.6) !important;
     }
     
-    .voice-circle.speaking::before {
+    .main-circle.speaking::before {
       animation: wave 3s linear infinite !important;
       background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3)) !important;
     }
     
-    .voice-circle.speaking::after {
+    /* Волновой эффект для говорения */
+    .main-circle.speaking::after {
       content: '' !important;
       position: absolute !important;
       width: 100% !important;
@@ -269,9 +279,44 @@
     }
     
     @keyframes ripple {
-      0% { transform: scale(0.8) !important; opacity: 0 !important; }
-      50% { opacity: 0.5 !important; }
-      100% { transform: scale(1.2) !important; opacity: 0 !important; }
+      0% { 
+        transform: scale(0.8) !important; 
+        opacity: 0 !important;
+      }
+      50% { 
+        opacity: 0.5 !important;
+      }
+      100% { 
+        transform: scale(1.2) !important; 
+        opacity: 0 !important;
+      }
+    }
+    
+    /* Состояние переключения голоса */
+    .main-circle.voice-switching {
+      background: linear-gradient(135deg, #ffffff, #fff8e1, #ffc107) !important;
+      box-shadow: 0 0 30px rgba(255, 193, 7, 0.6) !important;
+    }
+    
+    .main-circle.voice-switching::before {
+      animation: wave 2s linear infinite !important;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(255, 193, 7, 0.3)) !important;
+    }
+    
+    /* Эффект вращения для переключения голоса */
+    .main-circle.voice-switching::after {
+      content: '' !important;
+      position: absolute !important;
+      width: 80% !important;
+      height: 80% !important;
+      border: 5px dashed rgba(255, 193, 7, 0.4) !important;
+      border-radius: 50% !important;
+      animation: rotate 2s linear infinite !important;
+    }
+    
+    @keyframes rotate {
+      0% { transform: rotate(0deg) !important; }
+      100% { transform: rotate(360deg) !important; }
     }
     
     .mic-icon {
@@ -280,17 +325,17 @@
       z-index: 10 !important;
     }
     
-    .voice-circle.listening .mic-icon {
+    .main-circle.listening .mic-icon {
       color: #2196f3 !important;
     }
     
-    .voice-circle.speaking .mic-icon {
+    .main-circle.speaking .mic-icon {
       color: #4caf50 !important;
     }
     
     /* Подсказка */
     .hint-text {
-      margin-top: 20px !important;
+      margin-top: 10px !important;
       text-align: center !important;
       color: #777 !important;
       font-size: 14px !important;
@@ -304,7 +349,7 @@
       position: absolute !important;
       width: 100% !important;
       max-width: 200px !important;
-      height: 40px !important;
+      height: 60px !important;
       bottom: 20px !important;
       opacity: 0.8 !important;
       pointer-events: none !important;
@@ -313,17 +358,17 @@
     .audio-bars {
       display: flex !important;
       align-items: flex-end !important;
-      height: 30px !important;
-      gap: 2px !important;
+      height: 40px !important;
+      gap: 3px !important;
       width: 100% !important;
       justify-content: center !important;
     }
     
     .audio-bar {
-      width: 3px !important;
+      width: 4px !important;
       height: 2px !important;
       background-color: #4a86e8 !important;
-      border-radius: 1px !important;
+      border-radius: 2px !important;
       transition: height 0.1s ease !important;
     }
     
@@ -373,9 +418,9 @@
         right: 20px !important;
       }
       
-      .voice-circle {
-        width: 100px !important;
-        height: 100px !important;
+      .main-circle {
+        width: 180px !important;
+        height: 180px !important;
       }
       
       .mic-icon {
@@ -410,8 +455,8 @@
         <!-- Контейнер сообщений -->
         <div class="messages-container" id="messagesContainer"></div>
         
-        <!-- Круг голосового ассистента -->
-        <div class="voice-circle" id="voiceCircle">
+        <!-- Круг голосового ассистента (идентичен основной странице) -->
+        <div class="main-circle" id="mainCircle">
           <i class="fas fa-microphone mic-icon"></i>
         </div>
         
@@ -440,7 +485,7 @@
     const robotButton = document.getElementById('robotButton');
     const chatWindow = document.getElementById('chatWindow');
     const closeButton = document.getElementById('closeButton');
-    const voiceCircle = document.getElementById('voiceCircle');
+    const mainCircle = document.getElementById('mainCircle');
     const messagesContainer = document.getElementById('messagesContainer');
     const hintText = document.getElementById('hintText');
     const audioBars = document.getElementById('audioBars');
@@ -492,6 +537,31 @@
         type: isUser ? 'user' : 'assistant',
         text: text
       });
+    }
+    
+    // Очистка чата и сброс состояния
+    function clearChat() {
+      // Очищаем контейнер сообщений
+      messagesContainer.innerHTML = '';
+      // Сбрасываем историю сообщений
+      messageHistory = [];
+      
+      // Сбрасываем все состояния
+      isListening = false;
+      isPlayingAudio = false;
+      hasAudioData = false;
+      audioDataStartTime = 0;
+      audioChunksBuffer = [];
+      audioPlaybackQueue = [];
+      
+      // Сбрасываем UI состояния
+      mainCircle.classList.remove('listening');
+      mainCircle.classList.remove('speaking');
+      mainCircle.classList.remove('voice-switching');
+      hintText.textContent = "Слушаю вас...";
+      
+      // Сбрасываем визуализацию
+      resetAudioVisualization();
     }
     
     // Переключение между компактным и развернутым режимом
@@ -554,22 +624,19 @@
       }
     }
     
-    // Сворачиваем виджет
+    // Закрываем диалог и сворачиваем виджет
     function collapseWidget() {
+      // Останавливаем прослушивание и сбрасываем все состояния
+      stopAllAudioProcessing();
+      
       // Показываем кнопку робота
       robotButton.style.display = 'flex';
       
       // Скрываем окно чата
       chatWindow.classList.remove('active');
       
-      // Останавливаем прослушивание
-      isListening = false;
-      
-      // Обновляем подсказку для следующего открытия
-      hintText.textContent = "Слушаю вас...";
-      
-      // Сбрасываем эффекты активности
-      voiceCircle.classList.remove('listening');
+      // Очищаем чат и сбрасываем состояние
+      clearChat();
       
       // Изменяем размер iframe, если мы в iframe
       if (isInIframe()) {
@@ -599,8 +666,51 @@
       widgetMode = 'compact';
     }
     
+    // Функция для полной остановки всех аудио процессов
+    function stopAllAudioProcessing() {
+      // Останавливаем прослушивание
+      isListening = false;
+      
+      // Останавливаем воспроизведение
+      isPlayingAudio = false;
+      
+      // Очищаем буферы и очереди
+      audioChunksBuffer = [];
+      audioPlaybackQueue = [];
+      
+      // Сбрасываем флаги
+      hasAudioData = false;
+      audioDataStartTime = 0;
+      
+      // Если есть активное соединение WebSocket, отправляем команду остановки
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        // Очищаем буфер ввода
+        websocket.send(JSON.stringify({
+          type: "input_audio_buffer.clear",
+          event_id: `clear_${Date.now()}`
+        }));
+        
+        // Отменяем любой текущий ответ
+        websocket.send(JSON.stringify({
+          type: "response.cancel",
+          event_id: `cancel_${Date.now()}`
+        }));
+      }
+      
+      // Сбрасываем состояние UI
+      mainCircle.classList.remove('listening');
+      mainCircle.classList.remove('speaking');
+      mainCircle.classList.remove('voice-switching');
+      
+      // Сбрасываем визуализацию
+      resetAudioVisualization();
+      
+      // Обновляем подсказку
+      hintText.textContent = "Слушаю вас...";
+    }
+    
     // Создаем аудио-бары для визуализации
-    function createAudioBars(count = 15) {
+    function createAudioBars(count = 30) {
       audioBars.innerHTML = '';
       for (let i = 0; i < count; i++) {
         const bar = document.createElement('div');
@@ -715,9 +825,9 @@
               silenceStartTime = now;
               
               // Активируем визуальное состояние прослушивания
-              if (!voiceCircle.classList.contains('listening') && 
-                  !voiceCircle.classList.contains('speaking')) {
-                voiceCircle.classList.add('listening');
+              if (!mainCircle.classList.contains('listening') && 
+                  !mainCircle.classList.contains('speaking')) {
+                mainCircle.classList.add('listening');
               }
             } else if (!isSilent) {
               // Если наступила тишина
@@ -792,7 +902,7 @@
       log("Отправка аудиобуфера");
       
       // Сбрасываем эффект активности
-      voiceCircle.classList.remove('listening');
+      mainCircle.classList.remove('listening');
       
       // Обновляем подсказку
       hintText.textContent = "Обработка...";
@@ -851,7 +961,7 @@
         const average = sum / step;
         
         // Нормализуем значение для высоты полосы (от 2px до 30px)
-        const height = 2 + Math.min(28, Math.floor(average * 100));
+        const height = 2 + Math.min(38, Math.floor(average * 100));
         bars[i].style.height = `${height}px`;
       }
     }
@@ -934,7 +1044,7 @@
       if (audioPlaybackQueue.length === 0) {
         isPlayingAudio = false;
         // Сбрасываем эффект говорения, когда все аудио воспроизведено
-        voiceCircle.classList.remove('speaking');
+        mainCircle.classList.remove('speaking');
         
         // Обновляем подсказку
         hintText.textContent = "Слушаю вас...";
@@ -949,8 +1059,8 @@
       isPlayingAudio = true;
       
       // Активируем визуальное состояние говорения
-      voiceCircle.classList.add('speaking');
-      voiceCircle.classList.remove('listening');
+      mainCircle.classList.add('speaking');
+      mainCircle.classList.remove('listening');
       
       // Обновляем подсказку
       hintText.textContent = "Говорю...";
@@ -1138,8 +1248,8 @@
           addMessage("Соединение прервано. Переподключение...");
           
           // Сбрасываем состояние UI
-          voiceCircle.classList.remove('listening');
-          voiceCircle.classList.remove('speaking');
+          mainCircle.classList.remove('listening');
+          mainCircle.classList.remove('speaking');
           hintText.textContent = "Подключение...";
           
           // Пытаемся переподключиться
@@ -1208,8 +1318,8 @@
       
       // Активируем визуальное состояние прослушивания если не воспроизводится аудио
       if (!isPlayingAudio) {
-        voiceCircle.classList.add('listening');
-        voiceCircle.classList.remove('speaking');
+        mainCircle.classList.add('listening');
+        mainCircle.classList.remove('speaking');
       }
     }
     
@@ -1242,9 +1352,10 @@
         // Настраиваем обработчики событий
         robotButton.addEventListener('click', expandWidget);
         
+        // При закрытии диалога: прекращаем текущую сессию и закрываем окно
         closeButton.addEventListener('click', collapseWidget);
         
-        voiceCircle.addEventListener('click', function() {
+        mainCircle.addEventListener('click', function() {
           if (!isListening && !isPlayingAudio) {
             startListening();
           }
