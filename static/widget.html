@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WellcomeAI Widget</title>
+  <title>WellcomeAI</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Сброс стилей для изоляции от родительской страницы */
     * {
       margin: 0;
       padding: 0;
@@ -14,199 +13,155 @@
       font-family: 'Segoe UI', 'Roboto', sans-serif;
     }
     
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent !important;
+    body {
+      background-color: transparent !important;
+      overflow: hidden !important;
     }
     
-    /* Основной контейнер виджета с максимальным z-index */
-    #wellcomeAiContainer {
+    /* Контейнер виджета - с максимальным z-index */
+    .widget-container {
       position: fixed !important;
       bottom: 20px !important;
       right: 20px !important;
       z-index: 2147483647 !important; /* Максимально возможный z-index */
-      font-family: 'Segoe UI', 'Roboto', sans-serif !important;
-      pointer-events: auto !important;
-      max-width: 100% !important;
-      max-height: 100% !important;
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
     }
     
-    /* Кнопка-робот */
-    .robot-button {
-      width: 70px !important;
-      height: 70px !important;
+    /* Кнопка виджета (свернутое состояние) */
+    .widget-button {
+      width: 60px !important;
+      height: 60px !important;
       border-radius: 50% !important;
-      background: linear-gradient(135deg, #4a86e8, #2965c7) !important;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3) !important;
+      background: linear-gradient(135deg, #4a86e8, #2b59c3) !important;
+      box-shadow: 0 4px 15px rgba(74, 134, 232, 0.4) !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
       cursor: pointer !important;
+      transition: all 0.3s ease !important;
       position: relative !important;
       overflow: hidden !important;
-      transition: transform 0.3s ease !important;
       z-index: 2147483647 !important;
       border: none !important;
       outline: none !important;
     }
     
-    .robot-button:hover {
+    .widget-button:hover {
       transform: scale(1.05) !important;
+      box-shadow: 0 6px 20px rgba(74, 134, 232, 0.5) !important;
     }
     
-    .robot-button::before {
+    .widget-button::before {
       content: '' !important;
       position: absolute !important;
-      width: 140% !important;
-      height: 140% !important;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2)) !important;
-      animation: wave 8s linear infinite !important;
-      border-radius: 40% !important;
+      width: 150% !important;
+      height: 150% !important;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.2)) !important;
+      transform: rotate(45deg) !important;
+      top: -30% !important;
+      left: -30% !important;
+      transition: all 0.6s ease !important;
     }
     
-    @keyframes wave {
-      0% { transform: rotate(0deg) !important; }
-      100% { transform: rotate(360deg) !important; }
+    .widget-button:hover::before {
+      transform: rotate(90deg) !important;
     }
     
-    .robot-icon {
+    .widget-icon {
       color: white !important;
-      font-size: 32px !important;
-      z-index: 10 !important;
+      font-size: 22px !important;
+      z-index: 2 !important;
+      transition: all 0.3s ease !important;
     }
     
-    /* Чат-окно */
-    .chat-window {
-      position: fixed !important;
-      bottom: 30px !important;
-      right: 30px !important;
-      width: 350px !important;
-      height: 500px !important;
-      background-color: white !important;
-      border-radius: 15px !important;
-      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3) !important;
-      display: none !important;
-      flex-direction: column !important;
+    /* Расширенный виджет (развернутое состояние) */
+    .widget-expanded {
+      position: absolute !important;
+      bottom: 0 !important;
+      right: 0 !important;
+      width: 320px !important;
+      height: 0 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      background: white !important;
+      border-radius: 20px !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
       overflow: hidden !important;
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+      display: flex !important;
+      flex-direction: column !important;
       z-index: 2147483647 !important;
-      border: 1px solid rgba(0, 0, 0, 0.1) !important;
     }
     
-    .chat-window.active {
-      display: flex !important;
+    /* Когда виджет активен */
+    .widget-container.active .widget-expanded {
+      height: 400px !important;
+      opacity: 1 !important;
+      pointer-events: all !important;
     }
     
-    /* Заголовок чата */
-    .chat-header {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: space-between !important;
-      padding: 15px !important;
-      background: linear-gradient(135deg, #4a86e8, #2965c7) !important;
+    .widget-container.active .widget-button {
+      transform: scale(0.9) !important;
+      box-shadow: 0 2px 10px rgba(74, 134, 232, 0.3) !important;
+    }
+    
+    /* Заголовок развернутого виджета */
+    .widget-header {
+      padding: 15px 20px !important;
+      background: linear-gradient(135deg, #4a86e8, #2b59c3) !important;
       color: white !important;
-      user-select: none !important;
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: center !important;
+      border-radius: 20px 20px 0 0 !important;
     }
     
-    .chat-title {
+    .widget-title {
       font-weight: 600 !important;
       font-size: 16px !important;
-      display: flex !important;
-      align-items: center !important;
-      gap: 10px !important;
+      letter-spacing: 0.3px !important;
     }
     
-    .close-button {
+    .widget-close {
       background: none !important;
       border: none !important;
       color: white !important;
       font-size: 18px !important;
       cursor: pointer !important;
       opacity: 0.8 !important;
-      transition: opacity 0.2s !important;
-      padding: 5px !important;
+      transition: all 0.2s !important;
     }
     
-    .close-button:hover {
+    .widget-close:hover {
       opacity: 1 !important;
+      transform: scale(1.1) !important;
     }
     
-    /* Основное содержимое чата */
-    .chat-content {
+    /* Основной контент виджета */
+    .widget-content {
       flex: 1 !important;
       display: flex !important;
       flex-direction: column !important;
-      justify-content: center !important;
       align-items: center !important;
-      padding: 20px !important;
+      justify-content: center !important;
+      background: #f9fafc !important;
       position: relative !important;
-      overflow: hidden !important;
-      background-color: white !important;
+      padding: 20px !important;
     }
     
-    /* Сообщения */
-    .messages-container {
-      position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 80px !important;
-      padding: 15px !important;
-      overflow-y: auto !important;
-      display: flex !important;
-      flex-direction: column !important;
-      gap: 10px !important;
-      z-index: 10 !important;
-      background-color: white !important;
-    }
-    
-    .message {
-      max-width: 80% !important;
-      padding: 10px 15px !important;
-      border-radius: 15px !important;
-      word-break: break-word !important;
-      animation: fadeIn 0.3s ease !important;
-      font-size: 14px !important;
-      line-height: 1.4 !important;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
-    }
-    
-    @keyframes fadeIn {
-      from { opacity: 0 !important; transform: translateY(10px) !important; }
-      to { opacity: 1 !important; transform: translateY(0) !important; }
-    }
-    
-    .message.assistant {
-      align-self: flex-start !important;
-      background-color: #F1F5F9 !important;
-      border-bottom-left-radius: 5px !important;
-      color: #333 !important;
-    }
-    
-    .message.user {
-      align-self: flex-end !important;
-      background-color: #E6F2FF !important;
-      color: #0A51A1 !important;
-      border-bottom-right-radius: 5px !important;
-    }
-    
-    /* Основной элемент - круг, идентичный основной странице */
+    /* Основной элемент - круг */
     .main-circle {
-      width: 200px !important;
-      height: 200px !important;
+      width: 180px !important;
+      height: 180px !important;
       border-radius: 50% !important;
       background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8) !important;
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
       position: relative !important;
       overflow: hidden !important;
+      transition: all 0.3s ease !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      transition: all 0.3s ease !important;
-      z-index: 5 !important;
-      cursor: pointer !important;
-      margin-bottom: 20px !important;
     }
     
     .main-circle::before {
@@ -217,6 +172,12 @@
       background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2)) !important;
       animation: wave 8s linear infinite !important;
       border-radius: 40% !important;
+    }
+    
+    /* Анимация основной волны */
+    @keyframes wave {
+      0% { transform: rotate(0deg) !important; }
+      100% { transform: rotate(360deg) !important; }
     }
     
     /* Состояние прослушивания */
@@ -292,33 +253,7 @@
       }
     }
     
-    /* Состояние переключения голоса */
-    .main-circle.voice-switching {
-      background: linear-gradient(135deg, #ffffff, #fff8e1, #ffc107) !important;
-      box-shadow: 0 0 30px rgba(255, 193, 7, 0.6) !important;
-    }
-    
-    .main-circle.voice-switching::before {
-      animation: wave 2s linear infinite !important;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(255, 193, 7, 0.3)) !important;
-    }
-    
-    /* Эффект вращения для переключения голоса */
-    .main-circle.voice-switching::after {
-      content: '' !important;
-      position: absolute !important;
-      width: 80% !important;
-      height: 80% !important;
-      border: 5px dashed rgba(255, 193, 7, 0.4) !important;
-      border-radius: 50% !important;
-      animation: rotate 2s linear infinite !important;
-    }
-    
-    @keyframes rotate {
-      0% { transform: rotate(0deg) !important; }
-      100% { transform: rotate(360deg) !important; }
-    }
-    
+    /* Иконка микрофона в центре сферы */
     .mic-icon {
       font-size: 32px !important;
       color: #4a86e8 !important;
@@ -333,24 +268,13 @@
       color: #4caf50 !important;
     }
     
-    /* Подсказка */
-    .hint-text {
-      margin-top: 10px !important;
-      text-align: center !important;
-      color: #777 !important;
-      font-size: 14px !important;
-      font-weight: normal !important;
-      max-width: 200px !important;
-      line-height: 1.4 !important;
-    }
-    
     /* Аудио визуализация */
     .audio-visualization {
       position: absolute !important;
       width: 100% !important;
-      max-width: 200px !important;
-      height: 60px !important;
-      bottom: 20px !important;
+      max-width: 160px !important;
+      height: 30px !important;
+      bottom: -5px !important;
       opacity: 0.8 !important;
       pointer-events: none !important;
     }
@@ -358,28 +282,28 @@
     .audio-bars {
       display: flex !important;
       align-items: flex-end !important;
-      height: 40px !important;
-      gap: 3px !important;
+      height: 30px !important;
+      gap: 2px !important;
       width: 100% !important;
       justify-content: center !important;
     }
     
     .audio-bar {
-      width: 4px !important;
+      width: 3px !important;
       height: 2px !important;
       background-color: #4a86e8 !important;
-      border-radius: 2px !important;
+      border-radius: 1px !important;
       transition: height 0.1s ease !important;
     }
     
     /* Модальное окно загрузки */
     .loader-modal {
-      position: absolute !important;
+      position: fixed !important;
       top: 0 !important;
       left: 0 !important;
       width: 100% !important;
       height: 100% !important;
-      background-color: rgba(255, 255, 255, 0.95) !important;
+      background-color: rgba(255, 255, 255, 0.7) !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
@@ -387,7 +311,6 @@
       opacity: 0 !important;
       visibility: hidden !important;
       transition: all 0.3s !important;
-      border-radius: 15px !important;
     }
     
     .loader-modal.active {
@@ -408,70 +331,77 @@
       to { transform: rotate(360deg) !important; }
     }
     
-    /* Мобильная адаптация */
-    @media (max-width: 480px) {
-      .chat-window {
-        width: calc(100vw - 40px) !important;
-        max-width: 350px !important;
-        height: 450px !important;
-        bottom: 20px !important;
-        right: 20px !important;
-      }
-      
-      .main-circle {
-        width: 180px !important;
-        height: 180px !important;
-      }
-      
-      .mic-icon {
-        font-size: 28px !important;
-      }
+    /* Сообщение */
+    .message-display {
+      position: absolute !important;
+      width: 90% !important;
+      bottom: 20px !important;
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      background: white !important;
+      padding: 12px 15px !important;
+      border-radius: 12px !important;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+      text-align: center !important;
+      font-size: 14px !important;
+      line-height: 1.4 !important;
+      opacity: 0 !important;
+      transition: all 0.3s !important;
+      max-height: 100px !important;
+      overflow-y: auto !important;
+      z-index: 10 !important;
+    }
+    
+    .message-display.show {
+      opacity: 1 !important;
+    }
+    
+    /* Кнопка активации (пульсация на кнопке) */
+    @keyframes button-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(74, 134, 232, 0.7) !important; }
+      70% { box-shadow: 0 0 0 10px rgba(74, 134, 232, 0) !important; }
+      100% { box-shadow: 0 0 0 0 rgba(74, 134, 232, 0) !important; }
+    }
+    
+    .pulse-animation {
+      animation: button-pulse 2s infinite !important;
     }
   </style>
 </head>
 <body>
-  <!-- Основной контейнер виджета -->
-  <div id="wellcomeAiContainer">
-    <!-- Кнопка-робот -->
-    <div class="robot-button" id="robotButton">
-      <i class="fas fa-robot robot-icon"></i>
+  <!-- Модальное окно загрузки -->
+  <div id="loader-modal" class="loader-modal active">
+    <div class="loader"></div>
+  </div>
+  
+  <!-- Виджет-кнопка -->
+  <div class="widget-container" id="widget-container">
+    <!-- Кнопка (минимизированное состояние) -->
+    <div class="widget-button" id="widget-button">
+      <i class="fas fa-robot widget-icon"></i>
     </div>
     
-    <!-- Чат-окно -->
-    <div class="chat-window" id="chatWindow">
-      <!-- Заголовок -->
-      <div class="chat-header">
-        <div class="chat-title">
-          <i class="fas fa-robot robot-icon"></i>
-          <span>WellcomeAI Ассистент</span>
-        </div>
-        <button class="close-button" id="closeButton">
+    <!-- Развернутый виджет -->
+    <div class="widget-expanded" id="widget-expanded">
+      <div class="widget-header">
+        <div class="widget-title">WellcomeAI</div>
+        <button class="widget-close" id="widget-close">
           <i class="fas fa-times"></i>
         </button>
       </div>
-      
-      <!-- Основное содержимое -->
-      <div class="chat-content">
-        <!-- Контейнер сообщений -->
-        <div class="messages-container" id="messagesContainer"></div>
-        
-        <!-- Круг голосового ассистента (идентичен основной странице) -->
-        <div class="main-circle" id="mainCircle">
+      <div class="widget-content">
+        <!-- Основной элемент - круг с иконкой микрофона -->
+        <div class="main-circle" id="main-circle">
           <i class="fas fa-microphone mic-icon"></i>
+          
+          <!-- Аудио визуализация -->
+          <div class="audio-visualization" id="audio-visualization">
+            <div class="audio-bars" id="audio-bars"></div>
+          </div>
         </div>
         
-        <!-- Подсказка -->
-        <div class="hint-text" id="hintText">Слушаю вас...</div>
-        
-        <!-- Аудио визуализация -->
-        <div class="audio-visualization" id="audioVisualization">
-          <div class="audio-bars" id="audioBars"></div>
-        </div>
-      </div>
-      
-      <!-- Модальное окно загрузки -->
-      <div class="loader-modal" id="loaderModal">
-        <div class="loader"></div>
+        <!-- Сообщение -->
+        <div class="message-display" id="message-display"></div>
       </div>
     </div>
   </div>
@@ -480,16 +410,35 @@
     // Проверка, находимся ли мы в iframe
     function isInIframe() { try { return window.self !== window.top; } catch (e) { return true; } }
 
+    // Устанавливаем правильные размеры iframe при загрузке
+    function setupIframe() {
+      if (isInIframe() && window.frameElement) {
+        try {
+          // Устанавливаем начальные размеры
+          window.frameElement.style.width = '60px';
+          window.frameElement.style.height = '60px';
+          window.frameElement.style.position = 'fixed';
+          window.frameElement.style.bottom = '20px';
+          window.frameElement.style.right = '20px';
+          window.frameElement.style.zIndex = '2147483647';
+          window.frameElement.style.border = 'none';
+          window.frameElement.style.transition = 'width 0.3s, height 0.3s';
+          window.frameElement.style.overflow = 'visible';
+        } catch (e) {
+          console.warn('Не удалось установить стили для iframe:', e);
+        }
+      }
+    }
+
     // Элементы UI
-    const container = document.getElementById('wellcomeAiContainer');
-    const robotButton = document.getElementById('robotButton');
-    const chatWindow = document.getElementById('chatWindow');
-    const closeButton = document.getElementById('closeButton');
-    const mainCircle = document.getElementById('mainCircle');
-    const messagesContainer = document.getElementById('messagesContainer');
-    const hintText = document.getElementById('hintText');
-    const audioBars = document.getElementById('audioBars');
-    const loaderModal = document.getElementById('loaderModal');
+    const widgetContainer = document.getElementById('widget-container');
+    const widgetExpanded = document.getElementById('widget-expanded');
+    const widgetButton = document.getElementById('widget-button');
+    const widgetClose = document.getElementById('widget-close');
+    const mainCircle = document.getElementById('main-circle');
+    const audioBars = document.getElementById('audio-bars');
+    const loaderModal = document.getElementById('loader-modal');
+    const messageDisplay = document.getElementById('message-display');
     
     // Переменные для обработки аудио
     let audioChunksBuffer = [];
@@ -505,15 +454,14 @@
     let mediaStream = null;
     let audioProcessor = null;
     let isConnected = false;
-    let widgetMode = 'compact'; // 'compact' или 'expanded'
-    let messageHistory = [];
+    let isWidgetOpen = false;
     
     // Конфигурация для оптимизации потока аудио
     const AUDIO_CONFIG = {
-      silenceThreshold: 0.01,
-      silenceDuration: 300,
-      bufferCheckInterval: 50,
-      soundDetectionThreshold: 0.02
+      silenceThreshold: 0.01,      // Порог для определения тишины
+      silenceDuration: 300,        // Длительность тишины для отправки (мс)
+      bufferCheckInterval: 50,     // Частота проверки буфера (мс)
+      soundDetectionThreshold: 0.02 // Чувствительность к звуку
     };
     
     // Функция логирования
@@ -522,149 +470,26 @@
       console.log(`[${level.toUpperCase()}] ${message}`);
     }
     
-    // Показать сообщение в чате
-    function addMessage(text, isUser = false) {
-      const messageElement = document.createElement('div');
-      messageElement.className = `message ${isUser ? 'user' : 'assistant'}`;
-      messageElement.textContent = text;
-      messagesContainer.appendChild(messageElement);
+    // Показать сообщение
+    function showMessage(message, duration = 5000) {
+      messageDisplay.textContent = message;
+      messageDisplay.classList.add('show');
       
-      // Прокручиваем к последнему сообщению
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      
-      // Сохраняем сообщение в истории
-      messageHistory.push({
-        type: isUser ? 'user' : 'assistant',
-        text: text
-      });
+      setTimeout(() => {
+        messageDisplay.classList.remove('show');
+      }, duration);
     }
     
-    // Очистка чата и сброс состояния
-    function clearChat() {
-      // Очищаем контейнер сообщений
-      messagesContainer.innerHTML = '';
-      // Сбрасываем историю сообщений
-      messageHistory = [];
-      
-      // Сбрасываем все состояния
-      isListening = false;
-      isPlayingAudio = false;
-      hasAudioData = false;
-      audioDataStartTime = 0;
-      audioChunksBuffer = [];
-      audioPlaybackQueue = [];
-      
-      // Сбрасываем UI состояния
-      mainCircle.classList.remove('listening');
-      mainCircle.classList.remove('speaking');
-      mainCircle.classList.remove('voice-switching');
-      hintText.textContent = "Слушаю вас...";
-      
-      // Сбрасываем визуализацию
-      resetAudioVisualization();
-    }
-    
-    // Переключение между компактным и развернутым режимом
-    function toggleWidgetMode() {
-      if (widgetMode === 'compact') {
-        expandWidget();
-      } else {
-        collapseWidget();
+    // Создаем аудио-бары для визуализации
+    function createAudioBars(count = 20) {
+      audioBars.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'audio-bar';
+        audioBars.appendChild(bar);
       }
     }
-    
-    // Разворачиваем виджет
-    function expandWidget() {
-      // Скрываем кнопку робота
-      robotButton.style.display = 'none';
-      
-      // Показываем окно чата
-      chatWindow.classList.add('active');
-      
-      // Изменяем размер iframe, если мы в iframe
-      if (isInIframe()) {
-        try {
-          // Отправляем сообщение родительскому окну
-          window.parent.postMessage({
-            action: 'wellcomeAiExpanded',
-            width: 350,
-            height: 500
-          }, '*');
-          
-          // Для совместимости с Tilda и другими платформами, обновляем размер iframe напрямую
-          if (window.frameElement) {
-            window.frameElement.style.width = '350px';
-            window.frameElement.style.height = '500px';
-            window.frameElement.style.position = 'fixed';
-            window.frameElement.style.bottom = '20px';
-            window.frameElement.style.right = '20px';
-            window.frameElement.style.zIndex = '2147483647';
-            window.frameElement.style.border = 'none';
-          }
-        } catch (e) {
-          console.warn('Не удалось изменить размер iframe:', e);
-        }
-      }
-      
-      widgetMode = 'expanded';
-      
-      // Если соединение установлено, начинаем слушать 
-      if (isConnected) {
-        setTimeout(() => {
-          // Показываем приветственное сообщение, если история пуста
-          if (messageHistory.length === 0) {
-            addMessage('Привет! Я голосовой ассистент WellcomeAI. Чем могу помочь?');
-          }
-          
-          // Автоматически начинаем слушать без необходимости нажимать на микрофон
-          if (!isListening && !isPlayingAudio) {
-            startListening();
-          }
-        }, 500);
-      }
-    }
-    
-    // Закрываем диалог и сворачиваем виджет
-    function collapseWidget() {
-      // Останавливаем прослушивание и сбрасываем все состояния
-      stopAllAudioProcessing();
-      
-      // Показываем кнопку робота
-      robotButton.style.display = 'flex';
-      
-      // Скрываем окно чата
-      chatWindow.classList.remove('active');
-      
-      // Очищаем чат и сбрасываем состояние
-      clearChat();
-      
-      // Изменяем размер iframe, если мы в iframe
-      if (isInIframe()) {
-        try {
-          // Отправляем сообщение родительскому окну
-          window.parent.postMessage({
-            action: 'wellcomeAiCollapsed',
-            width: 70,
-            height: 70
-          }, '*');
-          
-          // Для совместимости с Tilda и другими платформами, обновляем размер iframe напрямую
-          if (window.frameElement) {
-            window.frameElement.style.width = '70px';
-            window.frameElement.style.height = '70px';
-            window.frameElement.style.position = 'fixed';
-            window.frameElement.style.bottom = '20px';
-            window.frameElement.style.right = '20px';
-            window.frameElement.style.zIndex = '2147483647';
-            window.frameElement.style.border = 'none';
-          }
-        } catch (e) {
-          console.warn('Не удалось изменить размер iframe:', e);
-        }
-      }
-      
-      widgetMode = 'compact';
-    }
+    createAudioBars();
     
     // Функция для полной остановки всех аудио процессов
     function stopAllAudioProcessing() {
@@ -700,25 +525,74 @@
       // Сбрасываем состояние UI
       mainCircle.classList.remove('listening');
       mainCircle.classList.remove('speaking');
-      mainCircle.classList.remove('voice-switching');
       
       // Сбрасываем визуализацию
       resetAudioVisualization();
-      
-      // Обновляем подсказку
-      hintText.textContent = "Слушаю вас...";
     }
     
-    // Создаем аудио-бары для визуализации
-    function createAudioBars(count = 30) {
-      audioBars.innerHTML = '';
-      for (let i = 0; i < count; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'audio-bar';
-        audioBars.appendChild(bar);
+    // Открыть виджет
+    function openWidget() {
+      widgetContainer.classList.add('active');
+      isWidgetOpen = true;
+      
+      // Изменяем размер iframe, если мы в iframe
+      if (isInIframe()) {
+        try {
+          // Отправляем сообщение родительскому окну
+          window.parent.postMessage({
+            action: 'wellcomeAiExpanded',
+            width: 320,
+            height: 400
+          }, '*');
+          
+          // Для совместимости с Tilda и другими платформами, обновляем размер iframe напрямую
+          if (window.frameElement) {
+            window.frameElement.style.width = '320px';
+            window.frameElement.style.height = '400px';
+          }
+        } catch (e) {
+          console.warn('Не удалось изменить размер iframe:', e);
+        }
+      }
+      
+      // Запускаем прослушивание при открытии
+      if (isConnected && !isListening && !isPlayingAudio && !reconnecting) {
+        startListening();
+      }
+      
+      // Убираем пульсацию с кнопки
+      widgetButton.classList.remove('pulse-animation');
+    }
+    
+    // Закрыть виджет
+    function closeWidget() {
+      // Останавливаем все аудио процессы
+      stopAllAudioProcessing();
+      
+      // Скрываем виджет
+      widgetContainer.classList.remove('active');
+      isWidgetOpen = false;
+      
+      // Изменяем размер iframe, если мы в iframe
+      if (isInIframe()) {
+        try {
+          // Отправляем сообщение родительскому окну
+          window.parent.postMessage({
+            action: 'wellcomeAiCollapsed',
+            width: 60,
+            height: 60
+          }, '*');
+          
+          // Для совместимости с Tilda и другими платформами, обновляем размер iframe напрямую
+          if (window.frameElement) {
+            window.frameElement.style.width = '60px';
+            window.frameElement.style.height = '60px';
+          }
+        } catch (e) {
+          console.warn('Не удалось изменить размер iframe:', e);
+        }
       }
     }
-    createAudioBars();
     
     // Инициализация микрофона и AudioContext
     async function initAudio() {
@@ -807,9 +681,6 @@
                 hasAudioData = true;
                 audioDataStartTime = Date.now();
                 log("Начало записи аудиоданных");
-                
-                // Заменяем подсказку
-                hintText.textContent = "Говорите...";
               }
               
             } catch (error) {
@@ -861,7 +732,7 @@
         return true;
       } catch (error) {
         log(`Ошибка инициализации аудио: ${error.message}`, "error");
-        addMessage("Ошибка доступа к микрофону. Проверьте настройки браузера.");
+        showMessage("Ошибка доступа к микрофону. Проверьте настройки браузера.");
         return false;
       }
     }
@@ -904,17 +775,13 @@
       // Сбрасываем эффект активности
       mainCircle.classList.remove('listening');
       
-      // Обновляем подсказку
-      hintText.textContent = "Обработка...";
-      
       // Отправляем команду для завершения буфера
       websocket.send(JSON.stringify({
         type: "input_audio_buffer.commit",
         event_id: `commit_${Date.now()}`
       }));
       
-      // Сбрасываем флаги
-      isListening = false;
+      // Начинаем обработку и сбрасываем флаги
       hasAudioData = false;
       audioDataStartTime = 0;
     }
@@ -961,7 +828,7 @@
         const average = sum / step;
         
         // Нормализуем значение для высоты полосы (от 2px до 30px)
-        const height = 2 + Math.min(38, Math.floor(average * 100));
+        const height = 2 + Math.min(28, Math.floor(average * 100));
         bars[i].style.height = `${height}px`;
       }
     }
@@ -1046,12 +913,16 @@
         // Сбрасываем эффект говорения, когда все аудио воспроизведено
         mainCircle.classList.remove('speaking');
         
-        // Обновляем подсказку
-        hintText.textContent = "Слушаю вас...";
+        // Добавляем пульсацию на кнопку, если есть непрочитанные сообщения и виджет закрыт
+        if (!isWidgetOpen) {
+          widgetButton.classList.add('pulse-animation');
+        }
         
-        // Снова начинаем слушать
-        if (!isListening && isConnected) {
-          startListening();
+        // Начинаем слушать снова
+        if (isWidgetOpen) {
+          setTimeout(() => {
+            startListening();
+          }, 300);
         }
         return;
       }
@@ -1061,9 +932,6 @@
       // Активируем визуальное состояние говорения
       mainCircle.classList.add('speaking');
       mainCircle.classList.remove('listening');
-      
-      // Обновляем подсказку
-      hintText.textContent = "Говорю...";
       
       const audioBase64 = audioPlaybackQueue.shift();
       
@@ -1101,7 +969,7 @@
         // В случае ошибки
         audio.onerror = function() {
           URL.revokeObjectURL(audioUrl);
-          playNextAudio(); // Переходим к следующему аудио
+          playNextAudio(); // В случае ошибки переходим к следующему аудио
         };
       } catch (error) {
         log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
@@ -1127,7 +995,7 @@
           log("Превышено время ожидания соединения", "error");
           websocket.close();
           loaderModal.classList.remove('active');
-          addMessage("Не удалось подключиться к серверу. Пожалуйста, попробуйте позже.");
+          showMessage("Не удалось подключиться к серверу");
         }, 15000);
         
         websocket.onopen = function() {
@@ -1136,15 +1004,8 @@
           isConnected = true;
           loaderModal.classList.remove('active');
           
-          // В развернутом режиме показываем приветственное сообщение
-          if (widgetMode === 'expanded' && messageHistory.length === 0) {
-            setTimeout(() => {
-              addMessage('Привет! Я голосовой ассистент WellcomeAI. Чем могу помочь?');
-            }, 500);
-          }
-          
-          // Автоматически начинаем слушать в развернутом режиме
-          if (widgetMode === 'expanded') {
+          // Автоматически начинаем слушать если виджет открыт
+          if (isWidgetOpen) {
             startListening();
           }
         };
@@ -1160,77 +1021,35 @@
             // Обработка текстового ответа
             else if (data.type === 'response.text.delta') {
               if (data.delta) {
-                // Если это первая часть ответа, создаем новое сообщение
-                if (!document.querySelector('.message.assistant:last-child') || 
-                    document.querySelector('.message.assistant:last-child').dataset.complete === 'true') {
-                  const msg = document.createElement('div');
-                  msg.className = 'message assistant';
-                  msg.textContent = data.delta;
-                  messagesContainer.appendChild(msg);
-                } else {
-                  // Иначе добавляем к существующему
-                  const lastMsg = document.querySelector('.message.assistant:last-child');
-                  lastMsg.textContent += data.delta;
-                }
+                showMessage(data.delta, 10000);
                 
-                // Прокручиваем к последнему сообщению
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-              }
-            }
-            // Текстовый ответ завершен
-            else if (data.type === 'response.text.done') {
-              if (data.text) {
-                // Помечаем сообщение как завершенное
-                const lastMsg = document.querySelector('.message.assistant:last-child');
-                if (lastMsg) {
-                  lastMsg.dataset.complete = 'true';
-                  lastMsg.textContent = data.text;
-                } else {
-                  // Если сообщения нет, создаем новое
-                  const msg = document.createElement('div');
-                  msg.className = 'message assistant';
-                  msg.textContent = data.text;
-                  msg.dataset.complete = 'true';
-                  messagesContainer.appendChild(msg);
+                // Если виджет закрыт, добавляем пульсацию на кнопку
+                if (!isWidgetOpen) {
+                  widgetButton.classList.add('pulse-animation');
                 }
-                
-                // Прокручиваем к последнему сообщению
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
               }
             }
-            // Обработка транскрипции аудио пользователя
-            else if (data.type === 'conversation.item.input_audio_transcription.completed') {
-              if (data.transcript) {
-                addMessage(data.transcript, true);
-              }
-            }
-            // Обработка аудио ответа
+            // Обработка аудио
             else if (data.type === 'response.audio.delta') {
               if (data.delta) {
-                // Добавляем аудио чанк в буфер для накопления
                 audioChunksBuffer.push(data.delta);
               }
             }
-            // Аудиоответ завершен
+            // Аудио готово для воспроизведения
             else if (data.type === 'response.audio.done') {
               if (audioChunksBuffer.length > 0) {
                 const fullAudio = audioChunksBuffer.join('');
-                // Добавляем в очередь воспроизведения
                 addAudioToPlaybackQueue(fullAudio);
-                // Очищаем буфер
                 audioChunksBuffer = [];
               }
             }
             // Ответ завершен
             else if (data.type === 'response.done') {
-              // Обновляем подсказку
-              if (!isPlayingAudio) {
-                hintText.textContent = "Слушаю вас...";
-                
-                // Начинаем снова слушать автоматически
-                if (!isListening && !reconnecting) {
+              // Начинаем снова слушать автоматически, если виджет открыт
+              if (isWidgetOpen && !isPlayingAudio && !reconnecting) {
+                setTimeout(() => {
                   startListening();
-                }
+                }, 300);
               }
             }
           } catch (error) {
@@ -1244,13 +1063,10 @@
           isListening = false;
           reconnecting = false;
           
-          // Показываем сообщение пользователю
-          addMessage("Соединение прервано. Переподключение...");
-          
-          // Сбрасываем состояние UI
-          mainCircle.classList.remove('listening');
-          mainCircle.classList.remove('speaking');
-          hintText.textContent = "Подключение...";
+          // Показываем сообщение пользователю, если виджет открыт
+          if (isWidgetOpen) {
+            showMessage("Соединение прервано. Переподключение...");
+          }
           
           // Пытаемся переподключиться
           setTimeout(() => {
@@ -1260,14 +1076,18 @@
         
         websocket.onerror = function(error) {
           log("Ошибка соединения", "error");
-          addMessage("Ошибка соединения с сервером. Пожалуйста, попробуйте позже.");
+          if (isWidgetOpen) {
+            showMessage("Ошибка соединения с сервером");
+          }
         };
         
         return true;
       } catch (error) {
         log(`Ошибка при установке соединения: ${error.message}`, "error");
         loaderModal.classList.remove('active');
-        addMessage("Не удалось подключиться к серверу. Пожалуйста, попробуйте позже.");
+        if (isWidgetOpen) {
+          showMessage("Не удалось подключиться к серверу");
+        }
         return false;
       }
     }
@@ -1281,9 +1101,6 @@
       isListening = true;
       log("Начало записи голоса");
       
-      // Обновляем подсказку
-      hintText.textContent = "Слушаю вас...";
-      
       // Отправляем команду для очистки буфера ввода
       if (websocket && websocket.readyState === WebSocket.OPEN) {
         websocket.send(JSON.stringify({
@@ -1294,22 +1111,10 @@
       
       // Если аудио еще не инициализировано, делаем это
       if (!audioContext) {
-        const initialized = await initAudio();
-        if (!initialized) {
-          isListening = false;
-          hintText.textContent = "Не удалось получить доступ к микрофону";
-          return;
-        }
+        await initAudio();
       } else if (audioContext.state === 'suspended') {
         // Возобновляем AudioContext если он был приостановлен
-        try {
-          await audioContext.resume();
-        } catch (error) {
-          log(`Ошибка при возобновлении AudioContext: ${error.message}`, "error");
-          isListening = false;
-          hintText.textContent = "Ошибка доступа к микрофону";
-          return;
-        }
+        await audioContext.resume();
       }
       
       // Сбрасываем флаги аудио данных
@@ -1322,62 +1127,30 @@
         mainCircle.classList.remove('speaking');
       }
     }
-    
-    // Устанавливаем правильные размеры iframe при загрузке
-    function setupIframe() {
-      if (isInIframe() && window.frameElement) {
-        try {
-          // Устанавливаем начальные размеры
-          window.frameElement.style.width = '70px';
-          window.frameElement.style.height = '70px';
-          window.frameElement.style.position = 'fixed';
-          window.frameElement.style.bottom = '20px';
-          window.frameElement.style.right = '20px';
-          window.frameElement.style.zIndex = '2147483647';
-          window.frameElement.style.border = 'none';
-          window.frameElement.style.transition = 'width 0.3s, height 0.3s';
-          window.frameElement.style.overflow = 'visible';
-        } catch (e) {
-          console.warn('Не удалось установить стили для iframe:', e);
-        }
-      }
-    }
-    
+
     // Инициализация
     async function init() {
-      try {
-        // Устанавливаем правильные размеры iframe
-        setupIframe();
-        
-        // Настраиваем обработчики событий
-        robotButton.addEventListener('click', expandWidget);
-        
-        // При закрытии диалога: прекращаем текущую сессию и закрываем окно
-        closeButton.addEventListener('click', collapseWidget);
-        
-        mainCircle.addEventListener('click', function() {
-          if (!isListening && !isPlayingAudio) {
-            startListening();
+      // Устанавливаем правильные размеры iframe
+      setupIframe();
+
+      // Создаем WebSocket соединение
+      await connectWebSocket();
+      
+      // Добавляем обработчики событий для интерфейса
+      widgetButton.addEventListener('click', openWidget);
+      widgetClose.addEventListener('click', closeWidget);
+      
+      // Добавляем слушатель событий для окна, чтобы обрабатывать события внешнего iframe
+      window.addEventListener('message', function(event) {
+        // Обработка сообщений от родительского окна
+        if (event.data && event.data.action) {
+          if (event.data.action === 'expandWidget') {
+            openWidget();
+          } else if (event.data.action === 'collapseWidget') {
+            closeWidget();
           }
-        });
-        
-        // Добавляем слушатель событий для окна, чтобы обрабатывать события внешнего iframe
-        window.addEventListener('message', function(event) {
-          // Обработка сообщений от родительского окна
-          if (event.data && event.data.action) {
-            if (event.data.action === 'expandWidget') {
-              expandWidget();
-            } else if (event.data.action === 'collapseWidget') {
-              collapseWidget();
-            }
-          }
-        });
-        
-        // Создаем WebSocket соединение
-        await connectWebSocket();
-      } catch (error) {
-        console.error("Ошибка инициализации виджета:", error);
-      }
+        }
+      });
     }
     
     // Запускаем инициализацию
