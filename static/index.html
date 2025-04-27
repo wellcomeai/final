@@ -106,30 +106,6 @@
       100% { transform: rotate(360deg); }
     }
     
-    .activation-button {
-      position: absolute;
-      right: -40px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 48px;
-      height: 48px;
-      border-radius: 8px;
-      background-color: #1a237e;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      cursor: pointer;
-      box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
-      transition: all 0.3s ease;
-    }
-    
-    .activation-button:hover {
-      background-color: #283593;
-      transform: translateY(-50%) scale(1.05);
-    }
-    
     /* Аудио визуализация */
     .audio-visualization {
       width: 100%;
@@ -219,63 +195,6 @@
       align-self: flex-start;
       border-bottom-left-radius: 4px;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Область ввода */
-    .input-area {
-      display: flex;
-      padding: 15px;
-      background-color: white;
-      border-top: 1px solid #eee;
-    }
-    
-    #text-input {
-      flex: 1;
-      padding: 12px 20px;
-      border: 1px solid #ddd;
-      border-radius: 24px;
-      background-color: #f5f5f5;
-      color: #333;
-      font-size: 16px;
-      outline: none;
-      transition: all 0.2s;
-    }
-    
-    #text-input:focus {
-      border-color: #4a86e8;
-      background-color: #fff;
-      box-shadow: 0 0 0 2px rgba(74, 134, 232, 0.2);
-    }
-    
-    .voice-button {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background-color: #4a86e8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-left: 10px;
-      cursor: pointer;
-      border: none;
-      color: white;
-      transition: all 0.2s;
-    }
-    
-    .voice-button:hover {
-      background-color: #3b78e7;
-      transform: scale(1.05);
-    }
-    
-    .voice-button.listening {
-      animation: pulse 1.5s infinite;
-      background-color: #f44336;
-    }
-    
-    @keyframes pulse {
-      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); }
-      70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); }
-      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); }
     }
     
     /* Статус */
@@ -384,51 +303,6 @@
       font-size: 16px;
     }
     
-    .toggle-switch {
-      position: relative;
-      display: inline-block;
-      width: 50px;
-      height: 26px;
-    }
-    
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
-      border-radius: 34px;
-    }
-    
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 18px;
-      width: 18px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-    
-    input:checked + .slider {
-      background-color: #4a86e8;
-    }
-    
-    input:checked + .slider:before {
-      transform: translateX(24px);
-    }
-    
     .setting-buttons {
       display: flex;
       justify-content: flex-end;
@@ -459,39 +333,6 @@
       opacity: 0.9;
     }
     
-    /* Отладочная панель */
-    .debug-panel {
-      background-color: white;
-      border-radius: 8px;
-      padding: 15px;
-      margin-top: 20px;
-      border: 1px solid #eee;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-      display: none;
-      width: 100%;
-    }
-    
-    .debug-log {
-      max-height: 200px;
-      overflow-y: auto;
-      font-family: monospace;
-      font-size: 12px;
-      background-color: #f8f9fa;
-      padding: 10px;
-      border-radius: 5px;
-      border: 1px solid #eee;
-    }
-    
-    .log-entry {
-      margin-bottom: 5px;
-      line-height: 1.4;
-    }
-    
-    .log-info { color: #4a86e8; }
-    .log-error { color: #f44336; }
-    .log-warn { color: #ff9800; }
-    .log-debug { color: #777; }
-    
     /* Мобильная версия */
     @media (max-width: 768px) {
       .container {
@@ -507,13 +348,6 @@
         height: 220px;
       }
       
-      .activation-button {
-        right: -30px;
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
-      }
-      
       .chat-container {
         height: calc(100vh - 400px);
         min-height: 250px;
@@ -523,28 +357,12 @@
         max-width: 90%;
         font-size: 15px;
       }
-      
-      #text-input {
-        padding: 10px 15px;
-      }
-      
-      .voice-button {
-        width: 42px;
-        height: 42px;
-      }
     }
     
     @media (max-width: 480px) {
       .main-circle {
         width: 180px;
         height: 180px;
-      }
-      
-      .activation-button {
-        right: -25px;
-        width: 36px;
-        height: 36px;
-        font-size: 14px;
       }
       
       .chat-container {
@@ -575,24 +393,14 @@
           <label for="voice-selector">Выберите голос:</label>
           <select id="voice-selector" class="settings-voice-selector">
             <option value="alloy">Alloy (по умолчанию)</option>
+            <option value="ash">Ash</option>
+            <option value="ballad">Ballad</option>
+            <option value="coral">Coral</option>
             <option value="echo">Echo</option>
-            <option value="fable">Fable</option>
-            <option value="onyx">Onyx</option>
-            <option value="nova">Nova</option>
+            <option value="sage">Sage</option>
             <option value="shimmer">Shimmer</option>
+            <option value="verse">Verse</option>
           </select>
-        </div>
-      </div>
-      
-      <div class="settings-group">
-        <h3>Режим работы</h3>
-        <div class="settings-option">
-          <label for="always-listen-toggle">Постоянное прослушивание:</label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="always-listen-toggle" checked>
-            <span class="slider"></span>
-          </label>
-          <p style="margin-top: 5px; font-size: 13px; color: #777;">Если включено, микрофон будет активен постоянно без необходимости нажатия кнопки.</p>
         </div>
       </div>
       
@@ -613,9 +421,6 @@
     
     <div class="main-circle-container">
       <div class="main-circle" id="main-circle"></div>
-      <div class="activation-button" id="activation-button">
-        <i class="fas fa-terminal"></i>
-      </div>
     </div>
     
     <div class="audio-visualization" id="audio-visualization">
@@ -632,43 +437,22 @@
           Здравствуйте! Я WellcomeAI, ваш голосовой помощник. Чем могу помочь?
         </div>
       </div>
-      
-      <div class="input-area">
-        <input type="text" id="text-input" placeholder="Введите сообщение...">
-        <button class="voice-button" id="voice-button">
-          <i class="fas fa-microphone"></i>
-        </button>
-      </div>
     </div>
     
     <div class="status" id="status">Не подключено</div>
-    
-    <!-- Отладочная панель, скрыта по умолчанию -->
-    <div class="debug-panel" id="debug-panel">
-      <h3>Отладочная информация</h3>
-      <div class="debug-log" id="debug-log"></div>
-    </div>
   </div>
 
   <script>
     // НАСТРОЙКИ
     
-    // Включить режим отладки (true - включить, false - выключить)
-    const DEBUG_MODE = true;
-    
     // Элементы UI
-    const voiceButton = document.getElementById('voice-button');
     const mainCircle = document.getElementById('main-circle');
-    const activationButton = document.getElementById('activation-button');
-    const textInput = document.getElementById('text-input');
     const messagesContainer = document.getElementById('messages');
     const statusElement = document.getElementById('status');
     const transcriptElement = document.getElementById('transcript');
     const loadingModal = document.getElementById('loading-modal');
     const loadingStatus = document.getElementById('loading-status');
     const audioBars = document.getElementById('audio-bars');
-    const debugPanel = document.getElementById('debug-panel');
-    const debugLog = document.getElementById('debug-log');
     
     // Элементы настроек
     const settingsButton = document.getElementById('settings-button');
@@ -676,31 +460,16 @@
     const settingsSave = document.getElementById('settings-save');
     const settingsCancel = document.getElementById('settings-cancel');
     const voiceSelector = document.getElementById('voice-selector');
-    const alwaysListenToggle = document.getElementById('always-listen-toggle');
-    
-    // Включение отладочной панели, если режим отладки активен
-    if (DEBUG_MODE) {
-      debugPanel.style.display = 'block';
-    }
     
     // Настройки пользователя
     let userSettings = {
-      voice: "alloy",
-      alwaysListen: true,
+      voice: "alloy"
     };
     
     // Функция логирования
     function log(message, level = 'info') {
       const timestamp = new Date().toLocaleTimeString();
       console.log(`[${level.toUpperCase()}] ${message}`);
-      
-      if (DEBUG_MODE) {
-        const logEntry = document.createElement('div');
-        logEntry.className = `log-entry log-${level}`;
-        logEntry.textContent = `[${timestamp}] ${message}`;
-        debugLog.appendChild(logEntry);
-        debugLog.scrollTop = debugLog.scrollHeight;
-      }
       
       // Обновляем статус загрузки, если это информационное сообщение
       if (level === 'info' && loadingModal.classList.contains('active')) {
@@ -1028,10 +797,8 @@
             // Обновляем сессию с выбранным голосом
             updateSessionSettings();
             
-            // Если настройка "всегда слушать" включена, начинаем слушать
-            if (userSettings.alwaysListen) {
-              startListening();
-            }
+            // Автоматически начинаем слушать (всегда активно)
+            startListening();
             
             resolve(true);
           };
@@ -1234,10 +1001,6 @@
           if (audioChunks.length > 0) {
             log(`Аудиоответ завершен, ${audioChunks.length} фрагментов`, "info");
             const fullAudio = audioChunks.join('');
-            // Дамп первых 100 символов для отладки
-            if (fullAudio.length > 0) {
-              log(`Аудио данные (первые 50 символов): ${fullAudio.substring(0, 50)}...`, "debug");
-            }
             playAudio(fullAudio);
             audioChunks.length = 0; // Очищаем массив
           }
@@ -1258,14 +1021,10 @@
           // Сбрасываем эффекты UI
           mainCircle.style.boxShadow = "";
           
-          // Если настройка "всегда слушать" включена, начинаем слушать снова
-          if (userSettings.alwaysListen && !isListening) {
+          // Начинаем снова слушать автоматически
+          if (!isListening) {
             startListening();
           }
-          
-          // Активируем кнопки
-          voiceButton.disabled = false;
-          textInput.disabled = false;
           break;
           
         case "session.created":
@@ -1317,7 +1076,6 @@
       
       isListening = true;
       isProcessing = false;
-      voiceButton.classList.add('listening');
       transcriptElement.textContent = "Говорите...";
       log("Начало записи голоса", "info");
       
@@ -1338,98 +1096,10 @@
       mainCircle.style.boxShadow = "0 0 30px rgba(74, 134, 232, 0.2)";
     }
     
-    // Окончание записи голоса
-    function stopListening() {
-      if (!isListening) return;
-      
-      isListening = false;
-      voiceButton.classList.remove('listening');
-      transcriptElement.textContent = "Обработка...";
-      log("Завершение записи голоса", "info");
-      
-      // Отправляем команду для завершения записи
-      if (websocket && websocket.readyState === WebSocket.OPEN) {
-        websocket.send(JSON.stringify({
-          type: "input_audio_buffer.commit",
-          event_id: `commit_${Date.now()}`
-        }));
-        
-        // Отправляем команду для создания ответа
-        websocket.send(JSON.stringify({
-          type: "response.create",
-          event_id: `response_${Date.now()}`,
-          response: {}
-        }));
-      }
-      
-      isProcessing = true;
-      resetAudioVisualization();
-      
-      // Деактивируем кнопки на время обработки
-      voiceButton.disabled = true;
-      textInput.disabled = true;
-    }
-    
-    // Отправка текстового сообщения
-    function sendTextMessage() {
-      if (!isConnected || isProcessing) {
-        log("Невозможно отправить сообщение: " + (!isConnected ? "не подключено" : "идет обработка"), "warn");
-        return;
-      }
-      
-      const text = textInput.value.trim();
-      if (!text) {
-        log("Попытка отправить пустое сообщение", "warn");
-        return;
-      }
-      
-      log(`Отправка текстового сообщения: ${text}`, "info");
-      
-      // Добавляем сообщение пользователя в чат
-      addMessage(text, true);
-      
-      // Отправляем сообщение через WebSocket
-      websocket.send(JSON.stringify({
-        type: "conversation.item.create",
-        event_id: `msg_${Date.now()}`,
-        item: {
-          type: "message",
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: text
-            }
-          ]
-        }
-      }));
-      
-      // Отправляем команду для создания ответа
-      websocket.send(JSON.stringify({
-        type: "response.create",
-        event_id: `response_${Date.now()}`,
-        response: {}
-      }));
-      
-      // Сбрасываем поле ввода и состояние
-      textInput.value = "";
-      isProcessing = true;
-      
-      // Если был режим слушания, останавливаем его
-      if (isListening) {
-        stopListening();
-      }
-      
-      // Деактивируем кнопки на время обработки
-      voiceButton.disabled = true;
-      textInput.disabled = true;
-    }
-    
     // Открытие модального окна настроек
     function openSettingsModal() {
       // Устанавливаем текущие значения в элементы формы
       voiceSelector.value = userSettings.voice;
-      alwaysListenToggle.checked = userSettings.alwaysListen;
       
       // Отображаем модальное окно
       settingsModal.classList.add('active');
@@ -1444,32 +1114,18 @@
     function saveSettings() {
       // Получаем значения из формы
       const newVoice = voiceSelector.value;
-      const newAlwaysListen = alwaysListenToggle.checked;
       
       // Проверяем, изменился ли голос
       const voiceChanged = newVoice !== userSettings.voice;
-      const listenModeChanged = newAlwaysListen !== userSettings.alwaysListen;
       
       // Сохраняем новые настройки
       userSettings.voice = newVoice;
-      userSettings.alwaysListen = newAlwaysListen;
       
-      log(`Настройки сохранены: голос=${newVoice}, всегдаСлушать=${newAlwaysListen}`, "info");
+      log(`Настройки сохранены: голос=${newVoice}`, "info");
       
       // Если голос изменился и есть соединение, обновляем настройки на сервере
       if (voiceChanged && isConnected) {
         updateSessionSettings();
-      }
-      
-      // Если изменился режим прослушивания
-      if (listenModeChanged) {
-        if (newAlwaysListen && !isListening && !isProcessing) {
-          // Если включили режим "всегда слушать" и не слушаем сейчас, начинаем слушать
-          startListening();
-        } else if (!newAlwaysListen && isListening && !isProcessing) {
-          // Если выключили режим "всегда слушать" и слушаем сейчас, останавливаем
-          stopListening();
-        }
       }
       
       // Закрываем модальное окно
@@ -1486,15 +1142,10 @@
         settingsCancel.addEventListener('click', closeSettingsModal);
         settingsSave.addEventListener('click', saveSettings);
         
-        // Обработчик для большого активационного круга
-        activationButton.addEventListener('click', () => {
-          if (isProcessing) return;
-          
-          if (isListening) {
-            stopListening();
-          } else {
-            startListening();
-          }
+        // Обработчик для большого центрального круга
+        mainCircle.addEventListener('click', () => {
+          // При клике на круг можем добавить какое-то действие
+          // например, показ статуса или переключение режима
         });
         
         // Инициализируем аудио
@@ -1509,38 +1160,10 @@
           if (connected) {
             log("Подключение к WebSocket установлено", "info");
             
-            // Обработчики событий UI
-            voiceButton.addEventListener('click', event => {
-              event.preventDefault();
-              if (isProcessing) return;
-              
-              if (isListening) {
-                stopListening();
-              } else {
-                startListening();
-              }
-            });
-            
-            // Для отправки текстового сообщения
-            textInput.addEventListener('keypress', function(e) {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                sendTextMessage();
-              }
-            });
-            
             // Если пользователь щелкнул вне модального окна настроек, закрываем его
             window.addEventListener('click', function(e) {
               if (e.target === settingsModal) {
                 closeSettingsModal();
-              }
-            });
-            
-            // Если страница теряет фокус, останавливаем запись
-            window.addEventListener('blur', () => {
-              if (isListening && !userSettings.alwaysListen) {
-                log("Страница потеряла фокус, остановка записи", "info");
-                stopListening();
               }
             });
             
@@ -1568,11 +1191,6 @@
     // Обработка ошибок на уровне окна
     window.addEventListener('error', function(event) {
       log(`Глобальная ошибка: ${event.message} в ${event.filename}:${event.lineno}`, "error");
-    });
-    
-    // Double-click на статус для отображения отладочной информации
-    statusElement.addEventListener('dblclick', function() {
-      debugPanel.style.display = debugPanel.style.display === 'none' ? 'block' : 'none';
     });
   </script>
 </body>
