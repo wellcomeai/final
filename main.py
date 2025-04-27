@@ -26,7 +26,7 @@ DEFAULT_HTML_CONTENT = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WellcomeAI - Голосовой помощник</title>
+  <title>WellcomeAI</title>
   <style>
     body { 
       font-family: 'Segoe UI', sans-serif; 
@@ -48,7 +48,7 @@ DEFAULT_HTML_CONTENT = """<!DOCTYPE html>
 <body>
   <div class="container">
     <h1>WellcomeAI</h1>
-    <p>Голосовой помощник загружается...</p>
+    <p>Загрузка...</p>
   </div>
 </body>
 </html>
@@ -61,7 +61,7 @@ REALTIME_WS_URL = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-previe
 SYSTEM_MESSAGE = (
     "Ты WellcomeAI - умный голосовой помощник. Отвечай на вопросы пользователя коротко, "
     "информативно и с небольшой ноткой юмора, когда это уместно. Стремись быть полезным "
-    "и предоставлять точную информацию."
+    "и предоставлять точную информацию. Избегай длинных вступлений и лишних фраз."
 )
 
 # Допустимые голоса - ИСПРАВЛЕНО
@@ -114,9 +114,11 @@ if not OPENAI_API_KEY:
 
 # Отслеживаемые события от OpenAI для подробного логирования
 LOG_EVENT_TYPES = [
-    'response.content.done', 'rate_limits.updated', 'response.done',
-    'input_audio_buffer.committed', 'input_audio_buffer.speech_stopped',
-    'input_audio_buffer.speech_started', 'session.created', 'session.updated'
+    'response.done',
+    'input_audio_buffer.speech_stopped',
+    'input_audio_buffer.speech_started',
+    'session.created', 
+    'session.updated'
 ]
 
 # Хранилище активных соединений клиент <-> OpenAI
@@ -192,13 +194,16 @@ async def websocket_endpoint(websocket: WebSocket):
     }
     
     try:
-        # Устанавливаем соединение с OpenAI
-        openai_ws = await websockets.connect(
-            REALTIME_WS_URL,
-            extra_headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "OpenAI-Beta": "realtime=v1"
-            }
+        # Устанавливаем соединение с OpenAI с оптимизированным таймаутом
+        openai_ws = await asyncio.wait_for(
+            websockets.connect(
+                REALTIME_WS_URL,
+                extra_headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "OpenAI-Beta": "realtime=v1"
+                }
+            ),
+            timeout=10.0  # Уменьшенный таймаут для быстрой обработки ошибок соединения
         )
         
         client_connections[client_id]["openai_ws"] = openai_ws
@@ -298,13 +303,19 @@ async def forward_client_to_openai(client_ws: WebSocket, openai_ws, client_id: i
                             client_connections[client_id]["voice"] = voice
                             logger.info(f"Голос для клиента {client_id} изменен на {voice}")
                             updated = True
+                        else:
+                            # Если голос недоступен, меняем на запрос на допустимый голос
+                            logger.warning(f"Запрошенный голос {voice} недоступен. Используем {DEFAULT_VOICE}")
+                            data["session"]["voice"] = DEFAULT_VOICE
+                            client_connections[client_id]["voice"] = DEFAULT_VOICE
                     
                     # Если есть обновления настроек, передаем их в OpenAI
                     if updated:
                         logger.info(f"Отправка обновленных настроек на сервер")
                 
-                # Выводим информацию о сообщении в логи
-                logger.debug(f"[Клиент {client_id} -> OpenAI] {msg_type}")
+                # Выводим информацию о сообщении в логи только для важных типов сообщений
+                if msg_type != "input_audio_buffer.append":
+                    logger.debug(f"[Клиент {client_id} -> OpenAI] {msg_type}")
                 
                 # Отправляем сообщение в OpenAI
                 await openai_ws.send(message)
@@ -348,6 +359,13 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
                             client_connections[client_id]["voice"] = DEFAULT_VOICE
                             await send_session_update(openai_ws, DEFAULT_VOICE)
                     
+                    # Оптимизация: проверяем если это output_audio_buffer.started,
+                    # начинаем обрабатывать следующий буфер аудио
+                    if response.get('type') == 'output_audio_buffer.started':
+                        # Оптимизация: если начали получать аудио, запускаем подготовку к следующему слушанию
+                        # в параллельном таске, чтобы не терять время
+                        asyncio.create_task(prepare_next_listening(client_id))
+
                     # Пересылаем сообщение клиенту
                     await client_ws.send_text(openai_message)
                 else:
@@ -381,16 +399,35 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
         logger.error(traceback.format_exc())
         raise
 
+async def prepare_next_listening(client_id):
+    """Подготавливает следующее слушание параллельно с воспроизведением аудио"""
+    if client_id not in client_connections or not client_connections[client_id]["active"]:
+        return
+    
+    # Небольшая задержка для уверенности
+    await asyncio.sleep(0.05)
+    
+    # Отправляем команду для очистки буфера ввода
+    try:
+        ws = client_connections[client_id]["openai_ws"]
+        if ws:
+            await ws.send(json.stringify({
+                "type": "input_audio_buffer.clear",
+                "event_id": f"prepare_{Date.now()}"
+            }))
+    except Exception as e:
+        logger.debug(f"Не удалось подготовить следующее слушание: {str(e)}")
+
 async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_enabled=True):
     """Отправляет настройки сессии в WebSocket OpenAI"""
     
-    # Настройка определения завершения речи
+    # Настройка определения завершения речи - ОПТИМИЗИРОВАННЫЕ ПАРАМЕТРЫ
     turn_detection = {
         "type": "server_vad",
-        "threshold": 0.5,
-        "prefix_padding_ms": 300,
-        "silence_duration_ms": 500,
-        "create_response": True  # Автоматически создавать ответ при завершении речи
+        "threshold": 0.25,                 # Уменьшен порог для более чувствительного определения голоса
+        "prefix_padding_ms": 100,          # Уменьшено начальное время записи
+        "silence_duration_ms": 150,        # Уменьшено время ожидания до 150мс (было 300мс)
+        "create_response": True            # Автоматически создавать ответ при завершении речи
     } if turn_detection_enabled else None
     
     session_update = {
@@ -403,7 +440,7 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
             "instructions": SYSTEM_MESSAGE,     # Системное сообщение
             "modalities": ["text", "audio"],    # Поддерживаемые модальности
             "temperature": 0.7,                 # Температура генерации
-            "max_response_output_tokens": 300   # Лимит токенов в ответе для скорости
+            "max_response_output_tokens": 200   # Уменьшен лимит для более быстрого ответа
         }
     }
     
@@ -417,4 +454,12 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
 if __name__ == "__main__":
     import uvicorn
     logger.info(f"Запуск сервера на порту {PORT}")
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    # Оптимизированные настройки uvicorn для более быстрой обработки запросов
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=PORT,
+        log_level="info",
+        timeout_keep_alive=65,  # Увеличенный таймаут для поддержания соединения
+        loop="auto"             # Использовать оптимальный цикл событий для платформы
+    )
