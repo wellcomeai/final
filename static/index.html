@@ -85,9 +85,83 @@
       border-radius: 40%;
     }
     
+    /* Анимация основной волны */
     @keyframes wave {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
+    }
+    
+    /* Состояние прослушивания */
+    .main-circle.listening {
+      background: linear-gradient(135deg, #ffffff, #e3f2fd, #2196f3);
+      box-shadow: 0 0 30px rgba(33, 150, 243, 0.6);
+    }
+    
+    .main-circle.listening::before {
+      animation: wave 4s linear infinite;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(33, 150, 243, 0.3));
+    }
+    
+    /* Дополнительный эффект пульсации для прослушивания */
+    .main-circle.listening::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 3px solid rgba(33, 150, 243, 0.5);
+      animation: pulse 1.5s ease-out infinite;
+    }
+    
+    @keyframes pulse {
+      0% { 
+        transform: scale(0.95);
+        opacity: 0.7;
+      }
+      50% { 
+        transform: scale(1.05);
+        opacity: 0.3;
+      }
+      100% { 
+        transform: scale(0.95);
+        opacity: 0.7;
+      }
+    }
+    
+    /* Состояние говорения */
+    .main-circle.speaking {
+      background: linear-gradient(135deg, #ffffff, #e8f5e9, #4caf50);
+      box-shadow: 0 0 30px rgba(76, 175, 80, 0.6);
+    }
+    
+    .main-circle.speaking::before {
+      animation: wave 3s linear infinite;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3));
+    }
+    
+    /* Волновой эффект для говорения */
+    .main-circle.speaking::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, transparent 50%, rgba(76, 175, 80, 0.1) 100%);
+      border-radius: 50%;
+      animation: ripple 2s ease-out infinite;
+    }
+    
+    @keyframes ripple {
+      0% { 
+        transform: scale(0.8);
+        opacity: 0;
+      }
+      50% { 
+        opacity: 0.5;
+      }
+      100% { 
+        transform: scale(1.2);
+        opacity: 0;
+      }
     }
     
     /* Аудио визуализация (скрытая) */
@@ -281,6 +355,31 @@
       opacity: 0.9;
     }
     
+    /* Уведомление */
+    .notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      background-color: rgba(76, 175, 80, 0.9);
+      color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+    }
+    
+    .notification.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    
+    .notification.error {
+      background-color: rgba(244, 67, 54, 0.9);
+    }
+    
     /* Мобильная версия */
     @media (max-width: 768px) {      
       .main-circle {
@@ -318,14 +417,14 @@
         <div class="settings-option">
           <label for="voice-selector">Выберите голос:</label>
           <select id="voice-selector" class="settings-voice-selector">
-            <option value="alloy">Alloy (по умолчанию)</option>
-            <option value="ash">Ash</option>
-            <option value="ballad">Ballad</option>
-            <option value="coral">Coral</option>
-            <option value="echo">Echo</option>
-            <option value="sage">Sage</option>
-            <option value="shimmer">Shimmer</option>
-            <option value="verse">Verse</option>
+            <option value="alloy">Эллой (по умолчанию)</option>
+            <option value="ash">Эш</option>
+            <option value="ballad">Баллад</option>
+            <option value="coral">Корал</option>
+            <option value="echo">Эхо</option>
+            <option value="sage">Сейдж</option>
+            <option value="shimmer">Шиммер</option>
+            <option value="verse">Верс</option>
           </select>
         </div>
       </div>
@@ -335,6 +434,11 @@
         <button class="setting-button save" id="settings-save">Сохранить</button>
       </div>
     </div>
+  </div>
+
+  <!-- Уведомление -->
+  <div id="notification" class="notification">
+    Сообщение уведомления
   </div>
 
   <div class="container">
@@ -368,6 +472,7 @@
     const loadingModal = document.getElementById('loading-modal');
     const loadingStatus = document.getElementById('loading-status');
     const audioBars = document.getElementById('audio-bars');
+    const notification = document.getElementById('notification');
     
     // Элементы настроек
     const settingsButton = document.getElementById('settings-button');
@@ -381,6 +486,11 @@
       voice: "alloy"
     };
     
+    // Переменные для обработки аудио
+    let audioChunksBuffer = []; // Буфер для хранения аудио чанков
+    let audioPlaybackQueue = []; // Очередь для полного воспроизведения аудио
+    let isPlayingAudio = false; // Флаг воспроизведения аудио
+    
     // Функция логирования
     function log(message, level = 'info') {
       const timestamp = new Date().toLocaleTimeString();
@@ -390,6 +500,32 @@
       if (level === 'info' && loadingModal.classList.contains('active')) {
         loadingStatus.textContent = message;
       }
+    }
+    
+    // Показать уведомление
+    function showNotification(message, isError = false) {
+      // Очищаем предыдущие таймауты
+      if (notification.timeout) {
+        clearTimeout(notification.timeout);
+      }
+      
+      // Устанавливаем сообщение и стиль
+      notification.textContent = message;
+      notification.classList.remove('show', 'error');
+      
+      if (isError) {
+        notification.classList.add('error');
+      }
+      
+      // Показываем уведомление с небольшой задержкой
+      setTimeout(() => {
+        notification.classList.add('show');
+      }, 10);
+      
+      // Скрываем уведомление через 3 секунды
+      notification.timeout = setTimeout(() => {
+        notification.classList.remove('show');
+      }, 3000);
     }
     
     // Создаем аудио-бары для визуализации
@@ -416,10 +552,10 @@
     
     // Конфигурация для оптимизации потока аудио
     const AUDIO_CONFIG = {
-      silenceThreshold: 0.01,      // Порог для определения тишины (был 0.01)
-      silenceDuration: 300,        // Длительность тишины для отправки (мс) (было 500)
-      bufferCheckInterval: 50,     // Частота проверки буфера (мс) (было 100)
-      soundDetectionThreshold: 0.02 // Чувствительность к звуку (был 0.01)
+      silenceThreshold: 0.01,      // Порог для определения тишины
+      silenceDuration: 150,        // Длительность тишины для отправки (мс)
+      bufferCheckInterval: 50,     // Частота проверки буфера (мс)
+      soundDetectionThreshold: 0.02 // Чувствительность к звуку
     };
     
     // Инициализация микрофона и AudioContext
@@ -516,8 +652,10 @@
               isSilent = false;
               silenceStartTime = now;
               
-              // Анимируем круг при обнаружении звука
-              mainCircle.style.boxShadow = "0 0 30px rgba(74, 134, 232, 0.3)";
+              // Активируем визуальное состояние прослушивания
+              if (!mainCircle.classList.contains('listening') && !mainCircle.classList.contains('speaking')) {
+                mainCircle.classList.add('listening');
+              }
               
               // Очищаем предыдущий таймаут, если был запланирован
               if (audioBufferTimeoutId) {
@@ -559,7 +697,7 @@
         return true;
       } catch (error) {
         log(`Ошибка инициализации аудио: ${error.message}`, "error");
-        statusElement.textContent = "Ошибка доступа к микрофону";
+        showNotification("Ошибка доступа к микрофону. Пожалуйста, проверьте настройки браузера.", true);
         return false;
       }
     }
@@ -571,7 +709,7 @@
       log("Автоматическая отправка аудиобуфера");
       
       // Сбрасываем эффект активности
-      mainCircle.style.boxShadow = "";
+      mainCircle.classList.remove('listening');
       
       // Отправляем команду для завершения буфера
       websocket.send(JSON.stringify({
@@ -690,17 +828,45 @@
       return wavBuffer;
     }
     
-    // Воспроизведение аудио из Base64
-    function playAudio(audioBase64) {
+    // Добавить аудио в очередь воспроизведения
+    function addAudioToPlaybackQueue(audioBase64) {
+      if (!audioBase64 || typeof audioBase64 !== 'string') return;
+      
+      // Добавляем аудио в очередь
+      audioPlaybackQueue.push(audioBase64);
+      
+      // Если не запущено воспроизведение, запускаем
+      if (!isPlayingAudio) {
+        playNextAudio();
+      }
+    }
+    
+    // Воспроизведение следующего аудио в очереди
+    function playNextAudio() {
+      if (audioPlaybackQueue.length === 0) {
+        isPlayingAudio = false;
+        // Сбрасываем эффект говорения, когда все аудио воспроизведено
+        mainCircle.classList.remove('speaking');
+        return;
+      }
+      
+      isPlayingAudio = true;
+      
+      // Активируем визуальное состояние говорения
+      mainCircle.classList.add('speaking');
+      mainCircle.classList.remove('listening');
+      
+      const audioBase64 = audioPlaybackQueue.shift();
+      
       try {
-        // Проверяем непустую строку
-        if (!audioBase64 || typeof audioBase64 !== 'string') return;
-        
         // Декодируем Base64 в ArrayBuffer
         const audioData = base64ToArrayBuffer(audioBase64);
         
         // Проверяем размер данных
-        if (audioData.byteLength === 0) return;
+        if (audioData.byteLength === 0) {
+          playNextAudio(); // Пропускаем пустой аудио-чанк
+          return;
+        }
         
         // Предполагаем, что данные в формате PCM16, конвертируем в WAV для воспроизведения
         const wavBuffer = createWavFromPcm(audioData);
@@ -713,15 +879,24 @@
         audio.oncanplaythrough = function() {
           audio.play().catch(err => {
             log(`Ошибка при воспроизведении: ${err.message}`, "error");
+            playNextAudio(); // В случае ошибки переходим к следующему аудио
           });
         };
         
-        // Освобождаем ресурсы после воспроизведения
+        // После окончания воспроизведения
         audio.onended = function() {
           URL.revokeObjectURL(audioUrl);
+          playNextAudio(); // Переходим к следующему аудио
+        };
+        
+        // В случае ошибки
+        audio.onerror = function() {
+          URL.revokeObjectURL(audioUrl);
+          playNextAudio(); // Переходим к следующему аудио
         };
       } catch (error) {
         log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
+        playNextAudio(); // В случае ошибки переходим к следующему аудио
       }
     }
     
@@ -862,10 +1037,17 @@
     let currentResponseText = "";
     let currentResponseId = null;
     let currentItemId = null;
-    const audioChunks = [];
     
     function processServerEvent(event) {
       if (!event || !event.type) return;
+      
+      // Обрабатываем специальное событие изменения голоса
+      if (event.type === "voice_changed") {
+        const voiceName = event.voice_name || event.voice;
+        const message = event.message ? `${event.message}` : `Голос изменен на ${voiceName}`;
+        showNotification(message, event.message && event.message.includes("ошибка"));
+        return;
+      }
       
       // Сохраняем ID текущего ответа и элемента, если они есть
       if (event.response_id && !currentResponseId) {
@@ -885,6 +1067,11 @@
           setTimeout(() => {
             mainCircle.style.boxShadow = "";
           }, 2000);
+          
+          // Показываем уведомление об ошибке
+          if (event.error && event.error.message) {
+            showNotification(event.error.message, true);
+          }
           break;
           
         case "conversation.item.input_audio_transcription.delta":
@@ -911,9 +1098,6 @@
             } else {
               addMessage(currentResponseText, false);
             }
-            
-            // Анимируем круг, показывая активность
-            mainCircle.style.boxShadow = "0 0 30px rgba(74, 134, 232, 0.3)";
           }
           break;
           
@@ -929,27 +1113,25 @@
             } else {
               addMessage(currentResponseText, false);
             }
-            
-            // Сбрасываем анимацию круга
-            setTimeout(() => {
-              mainCircle.style.boxShadow = "";
-            }, 1000);
           }
           break;
           
         case "response.audio.delta":
-          // Обрабатываем аудиоответ по частям
+          // Улучшенная обработка аудиоответа - сохраняем все части
           if (event.delta) {
-            audioChunks.push(event.delta);
+            // Добавляем аудио чанк в буфер для накопления
+            audioChunksBuffer.push(event.delta);
           }
           break;
           
         case "response.audio.done":
-          // Аудиоответ завершен, воспроизводим его
-          if (audioChunks.length > 0) {
-            const fullAudio = audioChunks.join('');
-            playAudio(fullAudio);
-            audioChunks.length = 0; // Очищаем массив
+          // Аудиоответ завершен, воспроизводим его полностью
+          if (audioChunksBuffer.length > 0) {
+            const fullAudio = audioChunksBuffer.join('');
+            // Добавляем в очередь воспроизведения
+            addAudioToPlaybackQueue(fullAudio);
+            // Очищаем буфер
+            audioChunksBuffer = [];
           }
           break;
           
@@ -959,32 +1141,32 @@
           
           // Сбрасываем состояние
           currentResponseText = "";
-          audioChunks.length = 0;
           currentResponseId = null;
           currentItemId = null;
-          resetAudioVisualization();
           
-          // Сбрасываем эффекты UI
-          mainCircle.style.boxShadow = "";
-          
-          // Начинаем снова слушать автоматически
-          if (!isListening) {
-            setTimeout(() => {
+          // Добавляем небольшую задержку перед повторным слушанием
+          setTimeout(() => {
+            // Если не воспроизводится аудио, сбрасываем эффекты UI
+            if (!isPlayingAudio) {
+              mainCircle.classList.remove('speaking');
+            }
+            
+            // Начинаем снова слушать автоматически
+            if (!isListening) {
               startListening();
-            }, 100); // Небольшая задержка для уверенности
-          }
+            }
+          }, 300);
           break;
           
         case "input_audio_buffer.speech_started":
-          // Анимируем круг, показывая обнаружение речи
-          mainCircle.style.boxShadow = "0 0 30px rgba(244, 67, 54, 0.3)";
+          // Активируем визуальное состояние прослушивания
+          mainCircle.classList.add('listening');
+          mainCircle.classList.remove('speaking');
           break;
           
         case "input_audio_buffer.speech_stopped":
-          // Сбрасываем анимацию круга
-          setTimeout(() => {
-            mainCircle.style.boxShadow = "";
-          }, 500);
+          // Сбрасываем визуальное состояние
+          mainCircle.classList.remove('listening');
           break;
       }
     }
@@ -1012,8 +1194,11 @@
         audioContext.resume();
       }
       
-      // Мягкий пульсирующий эффект для индикации записи
-      mainCircle.style.animation = "pulse 2s infinite";
+      // Активируем визуальное состояние прослушивания если не воспроизводится аудио
+      if (!isPlayingAudio) {
+        mainCircle.classList.add('listening');
+        mainCircle.classList.remove('speaking');
+      }
     }
     
     // Открытие модального окна настроек
@@ -1076,6 +1261,7 @@
             });
           } else {
             loadingModal.classList.remove('active');
+            showNotification("Не удалось подключиться к серверу. Повторное подключение...", true);
             setTimeout(() => {
               // Повторная попытка подключения
               connectWebSocket().catch(() => {});
@@ -1087,6 +1273,7 @@
         }
       } catch (error) {
         loadingModal.classList.remove('active');
+        showNotification("Произошла ошибка при инициализации приложения", true);
       }
     }
     
