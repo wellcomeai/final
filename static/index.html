@@ -417,14 +417,14 @@
         <div class="settings-option">
           <label for="voice-selector">Выберите голос:</label>
           <select id="voice-selector" class="settings-voice-selector">
-            <option value="alloy">Эллой (по умолчанию)</option>
-            <option value="ash">Эш</option>
-            <option value="ballad">Баллад</option>
-            <option value="coral">Корал</option>
-            <option value="echo">Эхо</option>
-            <option value="sage">Сейдж</option>
-            <option value="shimmer">Шиммер</option>
-            <option value="verse">Верс</option>
+            <option value="alloy">Alloy (по умолчанию)</option>
+            <option value="ash">Ash</option>
+            <option value="ballad">Ballad</option>
+            <option value="coral">Coral</option>
+            <option value="echo">Echo</option>
+            <option value="sage">Sage</option>
+            <option value="shimmer">Shimmer</option>
+            <option value="verse">Verse</option>
           </select>
         </div>
       </div>
@@ -490,6 +490,10 @@
     let audioChunksBuffer = []; // Буфер для хранения аудио чанков
     let audioPlaybackQueue = []; // Очередь для полного воспроизведения аудио
     let isPlayingAudio = false; // Флаг воспроизведения аудио
+    let hasAudioData = false;   // Флаг наличия аудиоданных в буфере
+    let audioDataStartTime = 0; // Время начала записи аудио
+    let minimumAudioLength = 300; // Минимальная длительность аудио (мс)
+    let reconnecting = false;   // Флаг переподключения/смены голоса
     
     // Функция логирования
     function log(message, level = 'info') {
@@ -553,7 +557,7 @@
     // Конфигурация для оптимизации потока аудио
     const AUDIO_CONFIG = {
       silenceThreshold: 0.01,      // Порог для определения тишины
-      silenceDuration: 150,        // Длительность тишины для отправки (мс)
+      silenceDuration: 300,        // Длительность тишины для отправки (мс)
       bufferCheckInterval: 50,     // Частота проверки буфера (мс)
       soundDetectionThreshold: 0.02 // Чувствительность к звуку
     };
@@ -606,7 +610,7 @@
         
         // Обработчик аудио с оптимизированной логикой
         audioProcessor.onaudioprocess = function(e) {
-          if (isListening && websocket && websocket.readyState === WebSocket.OPEN) {
+          if (isListening && websocket && websocket.readyState === WebSocket.OPEN && !reconnecting) {
             // Получаем данные с микрофона
             const inputData = e.inputBuffer.getChannelData(0);
             
@@ -640,6 +644,14 @@
               
               websocket.send(message);
               hasSentAudioInCurrentSegment = true;
+              
+              // Отмечаем наличие аудиоданных
+              if (!hasAudioData && hasSound) {
+                hasAudioData = true;
+                audioDataStartTime = Date.now();
+                log("Начало записи аудиоданных");
+              }
+              
             } catch (error) {
               log(`Ошибка отправки аудио: ${error.message}`, "error");
             }
@@ -675,7 +687,7 @@
                   if (!audioBufferTimeoutId) {
                     audioBufferTimeoutId = setTimeout(() => {
                       // Проверяем снова, не появился ли звук
-                      if (isSilent && isListening && !isProcessing) {
+                      if (isSilent && isListening && !isProcessing && !reconnecting) {
                         commitAudioBuffer();
                         lastCommitTime = Date.now();
                         hasSentAudioInCurrentSegment = false;
@@ -704,9 +716,38 @@
     
     // Функция для отправки аудиобуфера
     function commitAudioBuffer() {
-      if (!isListening || isProcessing || !websocket || websocket.readyState !== WebSocket.OPEN) return;
+      if (!isListening || isProcessing || !websocket || websocket.readyState !== WebSocket.OPEN || reconnecting) return;
       
-      log("Автоматическая отправка аудиобуфера");
+      // Проверяем, есть ли в буфере достаточно аудиоданных
+      if (!hasAudioData) {
+        log("Не отправляем пустой аудиобуфер", "warn");
+        return;
+      }
+      
+      // Проверяем минимальную длительность аудио (200мс требуется OpenAI)
+      const audioLength = Date.now() - audioDataStartTime;
+      if (audioLength < minimumAudioLength) {
+        log(`Аудиобуфер слишком короткий (${audioLength}мс), ожидаем больше данных`, "warn");
+        
+        // Продолжаем запись еще немного времени
+        setTimeout(() => {
+          // Повторно пытаемся отправить буфер
+          if (isListening && !isProcessing && hasAudioData && !reconnecting) {
+            log(`Отправка аудиобуфера после дополнительной записи (${Date.now() - audioDataStartTime}мс)`);
+            sendCommitBuffer();
+          }
+        }, minimumAudioLength - audioLength);
+        
+        return;
+      }
+      
+      // Если все проверки пройдены, отправляем буфер
+      sendCommitBuffer();
+    }
+    
+    // Функция для фактической отправки буфера
+    function sendCommitBuffer() {
+      log("Отправка аудиобуфера");
       
       // Сбрасываем эффект активности
       mainCircle.classList.remove('listening');
@@ -717,8 +758,10 @@
         event_id: `commit_${Date.now()}`
       }));
       
-      // Начинаем обработку
+      // Начинаем обработку и сбрасываем флаги
       isProcessing = true;
+      hasAudioData = false;
+      audioDataStartTime = 0;
     }
     
     // Преобразование ArrayBuffer в Base64
@@ -953,6 +996,11 @@
             log(`WebSocket соединение закрыто: код ${event.code}`, event.wasClean ? "info" : "error");
             isConnected = false;
             
+            // Сбрасываем состояния
+            isListening = false;
+            isProcessing = false;
+            reconnecting = false;
+            
             // Пытаемся переподключиться, если соединение было разорвано не чисто
             if (!event.wasClean) {
               mainCircle.style.boxShadow = "0 0 30px rgba(244, 67, 54, 0.3)";
@@ -987,7 +1035,7 @@
       }
       
       try {
-        log(`Обновление настроек сессии. Голос: ${userSettings.voice}`);
+        log(`Отправка начальных настроек сессии с голосом ${userSettings.voice}`);
         
         // Отправляем обновление настроек
         const updateMessage = {
@@ -1041,11 +1089,50 @@
     function processServerEvent(event) {
       if (!event || !event.type) return;
       
-      // Обрабатываем специальное событие изменения голоса
+      // Обрабатываем специальные типы событий
+      // Обработка события смены голоса
       if (event.type === "voice_changed") {
         const voiceName = event.voice_name || event.voice;
         const message = event.message ? `${event.message}` : `Голос изменен на ${voiceName}`;
-        showNotification(message, event.message && event.message.includes("ошибка"));
+        
+        // Показываем уведомление
+        showNotification(message, !event.success);
+        
+        // Обновляем настройку голоса, если смена прошла успешно
+        if (event.success) {
+          userSettings.voice = event.voice;
+          voiceSelector.value = event.voice;
+          log(`Голос успешно изменен на ${event.voice}`);
+        }
+        
+        // Выходим из режима переподключения
+        reconnecting = false;
+        
+        // Если слушание было активно до смены голоса, восстанавливаем
+        if (!isListening && !isProcessing) {
+          setTimeout(() => {
+            startListening();
+          }, 300);
+        }
+        return;
+      }
+      
+      // Обработка ошибки буфера
+      if (event.type === "buffer_error") {
+        showNotification(event.message, true);
+        // Автоматически перезапускаем прослушивание
+        if (!isListening && !isProcessing && !reconnecting) {
+          setTimeout(() => {
+            startListening();
+          }, 300);
+        }
+        return;
+      }
+      
+      // Обработка уведомления о пересоздании соединения
+      if (event.type === "recreating_connection") {
+        showNotification("Переключение голоса...", false);
+        reconnecting = true;
         return;
       }
       
@@ -1151,8 +1238,8 @@
               mainCircle.classList.remove('speaking');
             }
             
-            // Начинаем снова слушать автоматически
-            if (!isListening) {
+            // Начинаем снова слушать автоматически, если не в процессе переподключения
+            if (!isListening && !reconnecting) {
               startListening();
             }
           }, 300);
@@ -1173,7 +1260,7 @@
     
     // Начало записи голоса
     function startListening() {
-      if (!isConnected || isProcessing) {
+      if (!isConnected || isProcessing || reconnecting) {
         return;
       }
       
@@ -1193,6 +1280,10 @@
       if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume();
       }
+      
+      // Сбрасываем флаги аудио данных
+      hasAudioData = false;
+      audioDataStartTime = 0;
       
       // Активируем визуальное состояние прослушивания если не воспроизводится аудио
       if (!isPlayingAudio) {
@@ -1223,18 +1314,29 @@
       // Проверяем, изменился ли голос
       const voiceChanged = newVoice !== userSettings.voice;
       
-      // Сохраняем новые настройки
-      userSettings.voice = newVoice;
-      
-      log(`Настройки сохранены: голос=${newVoice}`, "info");
-      
-      // Если голос изменился и есть соединение, обновляем настройки на сервере
-      if (voiceChanged && isConnected) {
-        updateSessionSettings();
-      }
-      
       // Закрываем модальное окно
       closeSettingsModal();
+      
+      // Если голос изменился и есть соединение, отправляем команду изменения голоса
+      if (voiceChanged && isConnected) {
+        // Показываем уведомление о начале смены голоса
+        showNotification("Переключение голоса...", false);
+        
+        // Устанавливаем флаг переподключения
+        reconnecting = true;
+        
+        // Останавливаем текущее слушание
+        isListening = false;
+        
+        // Отправляем специальную команду для пересоздания соединения
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+          websocket.send(JSON.stringify({
+            type: "change_voice",
+            event_id: `voice_${Date.now()}`,
+            voice: newVoice
+          }));
+        }
+      }
     }
     
     // Инициализация всего приложения
