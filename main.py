@@ -184,6 +184,26 @@ async def check_api():
             "message": str(e)
         }
 
+async def create_openai_connection():
+    """Создание нового соединения с OpenAI API"""
+    try:
+        openai_ws = await websockets.connect(
+            REALTIME_WS_URL,
+            extra_headers={
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "OpenAI-Beta": "realtime=v1"
+            },
+            # Увеличены буферы для более надежной передачи аудио
+            max_size=10 * 1024 * 1024,  # 10MB max message size
+            ping_interval=20,
+            ping_timeout=60
+        )
+        logger.info("Создано новое соединение с OpenAI")
+        return openai_ws
+    except Exception as e:
+        logger.error(f"Ошибка при создании соединения с OpenAI: {str(e)}")
+        raise
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
@@ -201,24 +221,15 @@ async def websocket_endpoint(websocket: WebSocket):
         "openai_ws": None,
         "active": True,
         "voice": DEFAULT_VOICE,
-        "turn_detection_enabled": True
+        "turn_detection_enabled": True,
+        "tasks": []  # Для хранения задач
     }
     
     try:
-        # Устанавливаем соединение с OpenAI с оптимизированным таймаутом
+        # Устанавливаем соединение с OpenAI
         openai_ws = await asyncio.wait_for(
-            websockets.connect(
-                REALTIME_WS_URL,
-                extra_headers={
-                    "Authorization": f"Bearer {OPENAI_API_KEY}",
-                    "OpenAI-Beta": "realtime=v1"
-                },
-                # Увеличены буферы для более надежной передачи аудио
-                max_size=10 * 1024 * 1024,  # 10MB max message size
-                ping_interval=20,
-                ping_timeout=60
-            ),
-            timeout=15.0  # Увеличенный таймаут для надежного соединения
+            create_openai_connection(),
+            timeout=15.0
         )
         
         client_connections[client_id]["openai_ws"] = openai_ws
@@ -230,6 +241,9 @@ async def websocket_endpoint(websocket: WebSocket):
         # Создаем две задачи для двустороннего обмена сообщениями
         client_to_openai = asyncio.create_task(forward_client_to_openai(websocket, openai_ws, client_id))
         openai_to_client = asyncio.create_task(forward_openai_to_client(openai_ws, websocket, client_id))
+        
+        # Сохраняем задачи для возможности отмены
+        client_connections[client_id]["tasks"] = [client_to_openai, openai_to_client]
         
         # Ждем, пока одна из задач не завершится
         done, pending = await asyncio.wait(
@@ -276,12 +290,92 @@ async def websocket_endpoint(websocket: WebSocket):
             except:
                 pass
         
+        # Отменяем все задачи
+        if client_id in client_connections and "tasks" in client_connections[client_id]:
+            for task in client_connections[client_id]["tasks"]:
+                if not task.done():
+                    task.cancel()
+        
         # Удаляем информацию о клиенте
         if client_id in client_connections:
             client_connections[client_id]["active"] = False
             del client_connections[client_id]
         
         logger.info(f"Соединение с клиентом {client_id} закрыто")
+
+async def recreate_openai_connection(client_id, new_voice):
+    """Пересоздание соединения с OpenAI для смены голоса"""
+    if client_id not in client_connections:
+        logger.error(f"Клиент {client_id} не найден при попытке пересоздания соединения")
+        return False
+    
+    client_data = client_connections[client_id]
+    client_ws = client_data["client_ws"]
+    
+    # Закрываем текущее соединение
+    if client_data["openai_ws"]:
+        try:
+            await client_data["openai_ws"].close()
+        except Exception as e:
+            logger.error(f"Ошибка при закрытии старого соединения: {str(e)}")
+    
+    # Отменяем текущие задачи
+    for task in client_data.get("tasks", []):
+        if not task.done():
+            task.cancel()
+    
+    # Уведомляем клиента о пересоздании соединения
+    try:
+        await client_ws.send_json({
+            "type": "recreating_connection",
+            "message": f"Пересоздание соединения для смены голоса на {VOICE_NAMES.get(new_voice, new_voice)}"
+        })
+    except Exception as e:
+        logger.error(f"Ошибка при отправке уведомления о пересоздании: {str(e)}")
+    
+    # Создаем новое соединение
+    try:
+        new_openai_ws = await create_openai_connection()
+        client_connections[client_id]["openai_ws"] = new_openai_ws
+        
+        # Отправляем настройки сессии с новым голосом
+        await send_session_update(new_openai_ws, new_voice)
+        
+        # Создаем новые задачи
+        client_to_openai = asyncio.create_task(forward_client_to_openai(client_ws, new_openai_ws, client_id))
+        openai_to_client = asyncio.create_task(forward_openai_to_client(new_openai_ws, client_ws, client_id))
+        
+        # Сохраняем новые задачи
+        client_connections[client_id]["tasks"] = [client_to_openai, openai_to_client]
+        client_connections[client_id]["voice"] = new_voice
+        
+        # Уведомляем клиента об успешной смене голоса
+        voice_name = VOICE_NAMES.get(new_voice, new_voice)
+        await client_ws.send_json({
+            "type": "voice_changed",
+            "voice": new_voice,
+            "voice_name": voice_name,
+            "success": True
+        })
+        
+        logger.info(f"Голос для клиента {client_id} успешно изменен на {new_voice} ({voice_name})")
+        return True
+    except Exception as e:
+        logger.error(f"Ошибка при пересоздании соединения: {str(e)}")
+        
+        # Уведомляем клиента об ошибке
+        try:
+            await client_ws.send_json({
+                "type": "voice_changed",
+                "voice": DEFAULT_VOICE,
+                "voice_name": VOICE_NAMES.get(DEFAULT_VOICE, DEFAULT_VOICE),
+                "message": f"Ошибка при смене голоса: {str(e)}",
+                "success": False
+            })
+        except:
+            pass
+        
+        return False
 
 async def forward_client_to_openai(client_ws: WebSocket, openai_ws, client_id: int):
     """Пересылает сообщения от клиента (браузера) к API OpenAI"""
@@ -303,53 +397,56 @@ async def forward_client_to_openai(client_ws: WebSocket, openai_ws, client_id: i
                 data = json.loads(message)
                 msg_type = data.get("type", "unknown")
                 
+                # Команда смены голоса
+                if msg_type == "change_voice":
+                    new_voice = data.get("voice", DEFAULT_VOICE)
+                    if new_voice in AVAILABLE_VOICES:
+                        logger.info(f"Запрос на смену голоса на {new_voice}")
+                        # Пересоздаем соединение для новой сессии с новым голосом
+                        await recreate_openai_connection(client_id, new_voice)
+                        continue
+                    else:
+                        logger.warning(f"Запрошенный голос {new_voice} недоступен")
+                        await client_ws.send_json({
+                            "type": "voice_changed",
+                            "voice": client_connections[client_id]["voice"],
+                            "voice_name": VOICE_NAMES.get(client_connections[client_id]["voice"], client_connections[client_id]["voice"]),
+                            "message": f"Голос {new_voice} недоступен",
+                            "success": False
+                        })
+                        continue
+                
+                # Проверка наличия аудио перед отправкой
+                if msg_type == "input_audio_buffer.commit":
+                    # Проверяем была ли отправка аудио данных
+                    if not client_connections[client_id].get("has_audio_data", False):
+                        logger.warning(f"Попытка отправить пустой аудиобуфер. Отмена.")
+                        await client_ws.send_json({
+                            "type": "buffer_error",
+                            "message": "Недостаточно аудио данных для отправки"
+                        })
+                        continue
+                
                 # Если это обновление сессии, обрабатываем его
                 if msg_type == "session.update":
                     # Обновляем настройки сессии
                     session_data = data.get("session", {})
                     
-                    # Проверяем наличие обновлений настроек
-                    updated = False
-                    
-                    # Если указан голос, обновляем его
+                    # Если указан голос, пересоздаем соединение вместо обновления
                     if "voice" in session_data:
-                        voice = session_data["voice"]
-                        if voice in AVAILABLE_VOICES:
-                            old_voice = client_connections[client_id]["voice"]
-                            if old_voice != voice:
-                                # Уведомляем клиента об изменении голоса
-                                client_connections[client_id]["voice"] = voice
-                                voice_name = VOICE_NAMES.get(voice, voice)
-                                logger.info(f"Голос для клиента {client_id} изменен на {voice} ({voice_name})")
-                                
-                                # Отправляем уведомление клиенту
-                                try:
-                                    await client_ws.send_json({
-                                        "type": "voice_changed",
-                                        "voice": voice,
-                                        "voice_name": voice_name
-                                    })
-                                except Exception as e:
-                                    logger.error(f"Ошибка при уведомлении о смене голоса: {str(e)}")
-                                
-                                updated = True
-                        else:
-                            # Если голос недоступен, меняем запрос на допустимый голос
-                            logger.warning(f"Запрошенный голос {voice} недоступен. Используем {DEFAULT_VOICE}")
-                            data["session"]["voice"] = DEFAULT_VOICE
-                            client_connections[client_id]["voice"] = DEFAULT_VOICE
-                            
-                            # Уведомляем клиента об использовании голоса по умолчанию
-                            try:
-                                await client_ws.send_json({
-                                    "type": "voice_changed",
-                                    "voice": DEFAULT_VOICE,
-                                    "voice_name": VOICE_NAMES.get(DEFAULT_VOICE, DEFAULT_VOICE),
-                                    "message": "Запрошенный голос недоступен. Используем голос по умолчанию."
-                                })
-                            except Exception as e:
-                                logger.error(f"Ошибка при уведомлении о смене голоса: {str(e)}")
-                    
+                        new_voice = session_data["voice"]
+                        if new_voice in AVAILABLE_VOICES and new_voice != client_connections[client_id]["voice"]:
+                            logger.info(f"Запрос на смену голоса через session.update на {new_voice}")
+                            # Пересоздаем соединение с новым голосом
+                            await recreate_openai_connection(client_id, new_voice)
+                            continue
+                
+                # Если это добавление аудио данных, отмечаем наличие данных
+                if msg_type == "input_audio_buffer.append":
+                    if "audio" in data and data["audio"]:
+                        client_connections[client_id]["has_audio_data"] = True
+                        client_connections[client_id]["last_audio_time"] = asyncio.get_event_loop().time()
+                
                 # Выводим информацию о сообщении в логи только для важных типов сообщений
                 if msg_type != "input_audio_buffer.append":
                     logger.debug(f"[Клиент {client_id} -> OpenAI] {msg_type}")
@@ -389,25 +486,36 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
                         error_msg = response.get('error', {}).get('message', 'Неизвестная ошибка')
                         logger.error(f"Ошибка от OpenAI: {error_msg}")
                         
-                        # Если это ошибка связана с голосом
-                        if 'voice' in error_msg.lower():
-                            logger.error(f"Ошибка голоса. Пробуем установить голос по умолчанию.")
-                            old_voice = client_connections[client_id]["voice"]
-                            # Возвращаем голос по умолчанию и отправляем обновление настроек
-                            client_connections[client_id]["voice"] = DEFAULT_VOICE
+                        # Если это ошибка, связанная с невозможностью изменить голос
+                        if 'Cannot update a conversation\'s voice' in error_msg:
+                            # Это значит, что нужно пересоздать соединение для смены голоса
+                            logger.info("Обнаружена необходимость пересоздания соединения для смены голоса")
                             
-                            # Уведомляем клиента об ошибке голоса
-                            try:
-                                await client_ws.send_json({
-                                    "type": "voice_changed",
-                                    "voice": DEFAULT_VOICE,
-                                    "voice_name": VOICE_NAMES.get(DEFAULT_VOICE, DEFAULT_VOICE),
-                                    "message": f"Ошибка при использовании голоса '{old_voice}'. Используем голос по умолчанию."
-                                })
-                            except Exception as e:
-                                logger.error(f"Ошибка при уведомлении о смене голоса: {str(e)}")
+                            # Пересоздаем соединение с текущим голосом
+                            current_voice = client_connections[client_id]["voice"]
+                            await recreate_openai_connection(client_id, current_voice)
                             
-                            await send_session_update(openai_ws, DEFAULT_VOICE)
+                            # Продолжаем без отправки этой ошибки клиенту
+                            continue
+                        
+                        # Если это ошибка пустого буфера
+                        if 'buffer too small' in error_msg or 'Expected at least 100ms' in error_msg:
+                            # Сбрасываем флаг наличия аудио данных
+                            client_connections[client_id]["has_audio_data"] = False
+                            
+                            # Отправляем понятное уведомление клиенту
+                            await client_ws.send_json({
+                                "type": "buffer_error",
+                                "message": "Недостаточно аудио данных. Пожалуйста, говорите чуть дольше."
+                            })
+                            
+                            # Продолжаем без отправки этой ошибки клиенту
+                            continue
+                    
+                    # Обрабатываем событие завершения сессии
+                    if response.get('type') == 'response.done':
+                        # Сбрасываем флаг наличия аудио данных при завершении ответа
+                        client_connections[client_id]["has_audio_data"] = False
                     
                     # Пересылаем сообщение клиенту
                     await client_ws.send_text(openai_message)
@@ -448,9 +556,9 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
     # Настройка определения завершения речи - ОПТИМИЗИРОВАННЫЕ ПАРАМЕТРЫ
     turn_detection = {
         "type": "server_vad",
-        "threshold": 0.25,                 # Уменьшен порог для более чувствительного определения голоса
-        "prefix_padding_ms": 100,          # Уменьшено начальное время записи
-        "silence_duration_ms": 150,        # Уменьшено время ожидания до 150мс
+        "threshold": 0.25,                 # Чувствительность определения голоса
+        "prefix_padding_ms": 200,          # Начальное время записи (увеличено)
+        "silence_duration_ms": 300,        # Время ожидания тишины (увеличено)
         "create_response": True            # Автоматически создавать ответ при завершении речи
     } if turn_detection_enabled else None
     
