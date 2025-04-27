@@ -59,6 +59,35 @@
       transform: rotate(30deg);
     }
     
+    /* Telegram кнопка */
+    .telegram-button {
+      position: absolute;
+      left: 20px;
+      top: 20px;
+      background: none;
+      border: none;
+      color: #0088cc;
+      font-size: 24px;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 10;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .telegram-button:hover {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+    
+    .telegram-button span {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
     /* Основной элемент - круг */
     .main-circle {
       width: 280px;
@@ -413,6 +442,12 @@
         width: 220px;
         height: 220px;
       }
+      
+      .telegram-button {
+        top: auto;
+        bottom: 20px;
+        left: 20px;
+      }
     }
     
     @media (max-width: 480px) {
@@ -469,6 +504,12 @@
   </div>
 
   <div class="container">
+    <!-- Ссылка на Telegram канал -->
+    <a href="https://t.me/wellcome_AI" target="_blank" class="telegram-button">
+      <i class="fab fa-telegram"></i>
+      <span>Подписаться</span>
+    </a>
+    
     <button class="settings-button" id="settings-button">
       <i class="fas fa-cog"></i>
     </button>
@@ -525,6 +566,10 @@
     // Функция логирования
     function log(message, level = 'info') {
       const timestamp = new Date().toLocaleTimeString();
+      // Отфильтровываем сообщения о WebSocket URL
+      if (message && message.includes("WebSocket URL:")) {
+        return;
+      }
       console.log(`[${level.toUpperCase()}] ${message}`);
       
       // Обновляем статус загрузки, если это информационное сообщение
@@ -758,7 +803,7 @@
         return;
       }
       
-      // Проверяем минимальную длительность аудио (200мс требуется OpenAI)
+      // Проверяем минимальную длительность аудио (300мс требуется для корректной работы)
       const audioLength = Date.now() - audioDataStartTime;
       if (audioLength < minimumAudioLength) {
         log(`Аудиобуфер слишком короткий (${audioLength}мс), ожидаем больше данных`, "warn");
@@ -770,7 +815,7 @@
             log(`Отправка аудиобуфера после дополнительной записи (${Date.now() - audioDataStartTime}мс)`);
             sendCommitBuffer();
           }
-        }, minimumAudioLength - audioLength);
+        }, minimumAudioLength - audioLength + 50); // Добавляем небольшой запас
         
         return;
       }
@@ -996,7 +1041,8 @@
           // Используем WebSocket-соединение с нашим локальным прокси
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
           const wsUrl = `${protocol}//${window.location.host}/ws`;
-          log(`WebSocket URL: ${wsUrl}`);
+          // НЕ логируем информацию о URL соединения
+          // log(`WebSocket URL: ${wsUrl}`);
           
           // Создаем новое WebSocket соединение
           websocket = new WebSocket(wsUrl);
@@ -1137,7 +1183,7 @@
           
           // Показываем уведомление только если установлен флаг готовности
           if (event.ready) {
-            showNotification(`Готов к работе`, false);
+            showNotification(`Голос изменен на ${voiceName}`, false);
             // Выходим из режима переключения и запускаем слушание
             reconnecting = false;
             mainCircle.classList.remove('voice-switching');
@@ -1393,6 +1439,9 @@
             event_id: `voice_${Date.now()}`,
             voice: newVoice
           }));
+          
+          // Отображаем уведомление о смене голоса
+          showNotification(`Переключение на голос ${newVoice}...`, false);
         }
       }
     }
