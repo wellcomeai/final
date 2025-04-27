@@ -11,6 +11,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from typing import Dict, Optional, List, Any
+from pydantic import BaseModel
+import time
+import uuid
+from fastapi import Body, Header, Depends, HTTPException, Request, UploadFile, File
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +138,70 @@ LOG_EVENT_TYPES = [
 
 # Хранилище активных соединений клиент <-> OpenAI
 client_connections = {}
+
+# Модели данных для API
+class SessionRequest(BaseModel):
+    prompt_id: Optional[str] = None
+    record_id: Optional[str] = None
+    lang: Optional[str] = "ru"
+    voice: Optional[bool] = True
+    avatar: Optional[bool] = False
+    wait_msg: Optional[str] = "Думаю..."
+
+class TextRequest(BaseModel):
+    session_id: str
+    message: str
+
+class VoiceSettings(BaseModel):
+    voice_id: str = DEFAULT_VOICE
+
+class ApiSession(BaseModel):
+    session_id: str
+    created_at: float
+    last_active: float
+    openai_session_id: Optional[str] = None
+    voice: str = DEFAULT_VOICE
+    lang: str = "ru"
+    messages: List[Dict[str, Any]] = []
+
+# Хранилище сессий API (в реальном приложении используйте базу данных)
+api_sessions: Dict[str, ApiSession] = {}
+
+# Функция очистки старых сессий
+async def cleanup_sessions():
+    while True:
+        current_time = time.time()
+        expired_sessions = []
+        
+        for session_id, session in api_sessions.items():
+            # Удаляем сессии старше 30 минут бездействия
+            if current_time - session.last_active > 1800:
+                expired_sessions.append(session_id)
+        
+        for session_id in expired_sessions:
+            logger.info(f"Удаление неактивной сессии API: {session_id}")
+            del api_sessions[session_id]
+            
+            # Также закрываем соединение с OpenAI, если оно существует
+            for client_id, client_data in list(client_connections.items()):
+                if hasattr(client_data, 'api_session_id') and client_data.api_session_id == session_id:
+                    # Закрываем соединение
+                    if client_data["openai_ws"]:
+                        try:
+                            await client_data["openai_ws"].close()
+                        except:
+                            pass
+                    
+                    # Удаляем информацию о клиенте
+                    client_connections[client_id]["active"] = False
+                    del client_connections[client_id]
+        
+        await asyncio.sleep(300)  # Проверка каждые 5 минут
+
+# Запускаем задачу очистки при старте приложения
+@app.on_event("startup")
+async def start_cleanup_task():
+    asyncio.create_task(cleanup_sessions())
 
 @app.get("/")
 async def index_page():
@@ -595,6 +664,542 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
     except Exception as e:
         logger.error(f"Ошибка при отправке настроек сессии: {str(e)}")
         raise
+
+# Функция для создания WebSocket соединения для REST API сессии
+async def create_api_websocket_connection(session_id: str, voice_id: str = DEFAULT_VOICE):
+    """
+    Создает WebSocket соединение с OpenAI для сессии API
+    и настраивает его для прослушивания и ответов.
+    """
+    try:
+        # Уникальный ID для клиента
+        client_id = f"api_{str(uuid.uuid4())}"
+        
+        # Создаем WebSocket соединение с OpenAI
+        openai_ws = await create_openai_connection()
+        
+        # Сохраняем информацию о соединении
+        client_connections[client_id] = {
+            "client_ws": None,  # В REST API нет клиентского WebSocket
+            "openai_ws": openai_ws,
+            "active": True,
+            "voice": voice_id,
+            "api_session_id": session_id,  # Связываем с API сессией
+            "tasks": [],
+            "reconnecting": False,
+            "messages_queue": asyncio.Queue(),  # Очередь для сообщений от OpenAI
+            "response_ready": asyncio.Event()   # Событие для сигнализации о готовности ответа
+        }
+        
+        # Отправляем настройки сессии в OpenAI
+        await send_session_update(openai_ws, voice_id)
+        
+        # Создаем задачу для слушания сообщений от OpenAI
+        openai_listener = asyncio.create_task(
+            listen_openai_for_api(openai_ws, client_id, session_id)
+        )
+        
+        # Сохраняем задачу
+        client_connections[client_id]["tasks"].append(openai_listener)
+        
+        # Обновляем сессию API с ID клиента
+        if session_id in api_sessions:
+            api_sessions[session_id].openai_session_id = client_id
+        
+        logger.info(f"Создано API соединение с OpenAI для сессии {session_id}, клиент {client_id}")
+        return client_id
+    
+    except Exception as e:
+        logger.error(f"Ошибка при создании API соединения: {str(e)}")
+        logger.error(traceback.format_exc())
+        return None
+
+async def listen_openai_for_api(openai_ws, client_id: str, session_id: str):
+    """
+    Слушает сообщения от OpenAI для API сессии и складывает их в очередь
+    """
+    try:
+        text_response = ""
+        audio_chunks = []
+        
+        async for openai_message in openai_ws:
+            if client_id not in client_connections or not client_connections[client_id]["active"]:
+                break
+                
+            try:
+                # Парсим JSON от OpenAI
+                if isinstance(openai_message, str):
+                    response = json.loads(openai_message)
+                    
+                    # Логируем определенные типы событий
+                    if response.get('type') in LOG_EVENT_TYPES:
+                        logger.info(f"[OpenAI -> API клиент {client_id}] {response.get('type')}")
+                    
+                    # Обрабатываем текстовый ответ
+                    if response.get('type') == 'response.text.delta':
+                        if 'delta' in response:
+                            text_response += response['delta']
+                    
+                    # Обрабатываем завершение ответа
+                    if response.get('type') == 'response.done':
+                        # Сохраняем результат в очередь
+                        await client_connections[client_id]["messages_queue"].put({
+                            "type": "response_complete",
+                            "text": text_response,
+                            "audio": audio_chunks,
+                            "timestamp": time.time()
+                        })
+                        
+                        # Сигнализируем о готовности ответа
+                        client_connections[client_id]["response_ready"].set()
+                        
+                        # Сбрасываем для следующего ответа
+                        text_response = ""
+                        audio_chunks = []
+                    
+                    # Обрабатываем ошибки
+                    if response.get('type') == 'error':
+                        error_msg = response.get('error', {}).get('message', 'Неизвестная ошибка')
+                        await client_connections[client_id]["messages_queue"].put({
+                            "type": "error",
+                            "message": error_msg,
+                            "timestamp": time.time()
+                        })
+                        client_connections[client_id]["response_ready"].set()
+                
+                # Обрабатываем аудио чанки
+                if response.get('type') == 'response.audio.delta':
+                    if 'delta' in response:
+                        audio_chunks.append(response['delta'])
+                
+            except json.JSONDecodeError:
+                logger.error(f"Получены некорректные данные от OpenAI для API клиента {client_id}")
+            except Exception as e:
+                logger.error(f"Ошибка при обработке данных от OpenAI для API клиента {client_id}: {str(e)}")
+    
+    except websockets.exceptions.ConnectionClosed as e:
+        logger.info(f"Соединение с OpenAI закрыто для API клиента {client_id}")
+    except Exception as e:
+        logger.error(f"Ошибка в задаче listen_openai_for_api: {str(e)}")
+        logger.error(traceback.format_exc())
+    finally:
+        # Помечаем соединение как неактивное при выходе
+        if client_id in client_connections:
+            client_connections[client_id]["active"] = False
+
+# API эндпоинты для REST API
+@app.get("/widget")
+async def widget_page():
+    """Возвращает HTML страницу с интерфейсом голосового помощника для встраивания"""
+    widget_path = os.path.join(static_dir, "widget.html")
+    
+    # Если файл виджета не существует, используем стандартный index.html
+    if not os.path.exists(widget_path):
+        widget_path = os.path.join(static_dir, "index.html")
+    
+    try:
+        with open(widget_path, "r", encoding="utf-8") as file:
+            content = file.read()
+        return HTMLResponse(content=content)
+    except Exception as e:
+        logger.error(f"Ошибка при отдаче виджета: {str(e)}")
+        return HTMLResponse(
+            content=f"<html><body><h1>Ошибка</h1><p>{str(e)}</p></body></html>",
+            status_code=500
+        )
+
+# Создаем новую сессию для API
+@app.post("/api/v1/session")
+async def create_session(request: SessionRequest = Body(...)):
+    session_id = str(uuid.uuid4())
+    
+    # Создаем новую сессию
+    session = ApiSession(
+        session_id=session_id,
+        created_at=time.time(),
+        last_active=time.time(),
+        voice=DEFAULT_VOICE,
+        lang=request.lang or "ru",
+        messages=[]
+    )
+    
+    api_sessions[session_id] = session
+    
+    return {
+        "status": "success",
+        "session_id": session_id,
+        "message": "Сессия создана успешно"
+    }
+
+# Получаем данные сессии
+@app.get("/api/v1/session/{session_id}")
+async def get_session(session_id: str):
+    if session_id not in api_sessions:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    session = api_sessions[session_id]
+    session.last_active = time.time()
+    
+    return {
+        "status": "success",
+        "session": {
+            "session_id": session.session_id,
+            "created_at": session.created_at,
+            "voice": session.voice,
+            "lang": session.lang,
+            "message_count": len(session.messages)
+        }
+    }
+
+# Изменяем настройки сессии
+@app.put("/api/v1/session/{session_id}/voice")
+async def update_session_voice(session_id: str, settings: VoiceSettings):
+    if session_id not in api_sessions:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    session = api_sessions[session_id]
+    session.last_active = time.time()
+    
+    voice_id = settings.voice_id
+    if voice_id not in AVAILABLE_VOICES:
+        raise HTTPException(status_code=400, detail=f"Голос {voice_id} недоступен")
+    
+    # Изменяем голос в сессии
+    session.voice = voice_id
+    
+    # Если есть активное соединение с OpenAI для этой сессии, изменяем и его
+    for client_id, client_data in client_connections.items():
+        if hasattr(client_data, 'api_session_id') and client_data.api_session_id == session_id:
+            # Запускаем пересоздание соединения для смены голоса
+            await recreate_openai_connection(client_id, voice_id)
+    
+    return {
+        "status": "success",
+        "message": f"Голос изменен на {voice_id}"
+    }
+
+# Отправка текстового сообщения
+@app.post("/api/v1/message")
+async def send_text_message(request: TextRequest):
+    session_id = request.session_id
+    
+    if session_id not in api_sessions:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    session = api_sessions[session_id]
+    session.last_active = time.time()
+    
+    # Добавляем сообщение пользователя в историю
+    user_message = {
+        "role": "user",
+        "content": request.message,
+        "timestamp": time.time()
+    }
+    session.messages.append(user_message)
+    
+    # Проверяем, есть ли активное соединение с OpenAI для этой сессии
+    client_id = None
+    if session.openai_session_id and session.openai_session_id in client_connections:
+        client_id = session.openai_session_id
+    
+    # Если нет активного соединения, создаем новое
+    if client_id is None:
+        client_id = await create_api_websocket_connection(session_id, session.voice)
+        if not client_id:
+            raise HTTPException(status_code=500, detail="Не удалось создать соединение с OpenAI")
+    
+    # Отправляем сообщение через WebSocket
+    try:
+        # Сбрасываем событие готовности ответа
+        client_connections[client_id]["response_ready"].clear()
+        
+        # Отправляем запрос в OpenAI
+        conversation_item = {
+            "type": "conversation.item.create",
+            "event_id": f"msg_{time.time()}",
+            "item": {
+                "id": f"user_msg_{uuid.uuid4()}",
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": request.message
+                    }
+                ]
+            }
+        }
+        
+        await client_connections[client_id]["openai_ws"].send(json.dumps(conversation_item))
+        
+        # Отправляем команду для создания ответа
+        response_create = {
+            "type": "response.create",
+            "event_id": f"resp_{time.time()}",
+            "response": {
+                "temperature": 0.7
+            }
+        }
+        
+        await client_connections[client_id]["openai_ws"].send(json.dumps(response_create))
+        
+        # Ждем ответа с таймаутом
+        try:
+            await asyncio.wait_for(
+                client_connections[client_id]["response_ready"].wait(),
+                timeout=60.0  # Максимальное время ожидания - 60 секунд
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="Превышено время ожидания ответа")
+        
+        # Получаем ответ из очереди
+        response_data = await client_connections[client_id]["messages_queue"].get()
+        
+        if response_data["type"] == "error":
+            raise HTTPException(status_code=500, detail=response_data["message"])
+        
+        # Получаем текст и аудио
+        response_text = response_data["text"]
+        audio_chunks = response_data["audio"]
+        
+        # Объединяем аудио чанки (если есть)
+        response_audio = None
+        if audio_chunks:
+            response_audio = "".join(audio_chunks)
+        
+        # Добавляем ответ ассистента в историю
+        assistant_message = {
+            "role": "assistant",
+            "content": response_text,
+            "timestamp": time.time()
+        }
+        session.messages.append(assistant_message)
+        
+        return {
+            "status": "success",
+            "response": {
+                "text": response_text,
+                "audio": response_audio
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Ошибка при обработке текстового запроса: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
+
+# Загрузка и обработка аудиофайла
+@app.post("/api/v1/audio")
+async def process_audio(
+    session_id: str = Body(...),
+    audio_file: UploadFile = File(...)
+):
+    if session_id not in api_sessions:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    session = api_sessions[session_id]
+    session.last_active = time.time()
+    
+    # Проверяем, есть ли активное соединение с OpenAI для этой сессии
+    client_id = None
+    if session.openai_session_id and session.openai_session_id in client_connections:
+        client_id = session.openai_session_id
+    
+    # Если нет активного соединения, создаем новое
+    if client_id is None:
+        client_id = await create_api_websocket_connection(session_id, session.voice)
+        if not client_id:
+            raise HTTPException(status_code=500, detail="Не удалось создать соединение с OpenAI")
+    
+    try:
+        # Сбрасываем событие готовности ответа
+        client_connections[client_id]["response_ready"].clear()
+        
+        # Читаем аудиофайл
+        audio_content = await audio_file.read()
+        
+        # Отправляем аудио через WebSocket
+        await client_connections[client_id]["openai_ws"].send(json.dumps({
+            "type": "input_audio_buffer.clear",
+            "event_id": f"clear_{time.time()}"
+        }))
+        
+        # Отправляем аудио чанками, чтобы избежать ограничений размера сообщения
+        chunk_size = 16384  # 16KB чанки
+        for i in range(0, len(audio_content), chunk_size):
+            chunk = audio_content[i:i+chunk_size]
+            
+            # Кодируем в base64
+            audio_b64 = base64.b64encode(chunk).decode('utf-8')
+            
+            # Отправляем чанк
+            await client_connections[client_id]["openai_ws"].send(json.dumps({
+                "type": "input_audio_buffer.append",
+                "event_id": f"audio_{time.time()}",
+                "audio": audio_b64
+            }))
+        
+        # Коммитим буфер
+        await client_connections[client_id]["openai_ws"].send(json.dumps({
+            "type": "input_audio_buffer.commit",
+            "event_id": f"commit_{time.time()}"
+        }))
+        
+        # Отправляем команду для создания ответа
+        await client_connections[client_id]["openai_ws"].send(json.dumps({
+            "type": "response.create",
+            "event_id": f"resp_{time.time()}",
+            "response": {
+                "temperature": 0.7
+            }
+        }))
+        
+        # Ждем ответа с таймаутом
+        try:
+            await asyncio.wait_for(
+                client_connections[client_id]["response_ready"].wait(),
+                timeout=60.0  # Максимальное время ожидания - 60 секунд
+            )
+        except asyncio.TimeoutError:
+            raise HTTPException(status_code=504, detail="Превышено время ожидания ответа")
+        
+        # Получаем ответ из очереди
+        response_data = await client_connections[client_id]["messages_queue"].get()
+        
+        if response_data["type"] == "error":
+            raise HTTPException(status_code=500, detail=response_data["message"])
+        
+        # Получаем текст и аудио
+        response_text = response_data["text"]
+        audio_chunks = response_data["audio"]
+        
+        # Объединяем аудио чанки (если есть)
+        response_audio = None
+        if audio_chunks:
+            response_audio = "".join(audio_chunks)
+        
+        # Добавляем сообщения в историю
+        user_message = {
+            "role": "user",
+            "content": "[Аудио сообщение]",
+            "timestamp": time.time()
+        }
+        session.messages.append(user_message)
+        
+        assistant_message = {
+            "role": "assistant",
+            "content": response_text,
+            "timestamp": time.time()
+        }
+        session.messages.append(assistant_message)
+        
+        return {
+            "status": "success",
+            "response": {
+                "text": response_text,
+                "audio": response_audio
+            }
+        }
+    
+    except Exception as e:
+        logger.error(f"Ошибка при обработке аудио: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}")
+
+# Удаляем сессию
+@app.delete("/api/v1/session/{session_id}")
+async def delete_session(session_id: str):
+    if session_id not in api_sessions:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+    
+    # Удаляем сессию
+    del api_sessions[session_id]
+    
+    # Также закрываем соединение с OpenAI, если оно существует
+    for client_id, client_data in list(client_connections.items()):
+        if hasattr(client_data, 'api_session_id') and client_data.api_session_id == session_id:
+            # Закрываем соединение
+            if client_data["openai_ws"]:
+                try:
+                    await client_data["openai_ws"].close()
+                except:
+                    pass
+            
+            # Удаляем информацию о клиенте
+            client_connections[client_id]["active"] = False
+            del client_connections[client_id]
+    
+    return {
+        "status": "success",
+        "message": "Сессия удалена"
+    }
+
+# API прокси для оригинального виджета
+@app.get("/api/v1.0/chatgpt_widget_dialog_api")
+async def proxy_widget_dialog_api(request: Request):
+    """
+    Прокси для оригинального виджета. Перехватывает запросы от iframe 
+    и обрабатывает их через ваш API вместо оригинального сервера.
+    """
+    # Получаем параметры запроса
+    params = dict(request.query_params)
+    
+    # Создаем HTML с вашим виджетом
+    # Здесь мы заменяем доступ к оригинальному API на ваш собственный
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WellcomeAI Widget</title>
+        <style>
+            body, html {{
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                font-family: 'Segoe UI', 'Roboto', sans-serif;
+            }}
+            #assistant-container {{
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+            }}
+            #widget-frame {{
+                width: 100%;
+                height: 100%;
+                border: none;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="assistant-container">
+            <!-- Здесь мы встраиваем ваш собственный интерфейс вместо оригинального -->
+            <iframe id="widget-frame" src="/widget" allow="microphone;autoplay"></iframe>
+        </div>
+        
+        <script>
+            // Здесь можно добавить JavaScript для обработки сообщений между iframe и родительской страницей
+            window.addEventListener('message', function(event) {{
+                // Обработка сообщений от родительской страницы или из iframe
+                console.log('Received message:', event.data);
+                
+                // Пример пересылки сообщения в iframe
+                const frame = document.getElementById('widget-frame');
+                if (frame && event.data && event.data.type) {{
+                    frame.contentWindow.postMessage(event.data, '*');
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    
+    # Возвращаем HTML страницу
+    return HTMLResponse(content=html_content)
 
 if __name__ == "__main__":
     import uvicorn
