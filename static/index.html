@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WellcomeAI - Голосовой помощник</title>
+  <title>WellcomeAI</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     /* Reset и базовые стили */
@@ -20,7 +20,9 @@
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      overflow-x: hidden;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
     }
     
     /* Главный контейнер */
@@ -33,27 +35,15 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-    }
-    
-    /* Заголовок */
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-      width: 100%;
+      justify-content: center;
       position: relative;
-    }
-    
-    .logo {
-      font-size: 28px;
-      color: #4a86e8;
-      font-weight: 600;
     }
     
     /* Настройки */
     .settings-button {
       position: absolute;
-      right: 0;
-      top: 5px;
+      right: 20px;
+      top: 20px;
       background: none;
       border: none;
       color: #777;
@@ -61,6 +51,7 @@
       cursor: pointer;
       opacity: 0.7;
       transition: opacity 0.3s, transform 0.3s;
+      z-index: 10;
     }
     
     .settings-button:hover {
@@ -69,14 +60,6 @@
     }
     
     /* Основной элемент - круг */
-    .main-circle-container {
-      position: relative;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    
     .main-circle {
       width: 280px;
       height: 280px;
@@ -89,6 +72,7 @@
       align-items: center;
       justify-content: center;
       transition: all 0.3s ease;
+      z-index: 5;
     }
     
     .main-circle::before {
@@ -106,15 +90,14 @@
       100% { transform: rotate(360deg); }
     }
     
-    /* Аудио визуализация */
+    /* Аудио визуализация (скрытая) */
     .audio-visualization {
+      position: absolute;
       width: 100%;
       max-width: 400px;
       height: 60px;
-      margin: 0 auto 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
     }
     
     .audio-bars {
@@ -134,75 +117,40 @@
       transition: height 0.1s ease;
     }
     
-    /* Транскрипция */
-    .transcript {
-      font-style: italic;
-      margin: 10px 0;
-      color: #666;
-      text-align: center;
-      min-height: 24px;
-      font-size: 16px;
-    }
-    
-    /* Чат */
+    /* Чат-контейнер (скрытый, но функциональный) */
     .chat-container {
+      position: fixed;
       width: 100%;
-      max-width: 800px;
-      background-color: #f8f9fa;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      height: calc(100vh - 500px);
-      min-height: 300px;
+      height: 100%;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      pointer-events: none;
     }
     
     .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
     }
     
-    .message {
-      max-width: 80%;
-      padding: 12px 16px;
-      margin-bottom: 15px;
-      border-radius: 18px;
-      position: relative;
-      animation: messageAppear 0.3s ease;
-      line-height: 1.5;
-    }
-    
-    @keyframes messageAppear {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .user-message {
-      background-color: #e3f2fd;
-      color: #333;
-      align-self: flex-end;
-      border-bottom-right-radius: 4px;
-    }
-    
-    .assistant-message {
-      background-color: white;
-      color: #333;
-      align-self: flex-start;
-      border-bottom-left-radius: 4px;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Статус */
+    /* Статус загрузки (скрытый) */
     .status {
-      text-align: center;
-      margin-top: 15px;
-      font-size: 14px;
-      color: #777;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
+    }
+    
+    /* Транскрипция (скрытая) */
+    .transcript {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
     }
     
     /* Модальное окно */
@@ -334,28 +282,10 @@
     }
     
     /* Мобильная версия */
-    @media (max-width: 768px) {
-      .container {
-        padding: 15px;
-      }
-      
-      .logo {
-        font-size: 24px;
-      }
-      
+    @media (max-width: 768px) {      
       .main-circle {
         width: 220px;
         height: 220px;
-      }
-      
-      .chat-container {
-        height: calc(100vh - 400px);
-        min-height: 250px;
-      }
-      
-      .message {
-        max-width: 90%;
-        font-size: 15px;
       }
     }
     
@@ -363,10 +293,6 @@
       .main-circle {
         width: 180px;
         height: 180px;
-      }
-      
-      .chat-container {
-        height: calc(100vh - 350px);
       }
     }
   </style>
@@ -376,8 +302,8 @@
   <div id="loading-modal" class="modal active">
     <div class="modal-content">
       <div class="spinner"></div>
-      <h2>Подключение к WellcomeAI...</h2>
-      <p>Пожалуйста, подождите. Это может занять несколько секунд.</p>
+      <h2>WellcomeAI</h2>
+      <p>Подключение...</p>
       <div id="loading-status">Инициализация...</div>
     </div>
   </div>
@@ -412,34 +338,23 @@
   </div>
 
   <div class="container">
-    <div class="header">
-      <h1 class="logo">WellcomeAI</h1>
-      <button class="settings-button" id="settings-button">
-        <i class="fas fa-cog"></i>
-      </button>
-    </div>
+    <button class="settings-button" id="settings-button">
+      <i class="fas fa-cog"></i>
+    </button>
     
-    <div class="main-circle-container">
-      <div class="main-circle" id="main-circle"></div>
-    </div>
+    <div class="main-circle" id="main-circle"></div>
     
     <div class="audio-visualization" id="audio-visualization">
-      <div class="audio-bars" id="audio-bars">
-        <!-- Аудио-бары будут добавлены с помощью JavaScript -->
-      </div>
+      <div class="audio-bars" id="audio-bars"></div>
     </div>
     
     <div class="transcript" id="transcript"></div>
     
     <div class="chat-container">
-      <div class="messages" id="messages">
-        <div class="message assistant-message">
-          Здравствуйте! Я WellcomeAI, ваш голосовой помощник. Чем могу помочь?
-        </div>
-      </div>
+      <div class="messages" id="messages"></div>
     </div>
     
-    <div class="status" id="status">Не подключено</div>
+    <div class="status" id="status"></div>
   </div>
 
   <script>
@@ -496,9 +411,16 @@
     let audioContext = null;
     let mediaStream = null;
     let audioProcessor = null;
+    let lastSilenceTime = 0;
+    let audioBufferTimeoutId = null;
     
-    // Создаем тестовый аудио-элемент для проверки форматов
-    const audioTestElement = new Audio();
+    // Конфигурация для оптимизации потока аудио
+    const AUDIO_CONFIG = {
+      silenceThreshold: 0.01,      // Порог для определения тишины (был 0.01)
+      silenceDuration: 300,        // Длительность тишины для отправки (мс) (было 500)
+      bufferCheckInterval: 50,     // Частота проверки буфера (мс) (было 100)
+      soundDetectionThreshold: 0.02 // Чувствительность к звуку (был 0.01)
+    };
     
     // Инициализация микрофона и AudioContext
     async function initAudio() {
@@ -510,7 +432,7 @@
           throw new Error("Ваш браузер не поддерживает доступ к микрофону");
         }
         
-        // Запрашиваем доступ к микрофону
+        // Запрашиваем доступ к микрофону с оптимальными настройками
         mediaStream = await navigator.mediaDevices.getUserMedia({ 
           audio: {
             echoCancellation: true,
@@ -530,7 +452,7 @@
         const streamSource = audioContext.createMediaStreamSource(mediaStream);
         
         // Выбираем размер буфера
-        const bufferSize = 4096;
+        const bufferSize = 2048; // Меньший размер буфера для меньшей задержки
         
         // Проверяем, доступен ли ScriptProcessorNode
         if (audioContext.createScriptProcessor) {
@@ -540,48 +462,90 @@
           throw new Error("Ваш браузер не поддерживает ScriptProcessorNode");
         }
         
-        // Обработчик аудио
+        // Переменные для отслеживания звука
+        let isSilent = true;
+        let silenceStartTime = Date.now();
+        let lastCommitTime = 0;
+        let hasSentAudioInCurrentSegment = false;
+        
+        // Обработчик аудио с оптимизированной логикой
         audioProcessor.onaudioprocess = function(e) {
           if (isListening && websocket && websocket.readyState === WebSocket.OPEN) {
             // Получаем данные с микрофона
             const inputData = e.inputBuffer.getChannelData(0);
             
-            // Проверяем, есть ли звук (чтобы не отправлять тишину)
-            let hasSound = false;
+            // Вычисляем максимальную амплитуду
             let maxAmplitude = 0;
-            
             for (let i = 0; i < inputData.length; i++) {
               const absValue = Math.abs(inputData[i]);
               maxAmplitude = Math.max(maxAmplitude, absValue);
-              if (absValue > 0.01) { // Порог обнаружения звука
-                hasSound = true;
-                break;
-              }
             }
             
-            // Обновляем визуализацию в любом случае
+            // Определяем, есть ли звук
+            const hasSound = maxAmplitude > AUDIO_CONFIG.soundDetectionThreshold;
+            
+            // Обновляем визуализацию
             updateAudioVisualization(inputData);
             
-            // Отправляем только если есть звук или если прошло определенное время
-            if (hasSound) {
-              // Преобразуем float32 в int16
-              const pcm16Data = new Int16Array(inputData.length);
-              for (let i = 0; i < inputData.length; i++) {
-                // Конвертируем float32 (-1.0 до 1.0) в int16 (-32768 до 32767)
-                pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
-              }
+            // Отправляем все аудиоданные для лучшего качества распознавания
+            // Преобразуем float32 в int16
+            const pcm16Data = new Int16Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+              pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
+            }
+            
+            // Отправляем данные через WebSocket
+            try {
+              const message = JSON.stringify({
+                type: "input_audio_buffer.append",
+                event_id: `audio_${Date.now()}`,
+                audio: arrayBufferToBase64(pcm16Data.buffer)
+              });
               
-              // Отправляем данные через WebSocket
-              try {
-                const message = JSON.stringify({
-                  type: "input_audio_buffer.append",
-                  event_id: `audio_${Date.now()}`,
-                  audio: arrayBufferToBase64(pcm16Data.buffer)
-                });
+              websocket.send(message);
+              hasSentAudioInCurrentSegment = true;
+            } catch (error) {
+              log(`Ошибка отправки аудио: ${error.message}`, "error");
+            }
+            
+            // Логика определения тишины и автоматической отправки
+            const now = Date.now();
+            
+            if (hasSound) {
+              // Сбрасываем время начала тишины
+              isSilent = false;
+              silenceStartTime = now;
+              
+              // Анимируем круг при обнаружении звука
+              mainCircle.style.boxShadow = "0 0 30px rgba(74, 134, 232, 0.3)";
+              
+              // Очищаем предыдущий таймаут, если был запланирован
+              if (audioBufferTimeoutId) {
+                clearTimeout(audioBufferTimeoutId);
+                audioBufferTimeoutId = null;
+              }
+            } else if (!isSilent) {
+              // Если наступила тишина
+              const silenceDuration = now - silenceStartTime;
+              
+              if (silenceDuration > AUDIO_CONFIG.silenceDuration) {
+                isSilent = true;
                 
-                websocket.send(message);
-              } catch (error) {
-                log(`Ошибка отправки аудио: ${error.message}`, "error");
+                // Если прошло достаточно времени с последней отправки и были данные
+                if (now - lastCommitTime > 1000 && hasSentAudioInCurrentSegment) {
+                  // Отправляем буфер с небольшой задержкой, чтобы убедиться в завершении речи
+                  if (!audioBufferTimeoutId) {
+                    audioBufferTimeoutId = setTimeout(() => {
+                      // Проверяем снова, не появился ли звук
+                      if (isSilent && isListening && !isProcessing) {
+                        commitAudioBuffer();
+                        lastCommitTime = Date.now();
+                        hasSentAudioInCurrentSegment = false;
+                      }
+                      audioBufferTimeoutId = null;
+                    }, 100); // Малая задержка перед отправкой для уверенности
+                  }
+                }
               }
             }
           }
@@ -598,6 +562,25 @@
         statusElement.textContent = "Ошибка доступа к микрофону";
         return false;
       }
+    }
+    
+    // Функция для отправки аудиобуфера
+    function commitAudioBuffer() {
+      if (!isListening || isProcessing || !websocket || websocket.readyState !== WebSocket.OPEN) return;
+      
+      log("Автоматическая отправка аудиобуфера");
+      
+      // Сбрасываем эффект активности
+      mainCircle.style.boxShadow = "";
+      
+      // Отправляем команду для завершения буфера
+      websocket.send(JSON.stringify({
+        type: "input_audio_buffer.commit",
+        event_id: `commit_${Date.now()}`
+      }));
+      
+      // Начинаем обработку
+      isProcessing = true;
     }
     
     // Преобразование ArrayBuffer в Base64
@@ -711,21 +694,13 @@
     function playAudio(audioBase64) {
       try {
         // Проверяем непустую строку
-        if (!audioBase64 || typeof audioBase64 !== 'string') {
-          log("Получены пустые аудио данные", "warn");
-          return;
-        }
+        if (!audioBase64 || typeof audioBase64 !== 'string') return;
         
         // Декодируем Base64 в ArrayBuffer
         const audioData = base64ToArrayBuffer(audioBase64);
         
         // Проверяем размер данных
-        if (audioData.byteLength === 0) {
-          log("Аудио данные имеют нулевую длину", "warn");
-          return;
-        }
-        
-        log(`Получено ${audioData.byteLength} байт аудио данных`);
+        if (audioData.byteLength === 0) return;
         
         // Предполагаем, что данные в формате PCM16, конвертируем в WAV для воспроизведения
         const wavBuffer = createWavFromPcm(audioData);
@@ -734,12 +709,8 @@
         
         // Воспроизводим звук
         const audio = new Audio(audioUrl);
-        audio.onerror = function(e) {
-          log(`Ошибка воспроизведения аудио: ${e.target.error.message || 'Неизвестная ошибка'}`, "error");
-        };
         
         audio.oncanplaythrough = function() {
-          log(`Готов к воспроизведению аудио: ${audio.duration.toFixed(2)} секунд`);
           audio.play().catch(err => {
             log(`Ошибка при воспроизведении: ${err.message}`, "error");
           });
@@ -754,21 +725,19 @@
       }
     }
     
-    // Добавление сообщения в чат
+    // Добавление сообщения в чат (скрытое)
     function addMessage(text, isUser) {
       const messageElement = document.createElement('div');
       messageElement.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
       messageElement.textContent = text;
       messagesContainer.appendChild(messageElement);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
     
-    // Подключение к WebSocket серверу (локальный прокси)
+    // Подключение к WebSocket серверу
     async function connectWebSocket() {
       return new Promise((resolve, reject) => {
         try {
           loadingModal.classList.add('active');
-          statusElement.textContent = "Подключение...";
           log("Подключение к WebSocket серверу...");
           
           // Используем WebSocket-соединение с нашим локальным прокси
@@ -789,8 +758,6 @@
           websocket.onopen = function() {
             clearTimeout(connectionTimeout);
             log("WebSocket соединение установлено");
-            statusElement.textContent = "Подключено";
-            statusElement.style.color = "#4a86e8";
             isConnected = true;
             loadingModal.classList.remove('active');
             
@@ -808,14 +775,12 @@
           };
           
           websocket.onclose = function(event) {
-            log(`WebSocket соединение закрыто: код ${event.code}, причина: ${event.reason || 'не указана'}`, event.wasClean ? "info" : "error");
-            statusElement.textContent = `Соединение закрыто: ${event.reason || 'Неизвестная причина'}`;
-            statusElement.style.color = "#f44336";
+            log(`WebSocket соединение закрыто: код ${event.code}`, event.wasClean ? "info" : "error");
             isConnected = false;
             
             // Пытаемся переподключиться, если соединение было разорвано не чисто
             if (!event.wasClean) {
-              log(`Попытка переподключения через 3 секунды...`, "warn");
+              mainCircle.style.boxShadow = "0 0 30px rgba(244, 67, 54, 0.3)";
               
               setTimeout(() => {
                 connectWebSocket().catch(err => {
@@ -824,13 +789,11 @@
               }, 3000);
             }
             
-            reject(new Error(`Соединение закрыто: ${event.reason || 'Неизвестная причина'}`));
+            reject(new Error(`Соединение закрыто`));
           };
           
           websocket.onerror = function(error) {
             log(`WebSocket ошибка: ${error.message || 'Неизвестная ошибка'}`, "error");
-            statusElement.textContent = "Ошибка соединения";
-            statusElement.style.color = "#f44336";
             isConnected = false;
             reject(error);
           };
@@ -878,7 +841,7 @@
               const json = JSON.parse(text);
               processServerEvent(json);
             } catch (e) {
-              log(`Ошибка парсинга JSON из бинарных данных: ${e.message}`, "error");
+              log(`Ошибка парсинга JSON из бинарных данных`, "error");
             }
           };
           reader.readAsText(data);
@@ -887,29 +850,22 @@
             const json = typeof data === 'string' ? JSON.parse(data) : data;
             processServerEvent(json);
           } catch (e) {
-            log(`Ошибка парсинга JSON из текстовых данных: ${e.message}`, "error");
-            log(`Данные: ${typeof data === 'string' ? data.substring(0, 100) : 'не строка'}`, "debug");
+            log(`Ошибка парсинга JSON из текстовых данных`, "error");
           }
         }
       } catch (error) {
-        log(`Ошибка обработки сообщения: ${error.message}`, "error");
+        log(`Ошибка обработки сообщения`, "error");
       }
     }
     
     // Обработка событий от сервера
     let currentResponseText = "";
-    let lastAudioTimestamp = 0;
     let currentResponseId = null;
     let currentItemId = null;
     const audioChunks = [];
     
     function processServerEvent(event) {
-      if (!event || !event.type) {
-        log("Получено некорректное событие без типа", "warn");
-        return;
-      }
-      
-      log(`Событие от сервера: ${event.type}`, "debug");
+      if (!event || !event.type) return;
       
       // Сохраняем ID текущего ответа и элемента, если они есть
       if (event.response_id && !currentResponseId) {
@@ -923,7 +879,6 @@
       switch (event.type) {
         case "error":
           log(`Ошибка от сервера: ${event.error ? event.error.message : 'Неизвестная ошибка'}`, "error");
-          statusElement.textContent = `Ошибка: ${event.error ? event.error.message : 'Неизвестная ошибка'}`;
           
           // Анимируем круг, чтобы показать ошибку
           mainCircle.style.boxShadow = "0 0 20px rgba(244, 67, 54, 0.5)";
@@ -937,12 +892,9 @@
           // Обновляем транскрипцию распознанной речи пользователя
           if (event.transcript || event.delta) {
             const transcript = event.transcript || event.delta;
-            transcriptElement.textContent = transcript;
-            log(`Транскрипция: ${transcript}`, "info");
             
             if (event.type === "conversation.item.input_audio_transcription.completed") {
               addMessage(transcript, true);
-              transcriptElement.textContent = "";
             }
           }
           break;
@@ -954,8 +906,7 @@
             
             // Обновляем текущее сообщение или создаем новое
             const lastMessage = messagesContainer.lastElementChild;
-            if (lastMessage && lastMessage.classList.contains('assistant-message') && 
-                lastMessage !== messagesContainer.firstElementChild) {
+            if (lastMessage && !lastMessage.classList.contains('user-message')) {
               lastMessage.textContent = currentResponseText;
             } else {
               addMessage(currentResponseText, false);
@@ -970,12 +921,10 @@
           // Текстовый ответ завершен
           if (event.text) {
             currentResponseText = event.text;
-            log(`Текстовый ответ завершен: ${currentResponseText.substring(0, 50)}...`, "info");
             
             // Обновляем текущее сообщение или создаем новое
             const lastMessage = messagesContainer.lastElementChild;
-            if (lastMessage && lastMessage.classList.contains('assistant-message') && 
-                lastMessage !== messagesContainer.firstElementChild) {
+            if (lastMessage && !lastMessage.classList.contains('user-message')) {
               lastMessage.textContent = currentResponseText;
             } else {
               addMessage(currentResponseText, false);
@@ -992,14 +941,12 @@
           // Обрабатываем аудиоответ по частям
           if (event.delta) {
             audioChunks.push(event.delta);
-            log(`Получен фрагмент аудио: ${event.delta.length} символов`, "debug");
           }
           break;
           
         case "response.audio.done":
           // Аудиоответ завершен, воспроизводим его
           if (audioChunks.length > 0) {
-            log(`Аудиоответ завершен, ${audioChunks.length} фрагментов`, "info");
             const fullAudio = audioChunks.join('');
             playAudio(fullAudio);
             audioChunks.length = 0; // Очищаем массив
@@ -1008,7 +955,6 @@
           
         case "response.done":
           // Ответ полностью завершен
-          log("Ответ полностью завершен", "info");
           isProcessing = false;
           
           // Сбрасываем состояние
@@ -1023,61 +969,35 @@
           
           // Начинаем снова слушать автоматически
           if (!isListening) {
-            startListening();
+            setTimeout(() => {
+              startListening();
+            }, 100); // Небольшая задержка для уверенности
           }
-          break;
-          
-        case "session.created":
-          log("Сессия создана на сервере", "info");
-          break;
-          
-        case "session.updated":
-          log("Сессия обновлена", "info");
-          
-          // Если в ответе есть информация о голосе, обновляем настройки
-          if (event.session && event.session.voice) {
-            log(`Голос обновлен на: ${event.session.voice}`, "info");
-          }
-          break;
-          
-        case "input_audio_buffer.committed":
-          log("Аудиобуфер отправлен", "info");
-          break;
-          
-        case "input_audio_buffer.cleared":
-          log("Аудиобуфер очищен", "info");
           break;
           
         case "input_audio_buffer.speech_started":
-          log("Обнаружена речь", "info");
           // Анимируем круг, показывая обнаружение речи
           mainCircle.style.boxShadow = "0 0 30px rgba(244, 67, 54, 0.3)";
           break;
           
         case "input_audio_buffer.speech_stopped":
-          log("Речь завершена", "info");
           // Сбрасываем анимацию круга
           setTimeout(() => {
             mainCircle.style.boxShadow = "";
           }, 500);
           break;
-          
-        default:
-          log(`Неизвестный тип события: ${event.type}`, "debug");
       }
     }
     
     // Начало записи голоса
     function startListening() {
       if (!isConnected || isProcessing) {
-        log("Невозможно начать запись: " + (!isConnected ? "не подключено" : "идет обработка"), "warn");
         return;
       }
       
       isListening = true;
       isProcessing = false;
-      transcriptElement.textContent = "Говорите...";
-      log("Начало записи голоса", "info");
+      log("Начало записи голоса");
       
       // Отправляем команду для очистки буфера ввода
       if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -1092,8 +1012,8 @@
         audioContext.resume();
       }
       
-      // Анимируем круг, показывая запись
-      mainCircle.style.boxShadow = "0 0 30px rgba(74, 134, 232, 0.2)";
+      // Мягкий пульсирующий эффект для индикации записи
+      mainCircle.style.animation = "pulse 2s infinite";
     }
     
     // Открытие модального окна настроек
@@ -1135,63 +1055,43 @@
     // Инициализация всего приложения
     async function init() {
       try {
-        log("Инициализация приложения", "info");
-        
         // Настраиваем обработчики событий для настроек
         settingsButton.addEventListener('click', openSettingsModal);
         settingsCancel.addEventListener('click', closeSettingsModal);
         settingsSave.addEventListener('click', saveSettings);
         
-        // Обработчик для большого центрального круга
-        mainCircle.addEventListener('click', () => {
-          // При клике на круг можем добавить какое-то действие
-          // например, показ статуса или переключение режима
-        });
-        
         // Инициализируем аудио
         const audioInitialized = await initAudio();
         
         if (audioInitialized) {
-          log("Аудио инициализировано успешно", "info");
-          
           // Подключаемся к WebSocket серверу
           const connected = await connectWebSocket();
           
           if (connected) {
-            log("Подключение к WebSocket установлено", "info");
-            
             // Если пользователь щелкнул вне модального окна настроек, закрываем его
             window.addEventListener('click', function(e) {
               if (e.target === settingsModal) {
                 closeSettingsModal();
               }
             });
-            
-            log("Обработчики событий установлены", "info");
           } else {
-            log("Не удалось установить подключение к WebSocket", "error");
             loadingModal.classList.remove('active');
-            alert("Не удалось подключиться к серверу. Проверьте консоль для получения дополнительной информации.");
+            setTimeout(() => {
+              // Повторная попытка подключения
+              connectWebSocket().catch(() => {});
+            }, 3000);
           }
         } else {
-          log("Не удалось инициализировать аудио", "error");
           loadingModal.classList.remove('active');
-          alert("Не удалось инициализировать аудио. Пожалуйста, разрешите доступ к микрофону и перезагрузите страницу.");
+          mainCircle.style.boxShadow = "0 0 30px rgba(244, 67, 54, 0.5)";
         }
       } catch (error) {
-        log(`Ошибка инициализации: ${error.message}`, "error");
         loadingModal.classList.remove('active');
-        alert(`Произошла ошибка: ${error.message}`);
       }
     }
     
     // Запускаем инициализацию после загрузки страницы
     window.addEventListener('load', init);
-    
-    // Обработка ошибок на уровне окна
-    window.addEventListener('error', function(event) {
-      log(`Глобальная ошибка: ${event.message} в ${event.filename}:${event.lineno}`, "error");
-    });
   </script>
 </body>
 </html>
