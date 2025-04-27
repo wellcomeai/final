@@ -3,441 +3,1007 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WellcomeAI Widget</title>
+  <title>WellcomeAI</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI','Roboto',sans-serif; }
-    body { background: transparent; overflow: hidden; }
-    .widget-wrapper { position: relative; width: 100%; height: 100%; }
-    /* Кнопка-микрофон */
-    #toggle-btn {
-      position: fixed; bottom: 20px; right: 20px;
-      width: 70px; height: 70px; border-radius: 50%;
-      background: linear-gradient(135deg,#ffffff,#e1f5fe,#4a86e8);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; transition: all .3s ease; z-index: 9999;
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', 'Roboto', sans-serif;
     }
-    #toggle-btn .mic-icon { font-size: 24px; color: #4a86e8; }
-
-    /* Развернутое окно */
-    #widget-container {
-      display: none;
-      position: fixed; bottom: 20px; right: 20px;
-      width: 360px; height: 500px;
-      background: white; border-radius: 15px;
-      box-shadow: 0 5px 25px rgba(0,0,0,0.2);
-      overflow: hidden; z-index: 9999;
-      flex-direction: column;
-    }
-    #widget.expanded #widget-container {
+    
+    body {
+      background-color: transparent;
+      color: #333;
+      min-height: 100vh;
       display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
     }
-
-    /* Кнопка закрытия */
-    .close-widget {
-      position: absolute; top: 15px; right: 15px;
-      width: 30px; height: 30px; border: none;
-      border-radius: 50%; background: rgba(255,255,255,0.8);
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      opacity: 0; transform: scale(0); transition: all .3s ease; z-index: 1001;
+    
+    /* Главный контейнер */
+    .container {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
     }
-    #widget.expanded .close-widget {
-      opacity: 1; transform: scale(1);
-    }
-    .close-widget i { font-size: 18px; color: #555; }
-
-    /* Лоадер */
-    .loader-modal {
-      position: absolute; top:0; left:0; width:100%; height:100%;
-      background: rgba(255,255,255,0.7);
-      display: flex; align-items:center; justify-content:center;
-      opacity: 0; visibility: hidden; transition: all .3s; z-index:1000;
-    }
-    .loader-modal.active { opacity:1; visibility:visible; }
-    .loader {
-      width:48px; height:48px;
-      border:4px solid rgba(74,134,232,0.3);
-      border-radius:50%; border-top-color:#4a86e8;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Основной кружок внутри окна */
+    
+    /* Основной элемент - круг */
     .main-circle {
-      width:200px; height:200px; border-radius:50%;
-      background: linear-gradient(135deg,#ffffff,#e1f5fe,#4a86e8);
-      box-shadow:0 10px 20px rgba(0,0,0,0.1);
-      position:relative; overflow:hidden;
-      display:flex; align-items:center; justify-content:center;
-      transition: all .3s ease; margin:auto; margin-top:60px;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      z-index: 5;
     }
+    
     .main-circle::before {
-      content: ''; position:absolute; width:140%; height:140%;
-      background: linear-gradient(45deg,rgba(255,255,255,0.3),rgba(74,134,232,0.2));
-      animation: wave 8s linear infinite; border-radius:40%;
+      content: '';
+      position: absolute;
+      width: 140%;
+      height: 140%;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2));
+      animation: wave 8s linear infinite;
+      border-radius: 40%;
     }
-    @keyframes wave { 0%{transform:rotate(0deg);}100%{transform:rotate(360deg);} }
+    
+    /* Анимация основной волны */
+    @keyframes wave {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Состояние прослушивания */
     .main-circle.listening {
-      background: linear-gradient(135deg,#ffffff,#e3f2fd,#2196f3);
-      box-shadow: 0 0 30px rgba(33,150,243,0.6);
+      background: linear-gradient(135deg, #ffffff, #e3f2fd, #2196f3);
+      box-shadow: 0 0 30px rgba(33, 150, 243, 0.6);
     }
+    
     .main-circle.listening::before {
       animation: wave 4s linear infinite;
-      background: linear-gradient(45deg,rgba(255,255,255,0.5),rgba(33,150,243,0.3));
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(33, 150, 243, 0.3));
     }
+    
+    /* Дополнительный эффект пульсации для прослушивания */
+    .main-circle.listening::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 3px solid rgba(33, 150, 243, 0.5);
+      animation: pulse 1.5s ease-out infinite;
+    }
+    
+    @keyframes pulse {
+      0% { 
+        transform: scale(0.95);
+        opacity: 0.7;
+      }
+      50% { 
+        transform: scale(1.05);
+        opacity: 0.3;
+      }
+      100% { 
+        transform: scale(0.95);
+        opacity: 0.7;
+      }
+    }
+    
+    /* Состояние говорения */
     .main-circle.speaking {
-      background: linear-gradient(135deg,#ffffff,#e8f5e9,#4caf50);
-      box-shadow: 0 0 30px rgba(76,175,80,0.6);
+      background: linear-gradient(135deg, #ffffff, #e8f5e9, #4caf50);
+      box-shadow: 0 0 30px rgba(76, 175, 80, 0.6);
     }
+    
     .main-circle.speaking::before {
       animation: wave 3s linear infinite;
-      background: linear-gradient(45deg,rgba(255,255,255,0.5),rgba(76,175,80,0.3));
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3));
     }
-    .mic-icon { font-size:48px; color:#4a86e8; z-index:10; }
-    .main-circle.listening .mic-icon { color:#2196f3; }
-    .main-circle.speaking .mic-icon { color:#4caf50; }
-
-    /* Визуализация звука */
+    
+    /* Иконка микрофона */
+    .mic-icon {
+      font-size: 48px;
+      color: #4a86e8;
+      z-index: 10;
+    }
+    
+    .main-circle.listening .mic-icon {
+      color: #2196f3;
+    }
+    
+    .main-circle.speaking .mic-icon {
+      color: #4caf50;
+    }
+    
+    /* Аудио визуализация (скрытая) */
     .audio-visualization {
-      position:absolute; width:100%; max-width:200px; height:30px;
-      bottom:10px; opacity:0.8;
+      position: absolute;
+      width: 100%;
+      max-width: 200px;
+      height: 30px;
+      bottom: 10px;
+      opacity: 0.8;
     }
+    
     .audio-bars {
-      display:flex; align-items:flex-end; height:30px; gap:2px;
-      width:100%; justify-content:center;
+      display: flex;
+      align-items: flex-end;
+      height: 30px;
+      gap: 2px;
+      width: 100%;
+      justify-content: center;
     }
+    
     .audio-bar {
-      width:3px; height:2px; background-color:#4a86e8;
-      border-radius:1px; transition: height .1s ease;
+      width: 3px;
+      height: 2px;
+      background-color: #4a86e8;
+      border-radius: 1px;
+      transition: height 0.1s ease;
+    }
+    
+    /* Модальное окно загрузки */
+    .loader-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s;
+    }
+    
+    .loader-modal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .loader {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(74, 134, 232, 0.3);
+      border-radius: 50%;
+      border-top-color: #4a86e8;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Сообщение */
+    .message-display {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-width: 80%;
+      text-align: center;
+      opacity: 0;
+      transition: all 0.3s;
+    }
+    
+    .message-display.show {
+      opacity: 1;
+    }
+    
+    /* Стили для встраивания */
+    .widget-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+    
+    /* Кнопка закрытия для раскрытого виджета */
+    .close-widget {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      width: 30px;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 1001;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border: none;
+      opacity: 0;
+      transform: scale(0);
+      transition: all 0.3s ease;
     }
 
-    /* Текстовое сообщение */
-    .message-display {
-      position:absolute; bottom:20px; left:50%;
-      transform: translateX(-50%);
-      background:white; padding:10px 15px; border-radius:8px;
-      box-shadow:0 2px 10px rgba(0,0,0,0.1);
-      max-width:80%; text-align:center; opacity:0;
-      transition: all .3s;
+    .close-widget.visible {
+      opacity: 1;
+      transform: scale(1);
     }
-    .message-display.show { opacity:1; }
+    
+    .close-widget i {
+      font-size: 18px;
+      color: #555;
+    }
+    
+    /* Стили для виджета в компактном режиме */
+    body.compact-mode .container {
+      padding: 0;
+      max-width: 100%;
+    }
+    
+    body.compact-mode .main-circle {
+      width: 70px;
+      height: 70px;
+      cursor: pointer;
+    }
+    
+    body.compact-mode .mic-icon {
+      font-size: 24px;
+    }
+    
+    body.compact-mode .audio-visualization {
+      display: none;
+    }
+    
+    body.compact-mode .message-display {
+      display: none;
+    }
+    
+    body.expanded-mode .widget-wrapper {
+      border-radius: 15px;
+      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Анимация перехода между режимами */
+    body.transitioning * {
+      transition: all 0.3s ease !important;
+    }
   </style>
 </head>
-<body>
-  <div id="widget" class="widget-wrapper">
-    <!-- Кнопка-микрофон до открытия -->
-    <div id="toggle-btn" class="main-circle">
-      <i class="fas fa-microphone mic-icon"></i>
+<body class="compact-mode">
+  <!-- Кнопка закрытия для раскрытого виджета -->
+  <button class="close-widget" id="close-widget">
+    <i class="fas fa-times"></i>
+  </button>
+
+  <div class="widget-wrapper">
+    <!-- Модальное окно загрузки -->
+    <div id="loader-modal" class="loader-modal active">
+      <div class="loader"></div>
     </div>
-    <!-- Окно виджета -->
-    <div id="widget-container" class="container">
-      <button id="close-btn" class="close-widget">
-        <i class="fas fa-times"></i>
-      </button>
-      <div id="loader-modal" class="loader-modal active">
-        <div class="loader"></div>
-      </div>
+    
+    <div class="container">
+      <!-- Основной элемент - круг -->
       <div class="main-circle" id="main-circle">
         <i class="fas fa-microphone mic-icon"></i>
       </div>
+      
+      <!-- Аудио визуализация -->
       <div class="audio-visualization" id="audio-visualization">
         <div class="audio-bars" id="audio-bars"></div>
       </div>
-      <div class="message-display" id="message-display"></div>
     </div>
   </div>
+  
+  <!-- Сообщение -->
+  <div class="message-display" id="message-display"></div>
 
   <script>
-  (function(){
-    const widget       = document.getElementById('widget');
-    const toggleBtn    = document.getElementById('toggle-btn');
-    const closeBtn     = document.getElementById('close-btn');
-    const container    = document.getElementById('widget-container');
-    const loaderModal  = document.getElementById('loader-modal');
-    const mainCircle   = document.getElementById('main-circle');
-    const audioBarsEl  = document.getElementById('audio-bars');
+    // Элементы UI
+    const mainCircle = document.getElementById('main-circle');
+    const audioBars = document.getElementById('audio-bars');
+    const loaderModal = document.getElementById('loader-modal');
     const messageDisplay = document.getElementById('message-display');
-
-    let initialized = false;
-    let audioChunksBuffer   = [];
-    let audioPlaybackQueue  = [];
-    let isPlayingAudio      = false;
-    let hasAudioData        = false;
-    let audioDataStartTime  = 0;
-    let minimumAudioLength  = 300;
-    let reconnecting        = false;
-    let isListening         = false;
-    let websocket           = null;
-    let audioContext        = null;
-    let mediaStream         = null;
-    let audioProcessor      = null;
-    let isConnected         = false;
+    const closeButton = document.getElementById('close-widget');
+    const body = document.body;
+    
+    // Переменные для обработки аудио
+    let audioChunksBuffer = [];
+    let audioPlaybackQueue = [];
+    let isPlayingAudio = false;
+    let hasAudioData = false;
+    let audioDataStartTime = 0;
+    let minimumAudioLength = 300;
+    let reconnecting = false;
+    let isListening = false;
+    let websocket = null;
+    let audioContext = null;
+    let mediaStream = null;
+    let audioProcessor = null;
+    let isConnected = false;
+    let widgetMode = 'compact'; // 'compact' или 'expanded'
+    
+    // Конфигурация для оптимизации потока аудио
     const AUDIO_CONFIG = {
-      silenceThreshold: 0.01,
-      silenceDuration:  300,
-      bufferCheckInterval: 50,
-      soundDetectionThreshold: 0.02
+      silenceThreshold: 0.01,      // Порог для определения тишины
+      silenceDuration: 300,        // Длительность тишины для отправки (мс)
+      bufferCheckInterval: 50,     // Частота проверки буфера (мс)
+      soundDetectionThreshold: 0.02 // Чувствительность к звуку
     };
-    let audioBufferTimeout = null;
-
-    // Клик по микрофону: открыть и инициализировать
-    toggleBtn.addEventListener('click', async () => {
-      widget.classList.add('expanded');
-      if (!initialized) {
-        initialized = true;
-        await initAudio();
-        await connectWebSocket();
-      }
-    });
-
-    // Клик по крестику: свернуть и приостановить аудио
-    closeBtn.addEventListener('click', () => {
-      widget.classList.remove('expanded');
-      if (audioContext && audioContext.state === 'running') {
-        audioContext.suspend();
-        isListening = false;
-      }
-    });
-
-    function log(msg, lvl='info'){ console.log(`[${lvl.toUpperCase()}] ${msg}`); }
-    function showMessage(msg, dur=5000){
-      messageDisplay.textContent = msg;
-      messageDisplay.classList.add('show');
-      setTimeout(() => messageDisplay.classList.remove('show'), dur);
+    
+    // Функция логирования
+    function log(message, level = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`[${level.toUpperCase()}] ${message}`);
     }
-
-    function createAudioBars(count=20){
-      audioBarsEl.innerHTML = '';
-      for(let i=0;i<count;i++){
-        const b = document.createElement('div');
-        b.className = 'audio-bar';
-        audioBarsEl.appendChild(b);
+    
+    // Показать сообщение
+    function showMessage(message, duration = 5000) {
+      messageDisplay.textContent = message;
+      messageDisplay.classList.add('show');
+      
+      setTimeout(() => {
+        messageDisplay.classList.remove('show');
+      }, duration);
+    }
+    
+    // Переключение между компактным и расширенным режимом
+    function toggleWidgetMode() {
+      if (widgetMode === 'compact') {
+        expandWidget();
+      } else {
+        collapseWidget();
+      }
+    }
+    
+    // Разворачиваем виджет
+    function expandWidget() {
+      // Отправляем сообщение родительскому окну, чтобы расширить iframe
+      window.parent.postMessage({ 
+        action: 'expandWidget',
+        source: 'wellcomeAI' 
+      }, '*');
+      
+      // Добавляем класс для анимации перехода
+      body.classList.add('transitioning');
+      
+      // Меняем класс на body
+      body.classList.remove('compact-mode');
+      body.classList.add('expanded-mode');
+      
+      // Отображаем кнопку закрытия
+      setTimeout(() => {
+        closeButton.classList.add('visible');
+      }, 300);
+      
+      widgetMode = 'expanded';
+      
+      // Убираем класс анимации через некоторое время
+      setTimeout(() => {
+        body.classList.remove('transitioning');
+      }, 350);
+    }
+    
+    // Сворачиваем виджет
+    function collapseWidget() {
+      // Отправляем сообщение родительскому окну, чтобы свернуть iframe
+      window.parent.postMessage({ 
+        action: 'collapseWidget',
+        source: 'wellcomeAI' 
+      }, '*');
+      
+      // Добавляем класс для анимации перехода
+      body.classList.add('transitioning');
+      
+      // Скрываем кнопку закрытия
+      closeButton.classList.remove('visible');
+      
+      // Меняем класс на body
+      setTimeout(() => {
+        body.classList.remove('expanded-mode');
+        body.classList.add('compact-mode');
+      }, 50);
+      
+      widgetMode = 'compact';
+      
+      // Убираем класс анимации через некоторое время
+      setTimeout(() => {
+        body.classList.remove('transitioning');
+      }, 350);
+    }
+    
+    // Создаем аудио-бары для визуализации
+    function createAudioBars(count = 20) {
+      audioBars.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'audio-bar';
+        audioBars.appendChild(bar);
       }
     }
     createAudioBars();
-
-    async function initAudio(){
+    
+    // Инициализация микрофона и AudioContext
+    async function initAudio() {
       try {
-        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Нет доступа к микрофону');
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true, sampleRate:24000 }
+        log("Запрос разрешения на доступ к микрофону...");
+        
+        // Проверяем поддержку getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Ваш браузер не поддерживает доступ к микрофону");
+        }
+        
+        // Запрашиваем доступ к микрофону с оптимальными настройками
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 24000
+          } 
         });
-        audioContext = new (window.AudioContext||window.webkitAudioContext)({ sampleRate:24000 });
-        const src = audioContext.createMediaStreamSource(mediaStream);
-        const bufSize = 2048;
-        if (!audioContext.createScriptProcessor) throw new Error('ScriptProcessorNode не поддерживается');
-        audioProcessor = audioContext.createScriptProcessor(bufSize,1,1);
-
-        let isSilent=true, silenceStart=0, lastCommit=0, sentInSeg=false;
-        audioProcessor.onaudioprocess = e => {
-          if (isListening && websocket?.readyState===WebSocket.OPEN && !reconnecting) {
-            const data = e.inputBuffer.getChannelData(0);
-            let maxA=0;
-            for(const v of data) maxA = Math.max(maxA, Math.abs(v));
-            const hasSound = maxA > AUDIO_CONFIG.soundDetectionThreshold;
-            updateAudioVisualization(data);
-
-            // PCM16
-            const pcm = new Int16Array(data.length);
-            for(let i=0;i<data.length;i++) pcm[i] = Math.floor(data[i]*32767);
+        
+        log("Доступ к микрофону получен");
+        
+        // Создаем AudioContext с нужной частотой дискретизации
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+        log(`AudioContext создан с частотой ${audioContext.sampleRate} Гц`);
+        
+        // Создаем обработчик аудиопотока
+        const streamSource = audioContext.createMediaStreamSource(mediaStream);
+        
+        // Выбираем размер буфера
+        const bufferSize = 2048; // Меньший размер буфера для меньшей задержки
+        
+        // Проверяем, доступен ли ScriptProcessorNode
+        if (audioContext.createScriptProcessor) {
+          audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+          log("Создан ScriptProcessorNode для обработки аудио");
+        } else {
+          throw new Error("Ваш браузер не поддерживает ScriptProcessorNode");
+        }
+        
+        // Переменные для отслеживания звука
+        let isSilent = true;
+        let silenceStartTime = Date.now();
+        let lastCommitTime = 0;
+        let hasSentAudioInCurrentSegment = false;
+        
+        // Обработчик аудио с оптимизированной логикой
+        audioProcessor.onaudioprocess = function(e) {
+          if (isListening && websocket && websocket.readyState === WebSocket.OPEN && !reconnecting) {
+            // Получаем данные с микрофона
+            const inputData = e.inputBuffer.getChannelData(0);
+            
+            // Вычисляем максимальную амплитуду
+            let maxAmplitude = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              const absValue = Math.abs(inputData[i]);
+              maxAmplitude = Math.max(maxAmplitude, absValue);
+            }
+            
+            // Определяем, есть ли звук
+            const hasSound = maxAmplitude > AUDIO_CONFIG.soundDetectionThreshold;
+            
+            // Обновляем визуализацию
+            updateAudioVisualization(inputData);
+            
+            // Преобразуем float32 в int16
+            const pcm16Data = new Int16Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+              pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
+            }
+            
+            // Отправляем данные через WebSocket
             try {
-              websocket.send(JSON.stringify({
-                type:'input_audio_buffer.append',
-                event_id:`audio_${Date.now()}`,
-                audio: arrayBufferToBase64(pcm.buffer)
-              }));
-              sentInSeg = true;
-              if(!hasAudioData && hasSound){
-                hasAudioData=true; audioDataStartTime=Date.now();
+              const message = JSON.stringify({
+                type: "input_audio_buffer.append",
+                event_id: `audio_${Date.now()}`,
+                audio: arrayBufferToBase64(pcm16Data.buffer)
+              });
+              
+              websocket.send(message);
+              hasSentAudioInCurrentSegment = true;
+              
+              // Отмечаем наличие аудиоданных
+              if (!hasAudioData && hasSound) {
+                hasAudioData = true;
+                audioDataStartTime = Date.now();
+                log("Начало записи аудиоданных");
               }
-            } catch(err){ log(`send audio error: ${err.message}`,'error'); }
-
+              
+            } catch (error) {
+              log(`Ошибка отправки аудио: ${error.message}`, "error");
+            }
+            
+            // Логика определения тишины и автоматической отправки
             const now = Date.now();
-            if(hasSound){
-              isSilent=false; silenceStart=now;
-              if(!mainCircle.classList.contains('listening')){
+            
+            if (hasSound) {
+              // Сбрасываем время начала тишины
+              isSilent = false;
+              silenceStartTime = now;
+              
+              // Активируем визуальное состояние прослушивания
+              if (!mainCircle.classList.contains('listening') && 
+                  !mainCircle.classList.contains('speaking')) {
                 mainCircle.classList.add('listening');
               }
-              if(audioBufferTimeout) clearTimeout(audioBufferTimeout);
-            } else if(!isSilent){
-              if(now - silenceStart > AUDIO_CONFIG.silenceDuration){
-                isSilent=true;
-                if(now - lastCommit > 1000 && sentInSeg){
-                  audioBufferTimeout = setTimeout(()=>{
-                    if(isSilent && isListening && !reconnecting){
+            } else if (!isSilent) {
+              // Если наступила тишина
+              const silenceDuration = now - silenceStartTime;
+              
+              if (silenceDuration > AUDIO_CONFIG.silenceDuration) {
+                isSilent = true;
+                
+                // Если прошло достаточно времени с последней отправки и были данные
+                if (now - lastCommitTime > 1000 && hasSentAudioInCurrentSegment) {
+                  // Отправляем буфер с задержкой 
+                  setTimeout(() => {
+                    // Проверяем снова, не появился ли звук
+                    if (isSilent && isListening && !reconnecting) {
                       commitAudioBuffer();
-                      lastCommit = Date.now();
-                      sentInSeg = false;
+                      lastCommitTime = Date.now();
+                      hasSentAudioInCurrentSegment = false;
                     }
-                  },100);
+                  }, 100);
                 }
               }
             }
           }
         };
-        src.connect(audioProcessor);
+        
+        // Подключаем обработчик
+        streamSource.connect(audioProcessor);
         audioProcessor.connect(audioContext.destination);
-        log('Audio initialized');
+        
+        log("Аудио инициализировано успешно");
         return true;
-      } catch(err){
-        log(`Audio init error: ${err.message}`,'error');
-        showMessage('Ошибка микрофона');
+      } catch (error) {
+        log(`Ошибка инициализации аудио: ${error.message}`, "error");
+        showMessage("Ошибка доступа к микрофону. Проверьте настройки браузера.");
         return false;
       }
     }
-
-    function commitAudioBuffer(){
-      if(!isListening||websocket?.readyState!==WebSocket.OPEN||reconnecting) return;
-      if(!hasAudioData){ log('Empty buffer','warn'); return; }
-      const length = Date.now() - audioDataStartTime;
-      if(length < minimumAudioLength){
-        return setTimeout(commitAudioBuffer, minimumAudioLength - length + 50);
+    
+    // Функция для отправки аудиобуфера
+    function commitAudioBuffer() {
+      if (!isListening || !websocket || websocket.readyState !== WebSocket.OPEN || reconnecting) return;
+      
+      // Проверяем, есть ли в буфере достаточно аудиоданных
+      if (!hasAudioData) {
+        log("Не отправляем пустой аудиобуфер", "warn");
+        return;
       }
+      
+      // Проверяем минимальную длительность аудио (300мс требуется для корректной работы)
+      const audioLength = Date.now() - audioDataStartTime;
+      if (audioLength < minimumAudioLength) {
+        log(`Аудиобуфер слишком короткий (${audioLength}мс), ожидаем больше данных`, "warn");
+        
+        // Продолжаем запись еще немного времени
+        setTimeout(() => {
+          // Повторно пытаемся отправить буфер
+          if (isListening && hasAudioData && !reconnecting) {
+            log(`Отправка аудиобуфера после дополнительной записи (${Date.now() - audioDataStartTime}мс)`);
+            sendCommitBuffer();
+          }
+        }, minimumAudioLength - audioLength + 50); // Добавляем небольшой запас
+        
+        return;
+      }
+      
+      // Если все проверки пройдены, отправляем буфер
       sendCommitBuffer();
     }
-    function sendCommitBuffer(){
-      log('Commit buffer');
+    
+    // Функция для фактической отправки буфера
+    function sendCommitBuffer() {
+      log("Отправка аудиобуфера");
+      
+      // Сбрасываем эффект активности
       mainCircle.classList.remove('listening');
+      
+      // Отправляем команду для завершения буфера
       websocket.send(JSON.stringify({
-        type:'input_audio_buffer.commit',
-        event_id:`commit_${Date.now()}`
+        type: "input_audio_buffer.commit",
+        event_id: `commit_${Date.now()}`
       }));
-      hasAudioData=false; audioDataStartTime=0;
+      
+      // Расширяем виджет при первом взаимодействии, если он в компактном режиме
+      if (widgetMode === 'compact') {
+        expandWidget();
+      }
+      
+      // Начинаем обработку и сбрасываем флаги
+      hasAudioData = false;
+      audioDataStartTime = 0;
     }
-
-    function arrayBufferToBase64(buf){
-      const u = new Uint8Array(buf);
-      let s='';
-      for(const b of u) s+=String.fromCharCode(b);
-      return btoa(s);
+    
+    // Преобразование ArrayBuffer в Base64
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
     }
-    function base64ToArrayBuffer(b64){
+    
+    // Преобразование Base64 в ArrayBuffer
+    function base64ToArrayBuffer(base64) {
       try {
-        const bin = atob(b64), len=bin.length, u=new Uint8Array(len);
-        for(let i=0;i<len;i++) u[i]=bin.charCodeAt(i);
-        return u.buffer;
-      } catch(e){ log(e.message,'error'); return new ArrayBuffer(0); }
-    }
-
-    function updateAudioVisualization(data){
-      const bars = document.querySelectorAll('.audio-bar');
-      const step = Math.floor(data.length / bars.length);
-      for(let i=0;i<bars.length;i++){
-        let sum=0;
-        for(let j=0;j<step;j++){
-          const v = data[i*step+j];
-          if(v) sum += Math.abs(v);
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
         }
-        const avg = sum/step;
-        const h = 2 + Math.min(28, Math.floor(avg*100));
-        bars[i].style.height = h + 'px';
+        return bytes.buffer;
+      } catch (e) {
+        log(`Ошибка при декодировании base64: ${e.message}`, "error");
+        return new ArrayBuffer(0);
       }
     }
-
-    function createWavFromPcm(buf, sr=24000){
-      const header = new ArrayBuffer(44), dv=new DataView(header);
-      ['R','I','F','F'].forEach((c,i)=>dv.setUint8(i,c.charCodeAt(0)));
-      dv.setUint32(4,36+buf.byteLength,true);
-      ['W','A','V','E'].forEach((c,i)=>dv.setUint8(8+i,c.charCodeAt(0)));
-      ['f','m','t',' '].forEach((c,i)=>dv.setUint8(12+i,c.charCodeAt(0)));
-      dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
-      dv.setUint32(24,sr,true); dv.setUint32(28,sr*2,true);
-      dv.setUint16(32,2,true); dv.setUint16(34,16,true);
-      ['d','a','t','a'].forEach((c,i)=>dv.setUint8(36+i,c.charCodeAt(0)));
-      dv.setUint32(40,buf.byteLength,true);
-      const wav = new ArrayBuffer(44+buf.byteLength), wv=new Uint8Array(wav);
-      wv.set(new Uint8Array(header),0);
-      wv.set(new Uint8Array(buf),44);
-      return wav;
+    
+    // Обновление визуализации аудио
+    function updateAudioVisualization(audioData) {
+      const bars = audioBars.querySelectorAll('.audio-bar');
+      const step = Math.floor(audioData.length / bars.length);
+      
+      for (let i = 0; i < bars.length; i++) {
+        // Вычисляем среднее значение амплитуды для этого "отрезка" аудиоданных
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+          const index = i * step + j;
+          if (index < audioData.length) {
+            sum += Math.abs(audioData[index]);
+          }
+        }
+        const average = sum / step;
+        
+        // Нормализуем значение для высоты полосы (от 2px до 30px)
+        const height = 2 + Math.min(28, Math.floor(average * 100));
+        bars[i].style.height = `${height}px`;
+      }
     }
-
-    function addAudioToPlaybackQueue(b64){
-      if(!b64) return;
-      audioPlaybackQueue.push(b64);
-      if(!isPlayingAudio) playNextAudio();
+    
+    // Сброс визуализации аудио
+    function resetAudioVisualization() {
+      const bars = audioBars.querySelectorAll('.audio-bar');
+      bars.forEach(bar => {
+        bar.style.height = '2px';
+      });
     }
-    function playNextAudio(){
-      if(audioPlaybackQueue.length===0){
-        isPlayingAudio=false;
+    
+    // Создаём простой WAV из PCM данных
+    function createWavFromPcm(pcmBuffer, sampleRate = 24000) {
+      // Создаём заголовок WAV
+      const wavHeader = new ArrayBuffer(44);
+      const view = new DataView(wavHeader);
+      
+      // "RIFF" chunk descriptor
+      view.setUint8(0, 'R'.charCodeAt(0));
+      view.setUint8(1, 'I'.charCodeAt(0));
+      view.setUint8(2, 'F'.charCodeAt(0));
+      view.setUint8(3, 'F'.charCodeAt(0));
+      
+      view.setUint32(4, 36 + pcmBuffer.byteLength, true); // Размер всего файла - 8
+      
+      // "WAVE" формат
+      view.setUint8(8, 'W'.charCodeAt(0));
+      view.setUint8(9, 'A'.charCodeAt(0));
+      view.setUint8(10, 'V'.charCodeAt(0));
+      view.setUint8(11, 'E'.charCodeAt(0));
+      
+      // "fmt " субчанк
+      view.setUint8(12, 'f'.charCodeAt(0));
+      view.setUint8(13, 'm'.charCodeAt(0));
+      view.setUint8(14, 't'.charCodeAt(0));
+      view.setUint8(15, ' '.charCodeAt(0));
+      
+      view.setUint32(16, 16, true); // Размер fmt субчанка
+      view.setUint16(20, 1, true);  // Формат аудио (1 = PCM)
+      view.setUint16(22, 1, true);  // Число каналов (1 = моно)
+      view.setUint32(24, sampleRate, true); // Частота дискретизации
+      view.setUint32(28, sampleRate * 2, true); // Байт в секунду (SampleRate * NumChannels * BitsPerSample/8)
+      view.setUint16(32, 2, true);  // Байт на сэмпл (NumChannels * BitsPerSample/8)
+      view.setUint16(34, 16, true); // Бит на сэмпл
+      
+      // "data" субчанк
+      view.setUint8(36, 'd'.charCodeAt(0));
+      view.setUint8(37, 'a'.charCodeAt(0));
+      view.setUint8(38, 't'.charCodeAt(0));
+      view.setUint8(39, 'a'.charCodeAt(0));
+      
+      view.setUint32(40, pcmBuffer.byteLength, true); // Размер данных
+      
+      // Объединяем заголовок и PCM данные
+      const wavBuffer = new ArrayBuffer(wavHeader.byteLength + pcmBuffer.byteLength);
+      const wavBytes = new Uint8Array(wavBuffer);
+      
+      wavBytes.set(new Uint8Array(wavHeader), 0);
+      wavBytes.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+      
+      return wavBuffer;
+    }
+    
+    // Добавить аудио в очередь воспроизведения
+    function addAudioToPlaybackQueue(audioBase64) {
+      if (!audioBase64 || typeof audioBase64 !== 'string') return;
+      
+      // Добавляем аудио в очередь
+      audioPlaybackQueue.push(audioBase64);
+      
+      // Если не запущено воспроизведение, запускаем
+      if (!isPlayingAudio) {
+        playNextAudio();
+      }
+    }
+    
+    // Воспроизведение следующего аудио в очереди
+    function playNextAudio() {
+      if (audioPlaybackQueue.length === 0) {
+        isPlayingAudio = false;
+        // Сбрасываем эффект говорения, когда все аудио воспроизведено
         mainCircle.classList.remove('speaking');
         return;
       }
-      isPlayingAudio=true;
+      
+      isPlayingAudio = true;
+      
+      // Активируем визуальное состояние говорения
       mainCircle.classList.add('speaking');
       mainCircle.classList.remove('listening');
-      const b64 = audioPlaybackQueue.shift();
-      const buf = base64ToArrayBuffer(b64);
-      if(buf.byteLength===0) return playNextAudio();
-      const wavBuf = createWavFromPcm(buf), blob=new Blob([wavBuf],{type:'audio/wav'}), url=URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.oncanplaythrough = ()=>audio.play().catch(()=>playNextAudio());
-      audio.onended = ()=>{ URL.revokeObjectURL(url); playNextAudio(); };
-      audio.onerror = ()=>{ URL.revokeObjectURL(url); playNextAudio(); };
+      
+      const audioBase64 = audioPlaybackQueue.shift();
+      
+      try {
+        // Декодируем Base64 в ArrayBuffer
+        const audioData = base64ToArrayBuffer(audioBase64);
+        
+        // Проверяем размер данных
+        if (audioData.byteLength === 0) {
+          playNextAudio(); // Пропускаем пустой аудио-чанк
+          return;
+        }
+        
+        // Предполагаем, что данные в формате PCM16, конвертируем в WAV для воспроизведения
+        const wavBuffer = createWavFromPcm(audioData);
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(blob);
+        
+        // Воспроизводим звук
+        const audio = new Audio(audioUrl);
+        
+        audio.oncanplaythrough = function() {
+          audio.play().catch(err => {
+            log(`Ошибка при воспроизведении: ${err.message}`, "error");
+            playNextAudio(); // В случае ошибки переходим к следующему аудио
+          });
+        };
+        
+        // После окончания воспроизведения
+        audio.onended = function() {
+          URL.revokeObjectURL(audioUrl);
+          playNextAudio(); // Переходим к следующему аудио
+        };
+        
+        // В случае ошибки
+        audio.onerror = function() {
+          URL.revokeObjectURL(audioUrl);
+          playNextAudio(); // Переходим к следующему аудио
+        };
+      } catch (error) {
+        log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
+        playNextAudio(); // В случае ошибки переходим к следующему аудио
+      }
     }
-
-    async function connectWebSocket(){
-      loaderModal.classList.add('active');
-      log('Connecting websocket...');
-      const proto = location.protocol==='https:'?'wss:':'ws:',
-            url = `${proto}//${location.host}/ws`;
-      return new Promise(res=>{
-        let timeout = setTimeout(()=>{
-          log('Connection timeout','error');
+    
+    // Подключение к WebSocket серверу
+    async function connectWebSocket() {
+      try {
+        loaderModal.classList.add('active');
+        log("Подключение...");
+        
+        // Используем WebSocket-соединение с нашим сервером
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        // Создаем новое WebSocket соединение
+        websocket = new WebSocket(wsUrl);
+        
+        // Устанавливаем таймаут на открытие соединения
+        const connectionTimeout = setTimeout(() => {
+          log("Превышено время ожидания соединения", "error");
           websocket.close();
           loaderModal.classList.remove('active');
-          showMessage('Не удалось подключиться');
-        },15000);
-        websocket = new WebSocket(url);
-        websocket.onopen = ()=>{
-          clearTimeout(timeout);
-          log('WebSocket open');
+          showMessage("Не удалось подключиться к серверу");
+        }, 15000);
+        
+        websocket.onopen = function() {
+          clearTimeout(connectionTimeout);
+          log("Соединение установлено");
           isConnected = true;
           loaderModal.classList.remove('active');
+          
+          // Автоматически начинаем слушать
           startListening();
-          res(true);
         };
-        websocket.onmessage = e=>{
+        
+        websocket.onmessage = function(event) {
           try {
-            const d = JSON.parse(e.data);
-            if(d.type==='response.text.delta' && d.delta) showMessage(d.delta,10000);
-            else if(d.type==='response.audio.delta' && d.delta) audioChunksBuffer.push(d.delta);
-            else if(d.type==='response.audio.done'){
-              if(audioChunksBuffer.length){
-                addAudioToPlaybackQueue(audioChunksBuffer.join(''));
-                audioChunksBuffer=[];
+            const data = JSON.parse(event.data);
+            
+            // Обработка различных типов сообщений
+            if (data.type === 'error') {
+              log(`Ошибка: ${data.error ? data.error.message : 'Неизвестная ошибка'}`, "error");
+            } 
+            // Обработка текстового ответа
+            else if (data.type === 'response.text.delta') {
+              if (data.delta) {
+                showMessage(data.delta, 10000);
               }
             }
-            else if(d.type==='response.done'){
-              setTimeout(()=>{ if(!isPlayingAudio&&!reconnecting) startListening(); },300);
+            // Обработка аудио
+            else if (data.type === 'response.audio.delta') {
+              if (data.delta) {
+                audioChunksBuffer.push(data.delta);
+              }
             }
-          } catch{}
+            // Аудио готово для воспроизведения
+            else if (data.type === 'response.audio.done') {
+              if (audioChunksBuffer.length > 0) {
+                const fullAudio = audioChunksBuffer.join('');
+                addAudioToPlaybackQueue(fullAudio);
+                audioChunksBuffer = [];
+              }
+            }
+            // Ответ завершен
+            else if (data.type === 'response.done') {
+              // Начинаем снова слушать автоматически
+              setTimeout(() => {
+                if (!isPlayingAudio && !reconnecting) {
+                  startListening();
+                }
+              }, 300);
+            }
+          } catch (error) {
+            log(`Ошибка обработки сообщения: ${error.message}`, "error");
+          }
         };
-        websocket.onclose = ()=>{
-          log('WebSocket closed');
+        
+        websocket.onclose = function() {
+          log("Соединение закрыто");
           isConnected = false;
           isListening = false;
           reconnecting = false;
-          showMessage('Отключено. Переподключение...');
-          setTimeout(()=>connectWebSocket(),3000);
+          
+          // Показываем сообщение пользователю
+          showMessage("Соединение прервано. Переподключение...");
+          
+          // Пытаемся переподключиться
+          setTimeout(() => {
+            connectWebSocket();
+          }, 3000);
         };
-        websocket.onerror = ()=>{ log('WebSocket error','error'); showMessage('Ошибка связи'); };
-      });
+        
+        websocket.onerror = function(error) {
+          log("Ошибка соединения", "error");
+          showMessage("Ошибка соединения с сервером");
+        };
+        
+        return true;
+      } catch (error) {
+        log(`Ошибка при установке соединения: ${error.message}`, "error");
+        loaderModal.classList.remove('active');
+        showMessage("Не удалось подключиться к серверу");
+        return false;
+      }
     }
-
-    async function startListening(){
-      if(!isConnected||isPlayingAudio||reconnecting) return;
-      isListening=true;
-      log('Start listening');
-      websocket.send(JSON.stringify({type:'input_audio_buffer.clear',event_id:`clear_${Date.now()}`}));
-      if(!audioContext) await initAudio();
-      else if(audioContext.state==='suspended') await audioContext.resume();
+    
+    // Начало записи голоса
+    async function startListening() {
+      if (!isConnected || isPlayingAudio || reconnecting) {
+        return;
+      }
+      
+      isListening = true;
+      log("Начало записи голоса");
+      
+      // Отправляем команду для очистки буфера ввода
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({
+          type: "input_audio_buffer.clear",
+          event_id: `clear_${Date.now()}`
+        }));
+      }
+      
+      // Если аудио еще не инициализировано, делаем это
+      if (!audioContext) {
+        await initAudio();
+      } else if (audioContext.state === 'suspended') {
+        // Возобновляем AudioContext если он был приостановлен
+        await audioContext.resume();
+      }
+      
+      // Сбрасываем флаги аудио данных
       hasAudioData = false;
       audioDataStartTime = 0;
-      if(!isPlayingAudio && !reconnecting) mainCircle.classList.add('listening');
+      
+      // Активируем визуальное состояние прослушивания если не воспроизводится аудио
+      if (!isPlayingAudio) {
+        mainCircle.classList.add('listening');
+        mainCircle.classList.remove('speaking');
+      }
     }
-  })();
+    
+    // Проверка, находимся ли мы в iframe
+    function isInIframe() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true; // При ошибке доступа предполагаем, что мы в iframe
+      }
+    }
+    
+    // Инициализация
+    async function init() {
+      // Настраиваем обработчики событий
+      mainCircle.addEventListener('click', function() {
+        if (widgetMode === 'compact') {
+          // В компактном режиме - разворачиваем при клике
+          expandWidget();
+        } else if (!isListening && !isPlayingAudio) {
+          // В развернутом режиме - начинаем слушать, если не слушаем уже
+          startListening();
+        }
+      });
+      
+      // Обработчик для кнопки закрытия
+      closeButton.addEventListener('click', function(e) {
+        e.stopPropagation(); // Предотвращаем всплытие события
+        collapseWidget();
+      });
+      
+      // Обработчик сообщений от родительского окна
+      window.addEventListener('message', function(event) {
+        // Для безопасности можно добавить проверку источника сообщения
+        if (event.data && event.data.action) {
+          switch (event.data.action) {
+            case 'toggleWidget':
+              toggleWidgetMode();
+              break;
+          }
+        }
+      });
+      
+      // Создаем WebSocket соединение
+      await connectWebSocket();
+    }
+    
+    // Запускаем инициализацию
+    document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
