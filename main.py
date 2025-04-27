@@ -4,6 +4,7 @@ import base64
 import asyncio
 import logging
 import traceback
+import shutil
 import websockets
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -19,6 +20,40 @@ logger.setLevel(logging.DEBUG)
 # Загружаем переменные окружения
 load_dotenv()
 
+# Базовое содержимое HTML для заглушки
+DEFAULT_HTML_CONTENT = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WellcomeAI - Голосовой помощник</title>
+  <style>
+    body { 
+      font-family: 'Segoe UI', sans-serif; 
+      background: white; 
+      display: flex; 
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container { 
+      text-align: center; 
+      max-width: 600px;
+      padding: 20px;
+    }
+    h1 { color: #4a86e8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WellcomeAI</h1>
+    <p>Голосовой помощник загружается...</p>
+  </div>
+</body>
+</html>
+"""
+
 # Конфигурация
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = int(os.getenv('PORT', 5050))
@@ -33,6 +68,33 @@ SYSTEM_MESSAGE = (
 AVAILABLE_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
 DEFAULT_VOICE = "alloy"
 
+# Проверяем наличие директории static и создаем ее, если она не существует
+static_dir = os.path.join(os.getcwd(), "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+    logger.info(f"Создана директория static")
+
+# Проверяем наличие index.html в корне и копируем в static
+index_in_root = os.path.join(os.getcwd(), "index.html")
+index_in_static = os.path.join(static_dir, "index.html")
+
+# Если файл есть в корне, копируем его в static
+if os.path.exists(index_in_root):
+    try:
+        shutil.copy2(index_in_root, index_in_static)
+        logger.info("index.html скопирован из корня в static директорию")
+    except Exception as e:
+        logger.error(f"Ошибка при копировании index.html: {str(e)}")
+
+# Если файла нет в static, создаем заглушку
+if not os.path.exists(index_in_static):
+    try:
+        with open(index_in_static, "w", encoding="utf-8") as f:
+            f.write(DEFAULT_HTML_CONTENT)
+        logger.info("Создан файл index.html в директории static")
+    except Exception as e:
+        logger.error(f"Ошибка при создании index.html: {str(e)}")
+
 app = FastAPI()
 
 # Добавляем CORS middleware для разрешения кросс-доменных запросов
@@ -44,19 +106,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Проверяем наличие директории static и создаем ее, если она не существует
-static_dir = os.path.join(os.getcwd(), "static")
-if not os.path.exists(static_dir):
-    os.makedirs(static_dir)
-    with open(os.path.join(static_dir, "index.html"), "w") as f:
-        f.write("<html><body><h1>WellcomeAI</h1></body></html>")
-    logger.info(f"Создана директория static с заглушкой index.html")
-
 # Монтируем статические файлы
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if not OPENAI_API_KEY:
-    raise ValueError('Отсутствует ключ API OpenAI. Пожалуйста, укажите его в .env файле.')
+    logger.warning('Отсутствует ключ API OpenAI. Пожалуйста, укажите его в .env файле.')
 
 # Отслеживаемые события от OpenAI для подробного логирования
 LOG_EVENT_TYPES = [
@@ -71,9 +125,26 @@ client_connections = {}
 @app.get("/")
 async def index_page():
     """Возвращает HTML страницу с интерфейсом голосового помощника"""
-    with open(os.path.join(os.path.dirname(__file__), "index.html"), "r", encoding="utf-8") as f:
-        content = f.read()
-    return HTMLResponse(content=content)
+    try:
+        index_path = os.path.join(static_dir, "index.html")
+        if os.path.exists(index_path):
+            with open(index_path, "r", encoding="utf-8") as file:
+                content = file.read()
+            return HTMLResponse(content=content)
+        else:
+            # Если файл не найден в static, создаем заглушку
+            logger.warning(f"Файл {index_path} не найден, создаем заглушку")
+            with open(index_path, "w", encoding="utf-8") as file:
+                file.write(DEFAULT_HTML_CONTENT)
+            with open(index_path, "r", encoding="utf-8") as file:
+                content = file.read()
+            return HTMLResponse(content=content)
+    except Exception as e:
+        logger.error(f"Ошибка при отдаче главной страницы: {str(e)}")
+        return HTMLResponse(
+            content=f"<html><body><h1>WellcomeAI</h1><p>Произошла ошибка: {str(e)}</p></body></html>",
+            status_code=500
+        )
 
 @app.get("/api/check")
 async def check_api():
