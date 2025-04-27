@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WellcomeAI Виджет</title>
+  <title>WellcomeAI</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Reset и базовые стили */
     * {
       margin: 0;
       padding: 0;
@@ -15,276 +14,152 @@
     }
     
     body {
-      background-color: transparent;
+      background-color: #ffffff;
       color: #333;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      justify-content: center;
+      align-items: center;
       overflow: hidden;
     }
     
     /* Главный контейнер */
-    .widget-container {
+    .container {
       width: 100%;
-      height: 100vh;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      flex: 1;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      justify-content: center;
       position: relative;
     }
     
-    /* Верхняя панель */
-    .widget-header {
-      background: #4a86e8;
-      color: white;
-      padding: 12px 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    
-    .widget-title {
-      font-size: 16px;
-      font-weight: 600;
-    }
-    
-    .widget-settings {
-      display: flex;
-      gap: 10px;
-    }
-    
-    .widget-button {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 18px;
-      cursor: pointer;
-      opacity: 0.9;
-      transition: all 0.2s;
-    }
-    
-    .widget-button:hover {
-      opacity: 1;
-      transform: scale(1.1);
-    }
-    
-    /* Контейнер для сообщений */
-    .chat-messages {
-      flex-grow: 1;
-      overflow-y: auto;
-      padding: 15px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background: #f9f9f9;
-    }
-    
-    /* Сообщения */
-    .message {
-      max-width: 80%;
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 14px;
-      line-height: 1.4;
-      word-wrap: break-word;
-    }
-    
-    .user-message {
-      align-self: flex-end;
-      background: #dcf8c6;
-      border-bottom-right-radius: 4px;
-    }
-    
-    .assistant-message {
-      align-self: flex-start;
-      background: white;
-      border-bottom-left-radius: 4px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    }
-    
-    /* Нижняя панель ввода */
-    .input-panel {
-      display: flex;
-      align-items: center;
-      padding: 10px 15px;
-      background: white;
-      border-top: 1px solid #eaeaea;
-    }
-    
-    .message-input {
-      flex-grow: 1;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 20px;
-      background: #f0f0f0;
-      font-size: 14px;
-      outline: none;
-      transition: background 0.2s;
-    }
-    
-    .message-input:focus {
-      background: #e8e8e8;
-    }
-    
-    .voice-button {
-      background: #4a86e8;
-      color: white;
-      width: 38px;
-      height: 38px;
+    /* Основной элемент - круг */
+    .main-circle {
+      width: 280px;
+      height: 280px;
       border-radius: 50%;
-      border: none;
-      margin-left: 8px;
+      background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+      position: relative;
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: all 0.3s ease;
+      z-index: 5;
       cursor: pointer;
-      transition: all 0.2s;
     }
     
-    .voice-button:hover {
-      background: #3a76d8;
-      transform: scale(1.05);
+    .main-circle::before {
+      content: '';
+      position: absolute;
+      width: 140%;
+      height: 140%;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2));
+      animation: wave 8s linear infinite;
+      border-radius: 40%;
     }
     
-    .voice-button.listening {
-      background: #f44336;
-      animation: pulse 1.5s infinite ease-in-out;
+    /* Анимация основной волны */
+    @keyframes wave {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
     
-    .send-button {
-      background: #4a86e8;
-      color: white;
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      border: none;
-      margin-left: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s;
+    /* Состояние прослушивания */
+    .main-circle.listening {
+      background: linear-gradient(135deg, #ffffff, #e3f2fd, #2196f3);
+      box-shadow: 0 0 30px rgba(33, 150, 243, 0.6);
     }
     
-    .send-button:hover {
-      background: #3a76d8;
-      transform: scale(1.05);
+    .main-circle.listening::before {
+      animation: wave 4s linear infinite;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(33, 150, 243, 0.3));
     }
     
-    /* Анимация пульсации */
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-      100% { transform: scale(1); }
-    }
-    
-    /* Индикатор "печатает" */
-    .typing-indicator {
-      display: none;
-      align-self: flex-start;
-      background: #f0f0f0;
-      padding: 12px 16px;
-      border-radius: 12px;
-    }
-    
-    .typing-dots {
-      display: flex;
-      gap: 4px;
-    }
-    
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      background: #999;
-      border-radius: 50%;
-      animation: typingAnimation 1.4s infinite;
-    }
-    
-    .typing-dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    
-    .typing-dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-    
-    @keyframes typingAnimation {
-      0%, 60%, 100% { transform: translateY(0); }
-      30% { transform: translateY(-6px); }
-    }
-    
-    /* Модальное окно */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
+    /* Дополнительный эффект пульсации для прослушивания */
+    .main-circle.listening::after {
+      content: '';
+      position: absolute;
       width: 100%;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
+      border-radius: 50%;
+      border: 3px solid rgba(33, 150, 243, 0.5);
+      animation: pulse 1.5s ease-out infinite;
+    }
+    
+    @keyframes pulse {
+      0% { 
+        transform: scale(0.95);
+        opacity: 0.7;
+      }
+      50% { 
+        transform: scale(1.05);
+        opacity: 0.3;
+      }
+      100% { 
+        transform: scale(0.95);
+        opacity: 0.7;
+      }
+    }
+    
+    /* Состояние говорения */
+    .main-circle.speaking {
+      background: linear-gradient(135deg, #ffffff, #e8f5e9, #4caf50);
+      box-shadow: 0 0 30px rgba(76, 175, 80, 0.6);
+    }
+    
+    .main-circle.speaking::before {
+      animation: wave 3s linear infinite;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3));
+    }
+    
+    /* Иконка микрофона */
+    .mic-icon {
+      font-size: 56px;
+      color: #4a86e8;
+      z-index: 10;
       transition: all 0.3s;
     }
     
-    .modal.active {
-      opacity: 1;
-      visibility: visible;
+    .main-circle.listening .mic-icon {
+      color: #2196f3;
+      animation: pulse-icon 1.5s ease-out infinite;
     }
     
-    .modal-content {
-      background-color: white;
-      padding: 20px;
-      border-radius: 12px;
-      max-width: 300px;
-      width: 100%;
+    .main-circle.speaking .mic-icon {
+      color: #4caf50;
+    }
+    
+    @keyframes pulse-icon {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    
+    /* Сообщения */
+    .message-display {
+      position: absolute;
+      width: 80%;
+      max-width: 600px;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border-radius: 15px;
+      padding: 15px 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       text-align: center;
+      opacity: 0;
+      transition: opacity 0.3s;
     }
     
-    .modal h2 {
-      margin-bottom: 15px;
-      color: #333;
-    }
-    
-    .modal-buttons {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 20px;
-      gap: 10px;
-    }
-    
-    .modal-button {
-      padding: 8px 15px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    
-    .modal-button.cancel {
-      background: #f5f5f5;
-      color: #333;
-    }
-    
-    .modal-button.primary {
-      background: #4a86e8;
-      color: white;
-    }
-    
-    /* Выбор голоса */
-    .voice-selector {
-      margin: 15px 0;
-    }
-    
-    .voice-selector select {
-      width: 100%;
-      padding: 8px;
-      border-radius: 4px;
-      border: 1px solid #ddd;
-      font-size: 14px;
+    .message-display.show {
+      opacity: 1;
     }
     
     /* Лоадер */
@@ -294,7 +169,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(255, 255, 255, 0.7);
+      background-color: rgba(255, 255, 255, 0.8);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -321,122 +196,67 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+    
+    /* Мобильная версия */
+    @media (max-width: 768px) {      
+      .main-circle {
+        width: 220px;
+        height: 220px;
+      }
+      
+      .mic-icon {
+        font-size: 42px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .main-circle {
+        width: 180px;
+        height: 180px;
+      }
+      
+      .mic-icon {
+        font-size: 36px;
+      }
+    }
   </style>
 </head>
 <body>
-  <!-- Контейнер виджета -->
-  <div class="widget-container">
-    <!-- Верхняя панель -->
-    <div class="widget-header">
-      <div class="widget-title">WellcomeAI</div>
-      <div class="widget-settings">
-        <button class="widget-button" id="voice-settings-button">
-          <i class="fas fa-microphone-alt"></i>
-        </button>
-        <button class="widget-button" id="clear-button">
-          <i class="fas fa-trash-alt"></i>
-        </button>
-      </div>
-    </div>
-    
-    <!-- Контейнер для сообщений -->
-    <div class="chat-messages" id="chat-messages">
-      <!-- Приветственное сообщение -->
-      <div class="message assistant-message">
-        Здравствуйте! Я голосовой помощник WellcomeAI. Чем могу помочь?
-      </div>
-      
-      <!-- Индикатор "печатает" -->
-      <div class="typing-indicator" id="typing-indicator">
-        <div class="typing-dots">
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-          <div class="typing-dot"></div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Нижняя панель ввода -->
-    <div class="input-panel">
-      <input type="text" class="message-input" id="message-input" placeholder="Введите сообщение..." aria-label="Введите сообщение">
-      <button class="voice-button" id="voice-button" aria-label="Записать голос">
-        <i class="fas fa-microphone"></i>
-      </button>
-      <button class="send-button" id="send-button" aria-label="Отправить сообщение">
-        <i class="fas fa-paper-plane"></i>
-      </button>
-    </div>
-  </div>
-  
-  <!-- Модальное окно настроек голоса -->
-  <div class="modal" id="voice-modal">
-    <div class="modal-content">
-      <h2>Настройки голоса</h2>
-      <div class="voice-selector">
-        <select id="voice-selector">
-          <option value="alloy">Alloy</option>
-          <option value="ash">Ash</option>
-          <option value="ballad">Ballad</option>
-          <option value="coral">Coral</option>
-          <option value="echo">Echo</option>
-          <option value="sage">Sage</option>
-          <option value="shimmer">Shimmer</option>
-          <option value="verse">Verse</option>
-        </select>
-      </div>
-      <div class="modal-buttons">
-        <button class="modal-button cancel" id="voice-modal-cancel">Отмена</button>
-        <button class="modal-button primary" id="voice-modal-save">Сохранить</button>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Модальное окно очистки чата -->
-  <div class="modal" id="clear-modal">
-    <div class="modal-content">
-      <h2>Очистить чат?</h2>
-      <p>Вы уверены, что хотите удалить всю историю сообщений?</p>
-      <div class="modal-buttons">
-        <button class="modal-button cancel" id="clear-modal-cancel">Отмена</button>
-        <button class="modal-button primary" id="clear-modal-confirm">Очистить</button>
-      </div>
-    </div>
-  </div>
-  
   <!-- Лоадер -->
-  <div class="loader-modal" id="loader-modal">
+  <div id="loader-modal" class="loader-modal active">
     <div class="loader"></div>
   </div>
-  
-  <!-- JavaScript для взаимодействия с API -->
+
+  <div class="container">
+    <!-- Основной круг с микрофоном -->
+    <div class="main-circle" id="main-circle">
+      <i class="fas fa-microphone mic-icon"></i>
+    </div>
+    
+    <!-- Отображение сообщений -->
+    <div class="message-display" id="message-display"></div>
+  </div>
+
   <script>
     // Элементы UI
-    const messagesContainer = document.getElementById('chat-messages');
-    const messageInput = document.getElementById('message-input');
-    const sendButton = document.getElementById('send-button');
-    const voiceButton = document.getElementById('voice-button');
-    const settingsButton = document.getElementById('voice-settings-button');
-    const clearButton = document.getElementById('clear-button');
-    const voiceModal = document.getElementById('voice-modal');
-    const voiceSelector = document.getElementById('voice-selector');
-    const voiceModalCancel = document.getElementById('voice-modal-cancel');
-    const voiceModalSave = document.getElementById('voice-modal-save');
-    const clearModal = document.getElementById('clear-modal');
-    const clearModalCancel = document.getElementById('clear-modal-cancel');
-    const clearModalConfirm = document.getElementById('clear-modal-confirm');
-    const typingIndicator = document.getElementById('typing-indicator');
+    const mainCircle = document.getElementById('main-circle');
+    const messageDisplay = document.getElementById('message-display');
     const loaderModal = document.getElementById('loader-modal');
     
-    // Конфигурация
-    const API_URL = window.location.origin; // Используем текущий домен
+    // Переменные для работы с API
     let sessionId = null;
     let isListening = false;
+    let isProcessing = false;
     let mediaRecorder = null;
+    let audioContext = null;
+    let audioProcessor = null;
     let audioChunks = [];
     
-    // Инициализация сессии
+    // API URL - берем из текущего домена
+    const API_URL = window.location.origin;
+    
+    // Функция для создания сессии
     async function initSession() {
-      showLoader();
       try {
         const response = await fetch(`${API_URL}/api/v1/session`, {
           method: 'POST',
@@ -456,275 +276,230 @@
           hideLoader();
           return true;
         } else {
-          throw new Error(data.message || 'Не удалось создать сессию');
+          showMessage('Не удалось подключиться. Попробуйте позже.', 'error');
+          hideLoader();
+          return false;
         }
       } catch (error) {
         console.error('Ошибка инициализации:', error);
-        addMessage('Не удалось подключиться к серверу. Пожалуйста, попробуйте позже.', 'assistant');
+        showMessage('Ошибка подключения к серверу', 'error');
         hideLoader();
         return false;
       }
     }
     
-    // Отправка текстового сообщения
-    async function sendMessage() {
-      const message = messageInput.value.trim();
-      if (!message) return;
-      
-      if (!sessionId) {
-        await initSession();
-      }
-      
-      // Очищаем поле ввода
-      messageInput.value = '';
-      
-      // Добавляем сообщение пользователя
-      addMessage(message, 'user');
-      
-      // Показываем индикатор "печатает"
-      showTypingIndicator();
-      
+    // Функция для отправки аудио на сервер через WebSocket вместо REST API
+    async function initWebSocket() {
       try {
-        // Отправляем сообщение
-        const response = await fetch(`${API_URL}/api/v1/message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            session_id: sessionId,
-            message: message
-          })
-        });
+        const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+        const ws = new WebSocket(wsUrl);
         
-        const data = await response.json();
+        ws.onopen = function() {
+          console.log('WebSocket соединение установлено');
+          window.websocket = ws;
+          hideLoader();
+        };
         
-        hideTypingIndicator();
-        
-        if (data.status === 'success') {
-          // Добавляем ответ ассистента
-          addMessage(data.response.text, 'assistant');
-          
-          // Если есть аудио, воспроизводим его
-          if (data.response.audio) {
-            playAudio(data.response.audio);
+        ws.onmessage = function(event) {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // Обработка ответов от сервера
+            if (data.type === 'error') {
+              console.log('Ошибка:', data.error?.message);
+            } else if (data.type === 'response.text.done') {
+              showMessage(data.text);
+              mainCircle.classList.remove('speaking');
+              isProcessing = false;
+            } else if (data.type === 'response.text.delta') {
+              // Обновляем текст по мере поступления
+              if (messageDisplay.textContent === '') {
+                showMessage(data.delta);
+              } else {
+                messageDisplay.textContent += data.delta;
+              }
+              
+              // Если начали получать ответ, отображаем состояние говорения
+              mainCircle.classList.add('speaking');
+            } else if (data.type === 'response.done') {
+              mainCircle.classList.remove('speaking');
+              isProcessing = false;
+            }
+          } catch (error) {
+            console.error('Ошибка обработки сообщения WebSocket:', error);
           }
-        } else {
-          addMessage('Произошла ошибка при обработке сообщения', 'assistant');
-        }
+        };
+        
+        ws.onclose = function() {
+          console.log('WebSocket соединение закрыто');
+          window.websocket = null;
+        };
+        
+        ws.onerror = function(error) {
+          console.error('Ошибка WebSocket:', error);
+          showMessage('Ошибка соединения', 'error');
+        };
+        
+        return ws;
       } catch (error) {
-        console.error('Ошибка при отправке сообщения:', error);
-        hideTypingIndicator();
-        addMessage('Не удалось отправить сообщение. Пожалуйста, попробуйте еще раз.', 'assistant');
+        console.error('Ошибка при создании WebSocket:', error);
+        return null;
       }
     }
     
-    // Начало записи голоса
-    async function startVoiceRecording() {
+    // Функция для начала/остановки записи голоса
+    async function toggleVoiceRecording() {
       if (isListening) {
-        stopVoiceRecording();
+        stopRecording();
         return;
       }
       
-      if (!sessionId) {
-        await initSession();
+      if (isProcessing) {
+        return; // Игнорируем клики, если идет обработка
+      }
+      
+      // Если нет WebSocket соединения, создаем его
+      if (!window.websocket || window.websocket.readyState !== WebSocket.OPEN) {
+        showLoader();
+        window.websocket = await initWebSocket();
+        
+        if (!window.websocket) {
+          hideLoader();
+          showMessage('Не удалось установить соединение', 'error');
+          return;
+        }
       }
       
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Запрашиваем доступ к микрофону
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            sampleRate: 24000,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        });
         
-        // Визуальный индикатор записи
-        voiceButton.classList.add('listening');
-        voiceButton.querySelector('i').className = 'fas fa-stop';
+        // Создаем AudioContext
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 24000
+        });
+        
+        // Изменяем состояние UI
+        mainCircle.classList.add('listening');
         isListening = true;
         
-        // Создаем MediaRecorder
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
+        // Создаем источник аудио
+        const source = audioContext.createMediaStreamSource(stream);
         
-        // Обработчик данных
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunks.push(event.data);
+        // Создаем процессор для обработки аудио
+        audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        
+        // Обработчик аудио
+        audioProcessor.onaudioprocess = function(e) {
+          if (!isListening || !window.websocket || window.websocket.readyState !== WebSocket.OPEN) return;
+          
+          // Получаем данные с микрофона
+          const inputData = e.inputBuffer.getChannelData(0);
+          
+          // Преобразуем float32 в int16 (для PCM16)
+          const pcm16Data = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
+          }
+          
+          // Отправляем данные через WebSocket
+          try {
+            const message = JSON.stringify({
+              type: "input_audio_buffer.append",
+              event_id: `audio_${Date.now()}`,
+              audio: arrayBufferToBase64(pcm16Data.buffer)
+            });
+            
+            window.websocket.send(message);
+          } catch (error) {
+            console.error('Ошибка отправки аудио:', error);
           }
         };
         
-        // Обработчик остановки
-        mediaRecorder.onstop = async () => {
-          // Создаем Blob из собранных данных
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          
-          // Сбрасываем состояние записи
-          voiceButton.classList.remove('listening');
-          voiceButton.querySelector('i').className = 'fas fa-microphone';
-          isListening = false;
-          
-          // Показываем индикатор "печатает"
-          showTypingIndicator();
-          
-          // Отправляем аудио на сервер
-          await sendAudio(audioBlob);
-          
-          // Останавливаем все треки MediaStream
-          stream.getTracks().forEach(track => track.stop());
-        };
-        
-        // Начинаем запись
-        mediaRecorder.start();
+        // Подключаем процессор
+        source.connect(audioProcessor);
+        audioProcessor.connect(audioContext.destination);
         
         // Автоматически останавливаем запись через 10 секунд
         setTimeout(() => {
-          if (mediaRecorder && mediaRecorder.state === 'recording') {
-            mediaRecorder.stop();
+          if (isListening) {
+            stopRecording();
           }
         }, 10000);
         
       } catch (error) {
-        console.error('Ошибка при записи голоса:', error);
-        voiceButton.classList.remove('listening');
-        addMessage('Не удалось получить доступ к микрофону. Пожалуйста, проверьте настройки вашего браузера.', 'assistant');
+        console.error('Ошибка при доступе к микрофону:', error);
+        mainCircle.classList.remove('listening');
+        isListening = false;
+        showMessage('Ошибка доступа к микрофону', 'error');
       }
     }
     
-    // Остановка записи голоса
-    function stopVoiceRecording() {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-      }
-    }
-    
-    // Отправка аудио на сервер
-    async function sendAudio(audioBlob) {
-      try {
-        // Создаем FormData для отправки файла
-        const formData = new FormData();
-        formData.append('session_id', sessionId);
-        formData.append('audio_file', audioBlob);
-        
-        // Отправляем запрос
-        const response = await fetch(`${API_URL}/api/v1/audio`, {
-          method: 'POST',
-          body: formData
-        });
-        
-        const data = await response.json();
-        
-        hideTypingIndicator();
-        
-        if (data.status === 'success') {
-          // Добавляем ответ ассистента
-          addMessage(data.response.text, 'assistant');
-          
-          // Если есть аудио, воспроизводим его
-          if (data.response.audio) {
-            playAudio(data.response.audio);
-          }
-        } else {
-          addMessage('Произошла ошибка при обработке аудио', 'assistant');
-        }
-      } catch (error) {
-        console.error('Ошибка при отправке аудио:', error);
-        hideTypingIndicator();
-        addMessage('Не удалось обработать аудиосообщение. Пожалуйста, попробуйте еще раз.', 'assistant');
-      }
-    }
-    
-    // Изменение голоса
-    async function changeVoice() {
-      const newVoice = voiceSelector.value;
+    // Функция остановки записи
+    function stopRecording() {
+      if (!isListening) return;
       
-      closeModal(voiceModal);
-      showLoader();
+      // Изменяем UI
+      mainCircle.classList.remove('listening');
+      isListening = false;
+      isProcessing = true;
       
-      try {
-        const response = await fetch(`${API_URL}/api/v1/session/${sessionId}/voice`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            voice_id: newVoice
-          })
-        });
-        
-        const data = await response.json();
-        
-        hideLoader();
-        
-        if (data.status === 'success') {
-          addMessage(`Голос изменен на ${newVoice}`, 'assistant');
-        } else {
-          addMessage('Не удалось изменить голос', 'assistant');
-        }
-      } catch (error) {
-        console.error('Ошибка при изменении голоса:', error);
-        hideLoader();
-        addMessage('Не удалось изменить голос. Пожалуйста, попробуйте еще раз.', 'assistant');
+      // Отключаем обработчик аудио
+      if (audioProcessor) {
+        audioProcessor.disconnect();
+        audioProcessor = null;
+      }
+      
+      // Отправляем команду для обработки собранного аудио
+      if (window.websocket && window.websocket.readyState === WebSocket.OPEN) {
+        window.websocket.send(JSON.stringify({
+          type: "input_audio_buffer.commit",
+          event_id: `commit_${Date.now()}`
+        }));
+      }
+      
+      // Закрываем AudioContext
+      if (audioContext) {
+        audioContext.close().catch(err => console.error('Ошибка закрытия AudioContext:', err));
+        audioContext = null;
       }
     }
     
-    // Очистка чата
-    function clearChat() {
-      // Оставляем только приветственное сообщение
-      messagesContainer.innerHTML = '';
-      addMessage('Чат очищен. Чем еще могу помочь?', 'assistant');
-      closeModal(clearModal);
+    // Преобразование ArrayBuffer в Base64
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
     }
     
-    // Добавление сообщения в чат
-    function addMessage(text, role) {
-      const messageElement = document.createElement('div');
-      messageElement.className = `message ${role}-message`;
-      messageElement.textContent = text;
+    // Отображение сообщения
+    function showMessage(text, type = 'normal') {
+      messageDisplay.textContent = text;
+      messageDisplay.className = 'message-display show';
       
-      // Если есть индикатор печати, добавляем перед ним
-      if (typingIndicator.parentNode === messagesContainer) {
-        messagesContainer.insertBefore(messageElement, typingIndicator);
+      if (type === 'error') {
+        messageDisplay.style.backgroundColor = '#ffebee';
+        messageDisplay.style.color = '#d32f2f';
       } else {
-        messagesContainer.appendChild(messageElement);
+        messageDisplay.style.backgroundColor = '#ffffff';
+        messageDisplay.style.color = '#333333';
       }
       
-      // Прокручиваем к последнему сообщению
-      messageElement.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    // Воспроизведение аудио
-    function playAudio(audioBase64) {
-      try {
-        // Декодируем Base64 в ArrayBuffer
-        const binary = atob(audioBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        
-        // Создаем Blob
-        const blob = new Blob([bytes.buffer], { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(blob);
-        
-        // Создаем и воспроизводим аудио
-        const audio = new Audio(audioUrl);
-        
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-        };
-        
-        audio.play().catch(err => {
-          console.error('Ошибка воспроизведения аудио:', err);
-        });
-      } catch (error) {
-        console.error('Ошибка декодирования аудио:', error);
-      }
-    }
-    
-    // Показать/скрыть индикатор "печатает"
-    function showTypingIndicator() {
-      typingIndicator.style.display = 'block';
-      typingIndicator.scrollIntoView({ behavior: 'smooth' });
-    }
-    
-    function hideTypingIndicator() {
-      typingIndicator.style.display = 'none';
+      // Скрываем сообщение через 5 секунд
+      setTimeout(() => {
+        messageDisplay.classList.remove('show');
+      }, 5000);
     }
     
     // Показать/скрыть лоадер
@@ -736,64 +511,28 @@
       loaderModal.classList.remove('active');
     }
     
-    // Работа с модальными окнами
-    function openModal(modal) {
-      modal.classList.add('active');
+    // Инициализация
+    async function init() {
+      try {
+        // Инициализируем WebSocket соединение
+        window.websocket = await initWebSocket();
+        
+        // Если не удалось создать WebSocket, показываем сообщение
+        if (!window.websocket) {
+          showMessage('Не удалось подключиться к серверу', 'error');
+        }
+      } catch (error) {
+        console.error('Ошибка инициализации:', error);
+        showMessage('Ошибка подключения', 'error');
+        hideLoader();
+      }
     }
-    
-    function closeModal(modal) {
-      modal.classList.remove('active');
-    }
-    
-    // Инициализация при загрузке страницы
-    document.addEventListener('DOMContentLoaded', initSession);
     
     // Обработчики событий
-    sendButton.addEventListener('click', sendMessage);
+    mainCircle.addEventListener('click', toggleVoiceRecording);
     
-    messageInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        sendMessage();
-      }
-    });
-    
-    voiceButton.addEventListener('click', startVoiceRecording);
-    
-    settingsButton.addEventListener('click', () => {
-      if (!sessionId) {
-        initSession().then(() => {
-          openModal(voiceModal);
-        });
-      } else {
-        openModal(voiceModal);
-      }
-    });
-    
-    clearButton.addEventListener('click', () => {
-      openModal(clearModal);
-    });
-    
-    voiceModalCancel.addEventListener('click', () => {
-      closeModal(voiceModal);
-    });
-    
-    voiceModalSave.addEventListener('click', changeVoice);
-    
-    clearModalCancel.addEventListener('click', () => {
-      closeModal(clearModal);
-    });
-    
-    clearModalConfirm.addEventListener('click', clearChat);
-    
-    // Закрытие модальных окон по клику вне
-    window.addEventListener('click', (e) => {
-      if (e.target === voiceModal) {
-        closeModal(voiceModal);
-      }
-      if (e.target === clearModal) {
-        closeModal(clearModal);
-      }
-    });
+    // Запуск инициализации
+    document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
 </html>
