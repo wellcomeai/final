@@ -64,8 +64,8 @@ SYSTEM_MESSAGE = (
     "и предоставлять точную информацию."
 )
 
-# Допустимые голоса
-AVAILABLE_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+# Допустимые голоса - ИСПРАВЛЕНО
+AVAILABLE_VOICES = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"]
 DEFAULT_VOICE = "alloy"
 
 # Проверяем наличие директории static и создаем ее, если она не существует
