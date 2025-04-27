@@ -14,7 +14,7 @@
     }
     
     body {
-      background-color: #ffffff;
+      background-color: transparent;
       color: #333;
       min-height: 100vh;
       display: flex;
@@ -27,7 +27,7 @@
     /* Главный контейнер */
     .container {
       width: 100%;
-      max-width: 1200px;
+      max-width: 320px;
       margin: 0 auto;
       padding: 20px;
       flex: 1;
@@ -40,8 +40,8 @@
     
     /* Основной элемент - круг */
     .main-circle {
-      width: 280px;
-      height: 280px;
+      width: 200px;
+      height: 200px;
       border-radius: 50%;
       background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8);
       box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
@@ -52,7 +52,6 @@
       justify-content: center;
       transition: all 0.3s ease;
       z-index: 5;
-      cursor: pointer;
     }
     
     .main-circle::before {
@@ -121,55 +120,54 @@
     
     /* Иконка микрофона */
     .mic-icon {
-      font-size: 56px;
+      font-size: 48px;
       color: #4a86e8;
       z-index: 10;
-      transition: all 0.3s;
     }
     
     .main-circle.listening .mic-icon {
       color: #2196f3;
-      animation: pulse-icon 1.5s ease-out infinite;
     }
     
     .main-circle.speaking .mic-icon {
       color: #4caf50;
     }
     
-    @keyframes pulse-icon {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); }
-    }
-    
-    /* Сообщения */
-    .message-display {
+    /* Аудио визуализация (скрытая) */
+    .audio-visualization {
       position: absolute;
-      width: 80%;
-      max-width: 600px;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: white;
-      border-radius: 15px;
-      padding: 15px 20px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      text-align: center;
-      opacity: 0;
-      transition: opacity 0.3s;
+      width: 100%;
+      max-width: 200px;
+      height: 30px;
+      bottom: 10px;
+      opacity: 0.8;
     }
     
-    .message-display.show {
-      opacity: 1;
+    .audio-bars {
+      display: flex;
+      align-items: flex-end;
+      height: 30px;
+      gap: 2px;
+      width: 100%;
+      justify-content: center;
     }
     
-    /* Лоадер */
+    .audio-bar {
+      width: 3px;
+      height: 2px;
+      background-color: #4a86e8;
+      border-radius: 1px;
+      transition: height 0.1s ease;
+    }
+    
+    /* Модальное окно загрузки */
     .loader-modal {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(255, 255, 255, 0.8);
+      background-color: rgba(255, 255, 255, 0.7);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -197,280 +195,295 @@
       to { transform: rotate(360deg); }
     }
     
-    /* Мобильная версия */
-    @media (max-width: 768px) {      
-      .main-circle {
-        width: 220px;
-        height: 220px;
-      }
-      
-      .mic-icon {
-        font-size: 42px;
-      }
+    /* Сообщение */
+    .message-display {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-width: 80%;
+      text-align: center;
+      opacity: 0;
+      transition: all 0.3s;
     }
     
-    @media (max-width: 480px) {
-      .main-circle {
-        width: 180px;
-        height: 180px;
-      }
-      
-      .mic-icon {
-        font-size: 36px;
-      }
+    .message-display.show {
+      opacity: 1;
     }
   </style>
 </head>
 <body>
-  <!-- Лоадер -->
+  <!-- Модальное окно загрузки -->
   <div id="loader-modal" class="loader-modal active">
     <div class="loader"></div>
   </div>
-
+  
   <div class="container">
-    <!-- Основной круг с микрофоном -->
+    <!-- Основной элемент - круг -->
     <div class="main-circle" id="main-circle">
       <i class="fas fa-microphone mic-icon"></i>
     </div>
     
-    <!-- Отображение сообщений -->
-    <div class="message-display" id="message-display"></div>
+    <!-- Аудио визуализация -->
+    <div class="audio-visualization" id="audio-visualization">
+      <div class="audio-bars" id="audio-bars"></div>
+    </div>
   </div>
+  
+  <!-- Сообщение -->
+  <div class="message-display" id="message-display"></div>
 
   <script>
     // Элементы UI
     const mainCircle = document.getElementById('main-circle');
-    const messageDisplay = document.getElementById('message-display');
+    const audioBars = document.getElementById('audio-bars');
     const loaderModal = document.getElementById('loader-modal');
+    const messageDisplay = document.getElementById('message-display');
     
-    // Переменные для работы с API
-    let sessionId = null;
+    // Переменные для обработки аудио
+    let audioChunksBuffer = [];
+    let audioPlaybackQueue = [];
+    let isPlayingAudio = false;
+    let hasAudioData = false;
+    let audioDataStartTime = 0;
+    let minimumAudioLength = 300;
+    let reconnecting = false;
     let isListening = false;
-    let isProcessing = false;
-    let mediaRecorder = null;
+    let websocket = null;
     let audioContext = null;
+    let mediaStream = null;
     let audioProcessor = null;
-    let audioChunks = [];
+    let isConnected = false;
     
-    // API URL - берем из текущего домена
-    const API_URL = window.location.origin;
+    // Конфигурация для оптимизации потока аудио
+    const AUDIO_CONFIG = {
+      silenceThreshold: 0.01,      // Порог для определения тишины
+      silenceDuration: 300,        // Длительность тишины для отправки (мс)
+      bufferCheckInterval: 50,     // Частота проверки буфера (мс)
+      soundDetectionThreshold: 0.02 // Чувствительность к звуку
+    };
     
-    // Функция для создания сессии
-    async function initSession() {
+    // Функция логирования
+    function log(message, level = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`[${level.toUpperCase()}] ${message}`);
+    }
+    
+    // Показать сообщение
+    function showMessage(message, duration = 5000) {
+      messageDisplay.textContent = message;
+      messageDisplay.classList.add('show');
+      
+      setTimeout(() => {
+        messageDisplay.classList.remove('show');
+      }, duration);
+    }
+    
+    // Создаем аудио-бары для визуализации
+    function createAudioBars(count = 20) {
+      audioBars.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'audio-bar';
+        audioBars.appendChild(bar);
+      }
+    }
+    createAudioBars();
+    
+    // Инициализация микрофона и AudioContext
+    async function initAudio() {
       try {
-        const response = await fetch(`${API_URL}/api/v1/session`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            lang: 'ru',
-            voice: true
-          })
+        log("Запрос разрешения на доступ к микрофону...");
+        
+        // Проверяем поддержку getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("Ваш браузер не поддерживает доступ к микрофону");
+        }
+        
+        // Запрашиваем доступ к микрофону с оптимальными настройками
+        mediaStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 24000
+          } 
         });
         
-        const data = await response.json();
+        log("Доступ к микрофону получен");
         
-        if (data.status === 'success') {
-          sessionId = data.session_id;
-          hideLoader();
-          return true;
+        // Создаем AudioContext с нужной частотой дискретизации
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+        log(`AudioContext создан с частотой ${audioContext.sampleRate} Гц`);
+        
+        // Создаем обработчик аудиопотока
+        const streamSource = audioContext.createMediaStreamSource(mediaStream);
+        
+        // Выбираем размер буфера
+        const bufferSize = 2048; // Меньший размер буфера для меньшей задержки
+        
+        // Проверяем, доступен ли ScriptProcessorNode
+        if (audioContext.createScriptProcessor) {
+          audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+          log("Создан ScriptProcessorNode для обработки аудио");
         } else {
-          showMessage('Не удалось подключиться. Попробуйте позже.', 'error');
-          hideLoader();
-          return false;
+          throw new Error("Ваш браузер не поддерживает ScriptProcessorNode");
         }
+        
+        // Переменные для отслеживания звука
+        let isSilent = true;
+        let silenceStartTime = Date.now();
+        let lastCommitTime = 0;
+        let hasSentAudioInCurrentSegment = false;
+        
+        // Обработчик аудио с оптимизированной логикой
+        audioProcessor.onaudioprocess = function(e) {
+          if (isListening && websocket && websocket.readyState === WebSocket.OPEN && !reconnecting) {
+            // Получаем данные с микрофона
+            const inputData = e.inputBuffer.getChannelData(0);
+            
+            // Вычисляем максимальную амплитуду
+            let maxAmplitude = 0;
+            for (let i = 0; i < inputData.length; i++) {
+              const absValue = Math.abs(inputData[i]);
+              maxAmplitude = Math.max(maxAmplitude, absValue);
+            }
+            
+            // Определяем, есть ли звук
+            const hasSound = maxAmplitude > AUDIO_CONFIG.soundDetectionThreshold;
+            
+            // Обновляем визуализацию
+            updateAudioVisualization(inputData);
+            
+            // Преобразуем float32 в int16
+            const pcm16Data = new Int16Array(inputData.length);
+            for (let i = 0; i < inputData.length; i++) {
+              pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
+            }
+            
+            // Отправляем данные через WebSocket
+            try {
+              const message = JSON.stringify({
+                type: "input_audio_buffer.append",
+                event_id: `audio_${Date.now()}`,
+                audio: arrayBufferToBase64(pcm16Data.buffer)
+              });
+              
+              websocket.send(message);
+              hasSentAudioInCurrentSegment = true;
+              
+              // Отмечаем наличие аудиоданных
+              if (!hasAudioData && hasSound) {
+                hasAudioData = true;
+                audioDataStartTime = Date.now();
+                log("Начало записи аудиоданных");
+              }
+              
+            } catch (error) {
+              log(`Ошибка отправки аудио: ${error.message}`, "error");
+            }
+            
+            // Логика определения тишины и автоматической отправки
+            const now = Date.now();
+            
+            if (hasSound) {
+              // Сбрасываем время начала тишины
+              isSilent = false;
+              silenceStartTime = now;
+              
+              // Активируем визуальное состояние прослушивания
+              if (!mainCircle.classList.contains('listening') && 
+                  !mainCircle.classList.contains('speaking')) {
+                mainCircle.classList.add('listening');
+              }
+            } else if (!isSilent) {
+              // Если наступила тишина
+              const silenceDuration = now - silenceStartTime;
+              
+              if (silenceDuration > AUDIO_CONFIG.silenceDuration) {
+                isSilent = true;
+                
+                // Если прошло достаточно времени с последней отправки и были данные
+                if (now - lastCommitTime > 1000 && hasSentAudioInCurrentSegment) {
+                  // Отправляем буфер с задержкой 
+                  setTimeout(() => {
+                    // Проверяем снова, не появился ли звук
+                    if (isSilent && isListening && !reconnecting) {
+                      commitAudioBuffer();
+                      lastCommitTime = Date.now();
+                      hasSentAudioInCurrentSegment = false;
+                    }
+                  }, 100);
+                }
+              }
+            }
+          }
+        };
+        
+        // Подключаем обработчик
+        streamSource.connect(audioProcessor);
+        audioProcessor.connect(audioContext.destination);
+        
+        log("Аудио инициализировано успешно");
+        return true;
       } catch (error) {
-        console.error('Ошибка инициализации:', error);
-        showMessage('Ошибка подключения к серверу', 'error');
-        hideLoader();
+        log(`Ошибка инициализации аудио: ${error.message}`, "error");
+        showMessage("Ошибка доступа к микрофону. Проверьте настройки браузера.");
         return false;
       }
     }
     
-    // Функция для отправки аудио на сервер через WebSocket вместо REST API
-    async function initWebSocket() {
-      try {
-        const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
-        const ws = new WebSocket(wsUrl);
-        
-        ws.onopen = function() {
-          console.log('WebSocket соединение установлено');
-          window.websocket = ws;
-          hideLoader();
-        };
-        
-        ws.onmessage = function(event) {
-          try {
-            const data = JSON.parse(event.data);
-            
-            // Обработка ответов от сервера
-            if (data.type === 'error') {
-              console.log('Ошибка:', data.error?.message);
-            } else if (data.type === 'response.text.done') {
-              showMessage(data.text);
-              mainCircle.classList.remove('speaking');
-              isProcessing = false;
-            } else if (data.type === 'response.text.delta') {
-              // Обновляем текст по мере поступления
-              if (messageDisplay.textContent === '') {
-                showMessage(data.delta);
-              } else {
-                messageDisplay.textContent += data.delta;
-              }
-              
-              // Если начали получать ответ, отображаем состояние говорения
-              mainCircle.classList.add('speaking');
-            } else if (data.type === 'response.done') {
-              mainCircle.classList.remove('speaking');
-              isProcessing = false;
-            }
-          } catch (error) {
-            console.error('Ошибка обработки сообщения WebSocket:', error);
-          }
-        };
-        
-        ws.onclose = function() {
-          console.log('WebSocket соединение закрыто');
-          window.websocket = null;
-        };
-        
-        ws.onerror = function(error) {
-          console.error('Ошибка WebSocket:', error);
-          showMessage('Ошибка соединения', 'error');
-        };
-        
-        return ws;
-      } catch (error) {
-        console.error('Ошибка при создании WebSocket:', error);
-        return null;
-      }
-    }
-    
-    // Функция для начала/остановки записи голоса
-    async function toggleVoiceRecording() {
-      if (isListening) {
-        stopRecording();
+    // Функция для отправки аудиобуфера
+    function commitAudioBuffer() {
+      if (!isListening || !websocket || websocket.readyState !== WebSocket.OPEN || reconnecting) return;
+      
+      // Проверяем, есть ли в буфере достаточно аудиоданных
+      if (!hasAudioData) {
+        log("Не отправляем пустой аудиобуфер", "warn");
         return;
       }
       
-      if (isProcessing) {
-        return; // Игнорируем клики, если идет обработка
-      }
-      
-      // Если нет WebSocket соединения, создаем его
-      if (!window.websocket || window.websocket.readyState !== WebSocket.OPEN) {
-        showLoader();
-        window.websocket = await initWebSocket();
+      // Проверяем минимальную длительность аудио (300мс требуется для корректной работы)
+      const audioLength = Date.now() - audioDataStartTime;
+      if (audioLength < minimumAudioLength) {
+        log(`Аудиобуфер слишком короткий (${audioLength}мс), ожидаем больше данных`, "warn");
         
-        if (!window.websocket) {
-          hideLoader();
-          showMessage('Не удалось установить соединение', 'error');
-          return;
-        }
-      }
-      
-      try {
-        // Запрашиваем доступ к микрофону
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            sampleRate: 24000,
-            channelCount: 1,
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          } 
-        });
-        
-        // Создаем AudioContext
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({
-          sampleRate: 24000
-        });
-        
-        // Изменяем состояние UI
-        mainCircle.classList.add('listening');
-        isListening = true;
-        
-        // Создаем источник аудио
-        const source = audioContext.createMediaStreamSource(stream);
-        
-        // Создаем процессор для обработки аудио
-        audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-        
-        // Обработчик аудио
-        audioProcessor.onaudioprocess = function(e) {
-          if (!isListening || !window.websocket || window.websocket.readyState !== WebSocket.OPEN) return;
-          
-          // Получаем данные с микрофона
-          const inputData = e.inputBuffer.getChannelData(0);
-          
-          // Преобразуем float32 в int16 (для PCM16)
-          const pcm16Data = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
-          }
-          
-          // Отправляем данные через WebSocket
-          try {
-            const message = JSON.stringify({
-              type: "input_audio_buffer.append",
-              event_id: `audio_${Date.now()}`,
-              audio: arrayBufferToBase64(pcm16Data.buffer)
-            });
-            
-            window.websocket.send(message);
-          } catch (error) {
-            console.error('Ошибка отправки аудио:', error);
-          }
-        };
-        
-        // Подключаем процессор
-        source.connect(audioProcessor);
-        audioProcessor.connect(audioContext.destination);
-        
-        // Автоматически останавливаем запись через 10 секунд
+        // Продолжаем запись еще немного времени
         setTimeout(() => {
-          if (isListening) {
-            stopRecording();
+          // Повторно пытаемся отправить буфер
+          if (isListening && hasAudioData && !reconnecting) {
+            log(`Отправка аудиобуфера после дополнительной записи (${Date.now() - audioDataStartTime}мс)`);
+            sendCommitBuffer();
           }
-        }, 10000);
+        }, minimumAudioLength - audioLength + 50); // Добавляем небольшой запас
         
-      } catch (error) {
-        console.error('Ошибка при доступе к микрофону:', error);
-        mainCircle.classList.remove('listening');
-        isListening = false;
-        showMessage('Ошибка доступа к микрофону', 'error');
+        return;
       }
+      
+      // Если все проверки пройдены, отправляем буфер
+      sendCommitBuffer();
     }
     
-    // Функция остановки записи
-    function stopRecording() {
-      if (!isListening) return;
+    // Функция для фактической отправки буфера
+    function sendCommitBuffer() {
+      log("Отправка аудиобуфера");
       
-      // Изменяем UI
+      // Сбрасываем эффект активности
       mainCircle.classList.remove('listening');
-      isListening = false;
-      isProcessing = true;
       
-      // Отключаем обработчик аудио
-      if (audioProcessor) {
-        audioProcessor.disconnect();
-        audioProcessor = null;
-      }
+      // Отправляем команду для завершения буфера
+      websocket.send(JSON.stringify({
+        type: "input_audio_buffer.commit",
+        event_id: `commit_${Date.now()}`
+      }));
       
-      // Отправляем команду для обработки собранного аудио
-      if (window.websocket && window.websocket.readyState === WebSocket.OPEN) {
-        window.websocket.send(JSON.stringify({
-          type: "input_audio_buffer.commit",
-          event_id: `commit_${Date.now()}`
-        }));
-      }
-      
-      // Закрываем AudioContext
-      if (audioContext) {
-        audioContext.close().catch(err => console.error('Ошибка закрытия AudioContext:', err));
-        audioContext = null;
-      }
+      // Начинаем обработку и сбрасываем флаги
+      hasAudioData = false;
+      audioDataStartTime = 0;
     }
     
     // Преобразование ArrayBuffer в Base64
@@ -483,55 +496,320 @@
       return btoa(binary);
     }
     
-    // Отображение сообщения
-    function showMessage(text, type = 'normal') {
-      messageDisplay.textContent = text;
-      messageDisplay.className = 'message-display show';
+    // Преобразование Base64 в ArrayBuffer
+    function base64ToArrayBuffer(base64) {
+      try {
+        const binaryString = atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+      } catch (e) {
+        log(`Ошибка при декодировании base64: ${e.message}`, "error");
+        return new ArrayBuffer(0);
+      }
+    }
+    
+    // Обновление визуализации аудио
+    function updateAudioVisualization(audioData) {
+      const bars = audioBars.querySelectorAll('.audio-bar');
+      const step = Math.floor(audioData.length / bars.length);
       
-      if (type === 'error') {
-        messageDisplay.style.backgroundColor = '#ffebee';
-        messageDisplay.style.color = '#d32f2f';
-      } else {
-        messageDisplay.style.backgroundColor = '#ffffff';
-        messageDisplay.style.color = '#333333';
+      for (let i = 0; i < bars.length; i++) {
+        // Вычисляем среднее значение амплитуды для этого "отрезка" аудиоданных
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+          const index = i * step + j;
+          if (index < audioData.length) {
+            sum += Math.abs(audioData[index]);
+          }
+        }
+        const average = sum / step;
+        
+        // Нормализуем значение для высоты полосы (от 2px до 30px)
+        const height = 2 + Math.min(28, Math.floor(average * 100));
+        bars[i].style.height = `${height}px`;
+      }
+    }
+    
+    // Сброс визуализации аудио
+    function resetAudioVisualization() {
+      const bars = audioBars.querySelectorAll('.audio-bar');
+      bars.forEach(bar => {
+        bar.style.height = '2px';
+      });
+    }
+    
+    // Создаём простой WAV из PCM данных
+    function createWavFromPcm(pcmBuffer, sampleRate = 24000) {
+      // Создаём заголовок WAV
+      const wavHeader = new ArrayBuffer(44);
+      const view = new DataView(wavHeader);
+      
+      // "RIFF" chunk descriptor
+      view.setUint8(0, 'R'.charCodeAt(0));
+      view.setUint8(1, 'I'.charCodeAt(0));
+      view.setUint8(2, 'F'.charCodeAt(0));
+      view.setUint8(3, 'F'.charCodeAt(0));
+      
+      view.setUint32(4, 36 + pcmBuffer.byteLength, true); // Размер всего файла - 8
+      
+      // "WAVE" формат
+      view.setUint8(8, 'W'.charCodeAt(0));
+      view.setUint8(9, 'A'.charCodeAt(0));
+      view.setUint8(10, 'V'.charCodeAt(0));
+      view.setUint8(11, 'E'.charCodeAt(0));
+      
+      // "fmt " субчанк
+      view.setUint8(12, 'f'.charCodeAt(0));
+      view.setUint8(13, 'm'.charCodeAt(0));
+      view.setUint8(14, 't'.charCodeAt(0));
+      view.setUint8(15, ' '.charCodeAt(0));
+      
+      view.setUint32(16, 16, true); // Размер fmt субчанка
+      view.setUint16(20, 1, true);  // Формат аудио (1 = PCM)
+      view.setUint16(22, 1, true);  // Число каналов (1 = моно)
+      view.setUint32(24, sampleRate, true); // Частота дискретизации
+      view.setUint32(28, sampleRate * 2, true); // Байт в секунду (SampleRate * NumChannels * BitsPerSample/8)
+      view.setUint16(32, 2, true);  // Байт на сэмпл (NumChannels * BitsPerSample/8)
+      view.setUint16(34, 16, true); // Бит на сэмпл
+      
+      // "data" субчанк
+      view.setUint8(36, 'd'.charCodeAt(0));
+      view.setUint8(37, 'a'.charCodeAt(0));
+      view.setUint8(38, 't'.charCodeAt(0));
+      view.setUint8(39, 'a'.charCodeAt(0));
+      
+      view.setUint32(40, pcmBuffer.byteLength, true); // Размер данных
+      
+      // Объединяем заголовок и PCM данные
+      const wavBuffer = new ArrayBuffer(wavHeader.byteLength + pcmBuffer.byteLength);
+      const wavBytes = new Uint8Array(wavBuffer);
+      
+      wavBytes.set(new Uint8Array(wavHeader), 0);
+      wavBytes.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
+      
+      return wavBuffer;
+    }
+    
+    // Добавить аудио в очередь воспроизведения
+    function addAudioToPlaybackQueue(audioBase64) {
+      if (!audioBase64 || typeof audioBase64 !== 'string') return;
+      
+      // Добавляем аудио в очередь
+      audioPlaybackQueue.push(audioBase64);
+      
+      // Если не запущено воспроизведение, запускаем
+      if (!isPlayingAudio) {
+        playNextAudio();
+      }
+    }
+    
+    // Воспроизведение следующего аудио в очереди
+    function playNextAudio() {
+      if (audioPlaybackQueue.length === 0) {
+        isPlayingAudio = false;
+        // Сбрасываем эффект говорения, когда все аудио воспроизведено
+        mainCircle.classList.remove('speaking');
+        return;
       }
       
-      // Скрываем сообщение через 5 секунд
-      setTimeout(() => {
-        messageDisplay.classList.remove('show');
-      }, 5000);
+      isPlayingAudio = true;
+      
+      // Активируем визуальное состояние говорения
+      mainCircle.classList.add('speaking');
+      mainCircle.classList.remove('listening');
+      
+      const audioBase64 = audioPlaybackQueue.shift();
+      
+      try {
+        // Декодируем Base64 в ArrayBuffer
+        const audioData = base64ToArrayBuffer(audioBase64);
+        
+        // Проверяем размер данных
+        if (audioData.byteLength === 0) {
+          playNextAudio(); // Пропускаем пустой аудио-чанк
+          return;
+        }
+        
+        // Предполагаем, что данные в формате PCM16, конвертируем в WAV для воспроизведения
+        const wavBuffer = createWavFromPcm(audioData);
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(blob);
+        
+        // Воспроизводим звук
+        const audio = new Audio(audioUrl);
+        
+        audio.oncanplaythrough = function() {
+          audio.play().catch(err => {
+            log(`Ошибка при воспроизведении: ${err.message}`, "error");
+            playNextAudio(); // В случае ошибки переходим к следующему аудио
+          });
+        };
+        
+        // После окончания воспроизведения
+        audio.onended = function() {
+          URL.revokeObjectURL(audioUrl);
+          playNextAudio(); // Переходим к следующему аудио
+        };
+        
+        // В случае ошибки
+        audio.onerror = function() {
+          URL.revokeObjectURL(audioUrl);
+          playNextAudio(); // Переходим к следующему аудио
+        };
+      } catch (error) {
+        log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
+        playNextAudio(); // В случае ошибки переходим к следующему аудио
+      }
     }
     
-    // Показать/скрыть лоадер
-    function showLoader() {
-      loaderModal.classList.add('active');
+    // Подключение к WebSocket серверу
+    async function connectWebSocket() {
+      try {
+        loaderModal.classList.add('active');
+        log("Подключение...");
+        
+        // Используем WebSocket-соединение с нашим сервером
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        // Создаем новое WebSocket соединение
+        websocket = new WebSocket(wsUrl);
+        
+        // Устанавливаем таймаут на открытие соединения
+        const connectionTimeout = setTimeout(() => {
+          log("Превышено время ожидания соединения", "error");
+          websocket.close();
+          loaderModal.classList.remove('active');
+          showMessage("Не удалось подключиться к серверу");
+        }, 15000);
+        
+        websocket.onopen = function() {
+          clearTimeout(connectionTimeout);
+          log("Соединение установлено");
+          isConnected = true;
+          loaderModal.classList.remove('active');
+          
+          // Автоматически начинаем слушать
+          startListening();
+        };
+        
+        websocket.onmessage = function(event) {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // Обработка различных типов сообщений
+            if (data.type === 'error') {
+              log(`Ошибка: ${data.error ? data.error.message : 'Неизвестная ошибка'}`, "error");
+            } 
+            // Обработка текстового ответа
+            else if (data.type === 'response.text.delta') {
+              if (data.delta) {
+                showMessage(data.delta, 10000);
+              }
+            }
+            // Обработка аудио
+            else if (data.type === 'response.audio.delta') {
+              if (data.delta) {
+                audioChunksBuffer.push(data.delta);
+              }
+            }
+            // Аудио готово для воспроизведения
+            else if (data.type === 'response.audio.done') {
+              if (audioChunksBuffer.length > 0) {
+                const fullAudio = audioChunksBuffer.join('');
+                addAudioToPlaybackQueue(fullAudio);
+                audioChunksBuffer = [];
+              }
+            }
+            // Ответ завершен
+            else if (data.type === 'response.done') {
+              // Начинаем снова слушать автоматически
+              setTimeout(() => {
+                if (!isPlayingAudio && !reconnecting) {
+                  startListening();
+                }
+              }, 300);
+            }
+          } catch (error) {
+            log(`Ошибка обработки сообщения: ${error.message}`, "error");
+          }
+        };
+        
+        websocket.onclose = function() {
+          log("Соединение закрыто");
+          isConnected = false;
+          isListening = false;
+          reconnecting = false;
+          
+          // Показываем сообщение пользователю
+          showMessage("Соединение прервано. Переподключение...");
+          
+          // Пытаемся переподключиться
+          setTimeout(() => {
+            connectWebSocket();
+          }, 3000);
+        };
+        
+        websocket.onerror = function(error) {
+          log("Ошибка соединения", "error");
+          showMessage("Ошибка соединения с сервером");
+        };
+        
+        return true;
+      } catch (error) {
+        log(`Ошибка при установке соединения: ${error.message}`, "error");
+        loaderModal.classList.remove('active');
+        showMessage("Не удалось подключиться к серверу");
+        return false;
+      }
     }
     
-    function hideLoader() {
-      loaderModal.classList.remove('active');
+    // Начало записи голоса
+    async function startListening() {
+      if (!isConnected || isPlayingAudio || reconnecting) {
+        return;
+      }
+      
+      isListening = true;
+      log("Начало записи голоса");
+      
+      // Отправляем команду для очистки буфера ввода
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({
+          type: "input_audio_buffer.clear",
+          event_id: `clear_${Date.now()}`
+        }));
+      }
+      
+      // Если аудио еще не инициализировано, делаем это
+      if (!audioContext) {
+        await initAudio();
+      } else if (audioContext.state === 'suspended') {
+        // Возобновляем AudioContext если он был приостановлен
+        await audioContext.resume();
+      }
+      
+      // Сбрасываем флаги аудио данных
+      hasAudioData = false;
+      audioDataStartTime = 0;
+      
+      // Активируем визуальное состояние прослушивания если не воспроизводится аудио
+      if (!isPlayingAudio) {
+        mainCircle.classList.add('listening');
+        mainCircle.classList.remove('speaking');
+      }
     }
     
     // Инициализация
     async function init() {
-      try {
-        // Инициализируем WebSocket соединение
-        window.websocket = await initWebSocket();
-        
-        // Если не удалось создать WebSocket, показываем сообщение
-        if (!window.websocket) {
-          showMessage('Не удалось подключиться к серверу', 'error');
-        }
-      } catch (error) {
-        console.error('Ошибка инициализации:', error);
-        showMessage('Ошибка подключения', 'error');
-        hideLoader();
-      }
+      // Создаем WebSocket соединение
+      await connectWebSocket();
     }
     
-    // Обработчики событий
-    mainCircle.addEventListener('click', toggleVoiceRecording);
-    
-    // Запуск инициализации
+    // Запускаем инициализацию
     document.addEventListener('DOMContentLoaded', init);
   </script>
 </body>
