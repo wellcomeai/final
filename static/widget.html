@@ -6,6 +6,7 @@
   <title>WellcomeAI Widget</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
+    /* Сброс стилей для изоляции от родительской страницы */
     * {
       margin: 0;
       padding: 0;
@@ -17,344 +18,368 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: transparent;
+      background: transparent !important;
     }
     
-    /* Основной контейнер виджета - фиксированное позиционирование */
+    /* Основной контейнер виджета с максимальным z-index */
     #wellcomeAiContainer {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 999999;
-      font-family: 'Segoe UI', 'Roboto', sans-serif;
+      position: fixed !important;
+      bottom: 20px !important;
+      right: 20px !important;
+      z-index: 2147483647 !important; /* Максимально возможный z-index */
+      font-family: 'Segoe UI', 'Roboto', sans-serif !important;
+      pointer-events: auto !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
     }
     
     /* Кнопка-робот */
     .robot-button {
-      width: 70px;
-      height: 70px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #4a86e8, #2965c7);
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: transform 0.3s ease;
+      width: 70px !important;
+      height: 70px !important;
+      border-radius: 50% !important;
+      background: linear-gradient(135deg, #4a86e8, #2965c7) !important;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      cursor: pointer !important;
+      position: relative !important;
+      overflow: hidden !important;
+      transition: transform 0.3s ease !important;
+      z-index: 2147483647 !important;
+      border: none !important;
+      outline: none !important;
     }
     
     .robot-button:hover {
-      transform: scale(1.05);
+      transform: scale(1.05) !important;
     }
     
     .robot-button::before {
-      content: '';
-      position: absolute;
-      width: 140%;
-      height: 140%;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2));
-      animation: wave 8s linear infinite;
-      border-radius: 40%;
+      content: '' !important;
+      position: absolute !important;
+      width: 140% !important;
+      height: 140% !important;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2)) !important;
+      animation: wave 8s linear infinite !important;
+      border-radius: 40% !important;
     }
     
     @keyframes wave {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      0% { transform: rotate(0deg) !important; }
+      100% { transform: rotate(360deg) !important; }
     }
     
     .robot-icon {
-      color: white;
-      font-size: 32px;
-      z-index: 2;
+      color: white !important;
+      font-size: 32px !important;
+      z-index: 10 !important;
     }
     
     /* Чат-окно */
     .chat-window {
-      position: fixed;
-      bottom: 30px;
-      right: 30px;
-      width: 350px;
-      height: 500px;
-      background-color: white;
-      border-radius: 15px;
-      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
-      display: none;
-      flex-direction: column;
-      overflow: hidden;
-      z-index: 999999;
+      position: fixed !important;
+      bottom: 30px !important;
+      right: 30px !important;
+      width: 350px !important;
+      height: 500px !important;
+      background-color: white !important;
+      border-radius: 15px !important;
+      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3) !important;
+      display: none !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+      z-index: 2147483647 !important;
+      border: 1px solid rgba(0, 0, 0, 0.1) !important;
     }
     
     .chat-window.active {
-      display: flex;
+      display: flex !important;
     }
     
     /* Заголовок чата */
     .chat-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 15px;
-      background: linear-gradient(135deg, #4a86e8, #2965c7);
-      color: white;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 15px !important;
+      background: linear-gradient(135deg, #4a86e8, #2965c7) !important;
+      color: white !important;
+      user-select: none !important;
     }
     
     .chat-title {
-      font-weight: 600;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      font-weight: 600 !important;
+      font-size: 16px !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 10px !important;
     }
     
     .close-button {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 18px;
-      cursor: pointer;
-      opacity: 0.8;
-      transition: opacity 0.2s;
+      background: none !important;
+      border: none !important;
+      color: white !important;
+      font-size: 18px !important;
+      cursor: pointer !important;
+      opacity: 0.8 !important;
+      transition: opacity 0.2s !important;
+      padding: 5px !important;
     }
     
     .close-button:hover {
-      opacity: 1;
+      opacity: 1 !important;
     }
     
     /* Основное содержимое чата */
     .chat-content {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-      position: relative;
+      flex: 1 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      align-items: center !important;
+      padding: 20px !important;
+      position: relative !important;
+      overflow: hidden !important;
+      background-color: white !important;
     }
     
     /* Сообщения */
     .messages-container {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 80px;
-      padding: 15px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 80px !important;
+      padding: 15px !important;
+      overflow-y: auto !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 10px !important;
+      z-index: 10 !important;
+      background-color: white !important;
     }
     
     .message {
-      max-width: 80%;
-      padding: 10px 15px;
-      border-radius: 15px;
-      word-break: break-word;
-      animation: fadeIn 0.3s ease;
+      max-width: 80% !important;
+      padding: 10px 15px !important;
+      border-radius: 15px !important;
+      word-break: break-word !important;
+      animation: fadeIn 0.3s ease !important;
+      font-size: 14px !important;
+      line-height: 1.4 !important;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
     }
     
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0 !important; transform: translateY(10px) !important; }
+      to { opacity: 1 !important; transform: translateY(0) !important; }
     }
     
     .message.assistant {
-      align-self: flex-start;
-      background-color: #F1F5F9;
-      border-bottom-left-radius: 5px;
+      align-self: flex-start !important;
+      background-color: #F1F5F9 !important;
+      border-bottom-left-radius: 5px !important;
+      color: #333 !important;
     }
     
     .message.user {
-      align-self: flex-end;
-      background-color: #E6F2FF;
-      color: #0A51A1;
-      border-bottom-right-radius: 5px;
+      align-self: flex-end !important;
+      background-color: #E6F2FF !important;
+      color: #0A51A1 !important;
+      border-bottom-right-radius: 5px !important;
     }
     
     /* Круг голосового помощника */
     .voice-circle {
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-      z-index: 5;
-      cursor: pointer;
+      width: 120px !important;
+      height: 120px !important;
+      border-radius: 50% !important;
+      background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8) !important;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+      position: relative !important;
+      overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      transition: all 0.3s ease !important;
+      z-index: 5 !important;
+      cursor: pointer !important;
+      border: none !important;
+      margin-bottom: 10px !important;
     }
     
     .voice-circle::before {
-      content: '';
-      position: absolute;
-      width: 140%;
-      height: 140%;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2));
-      animation: wave 8s linear infinite;
-      border-radius: 40%;
+      content: '' !important;
+      position: absolute !important;
+      width: 140% !important;
+      height: 140% !important;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2)) !important;
+      animation: wave 8s linear infinite !important;
+      border-radius: 40% !important;
     }
     
     /* Состояние прослушивания */
     .voice-circle.listening {
-      background: linear-gradient(135deg, #ffffff, #e3f2fd, #2196f3);
-      box-shadow: 0 0 30px rgba(33, 150, 243, 0.6);
+      background: linear-gradient(135deg, #ffffff, #e3f2fd, #2196f3) !important;
+      box-shadow: 0 0 30px rgba(33, 150, 243, 0.6) !important;
     }
     
     .voice-circle.listening::before {
-      animation: wave 4s linear infinite;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(33, 150, 243, 0.3));
+      animation: wave 4s linear infinite !important;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(33, 150, 243, 0.3)) !important;
     }
     
     .voice-circle.listening::after {
-      content: '';
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      border: 3px solid rgba(33, 150, 243, 0.5);
-      animation: pulse 1.5s ease-out infinite;
+      content: '' !important;
+      position: absolute !important;
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 50% !important;
+      border: 3px solid rgba(33, 150, 243, 0.5) !important;
+      animation: pulse 1.5s ease-out infinite !important;
     }
     
     @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.7; }
-      50% { transform: scale(1.05); opacity: 0.3; }
-      100% { transform: scale(0.95); opacity: 0.7; }
+      0% { transform: scale(0.95) !important; opacity: 0.7 !important; }
+      50% { transform: scale(1.05) !important; opacity: 0.3 !important; }
+      100% { transform: scale(0.95) !important; opacity: 0.7 !important; }
     }
     
     /* Состояние говорения */
     .voice-circle.speaking {
-      background: linear-gradient(135deg, #ffffff, #e8f5e9, #4caf50);
-      box-shadow: 0 0 30px rgba(76, 175, 80, 0.6);
+      background: linear-gradient(135deg, #ffffff, #e8f5e9, #4caf50) !important;
+      box-shadow: 0 0 30px rgba(76, 175, 80, 0.6) !important;
     }
     
     .voice-circle.speaking::before {
-      animation: wave 3s linear infinite;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3));
+      animation: wave 3s linear infinite !important;
+      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3)) !important;
     }
     
     .voice-circle.speaking::after {
-      content: '';
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, transparent 50%, rgba(76, 175, 80, 0.1) 100%);
-      border-radius: 50%;
-      animation: ripple 2s ease-out infinite;
+      content: '' !important;
+      position: absolute !important;
+      width: 100% !important;
+      height: 100% !important;
+      background: radial-gradient(circle, transparent 50%, rgba(76, 175, 80, 0.1) 100%) !important;
+      border-radius: 50% !important;
+      animation: ripple 2s ease-out infinite !important;
     }
     
     @keyframes ripple {
-      0% { transform: scale(0.8); opacity: 0; }
-      50% { opacity: 0.5; }
-      100% { transform: scale(1.2); opacity: 0; }
+      0% { transform: scale(0.8) !important; opacity: 0 !important; }
+      50% { opacity: 0.5 !important; }
+      100% { transform: scale(1.2) !important; opacity: 0 !important; }
     }
     
     .mic-icon {
-      font-size: 32px;
-      color: #4a86e8;
-      z-index: 10;
+      font-size: 32px !important;
+      color: #4a86e8 !important;
+      z-index: 10 !important;
     }
     
     .voice-circle.listening .mic-icon {
-      color: #2196f3;
+      color: #2196f3 !important;
     }
     
     .voice-circle.speaking .mic-icon {
-      color: #4caf50;
+      color: #4caf50 !important;
     }
     
     /* Подсказка */
     .hint-text {
-      margin-top: 20px;
-      text-align: center;
-      color: #777;
-      font-size: 14px;
+      margin-top: 20px !important;
+      text-align: center !important;
+      color: #777 !important;
+      font-size: 14px !important;
+      font-weight: normal !important;
+      max-width: 200px !important;
+      line-height: 1.4 !important;
     }
     
     /* Аудио визуализация */
     .audio-visualization {
-      position: absolute;
-      width: 100%;
-      max-width: 200px;
-      height: 40px;
-      bottom: 20px;
-      opacity: 0.8;
+      position: absolute !important;
+      width: 100% !important;
+      max-width: 200px !important;
+      height: 40px !important;
+      bottom: 20px !important;
+      opacity: 0.8 !important;
+      pointer-events: none !important;
     }
     
     .audio-bars {
-      display: flex;
-      align-items: flex-end;
-      height: 30px;
-      gap: 2px;
-      width: 100%;
-      justify-content: center;
+      display: flex !important;
+      align-items: flex-end !important;
+      height: 30px !important;
+      gap: 2px !important;
+      width: 100% !important;
+      justify-content: center !important;
     }
     
     .audio-bar {
-      width: 3px;
-      height: 2px;
-      background-color: #4a86e8;
-      border-radius: 1px;
-      transition: height 0.1s ease;
+      width: 3px !important;
+      height: 2px !important;
+      background-color: #4a86e8 !important;
+      border-radius: 1px !important;
+      transition: height 0.1s ease !important;
     }
     
     /* Модальное окно загрузки */
     .loader-modal {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(255, 255, 255, 0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s;
-      border-radius: 15px;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      background-color: rgba(255, 255, 255, 0.95) !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      z-index: 2147483646 !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      transition: all 0.3s !important;
+      border-radius: 15px !important;
     }
     
     .loader-modal.active {
-      opacity: 1;
-      visibility: visible;
+      opacity: 1 !important;
+      visibility: visible !important;
     }
     
     .loader {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(74, 134, 232, 0.3);
-      border-radius: 50%;
-      border-top-color: #4a86e8;
-      animation: spin 1s linear infinite;
+      width: 40px !important;
+      height: 40px !important;
+      border: 3px solid rgba(74, 134, 232, 0.3) !important;
+      border-radius: 50% !important;
+      border-top-color: #4a86e8 !important;
+      animation: spin 1s linear infinite !important;
     }
     
     @keyframes spin {
-      to { transform: rotate(360deg); }
+      to { transform: rotate(360deg) !important; }
     }
     
     /* Мобильная адаптация */
     @media (max-width: 480px) {
       .chat-window {
-        width: 300px;
-        height: 450px;
-        bottom: 20px;
-        right: 20px;
+        width: calc(100vw - 40px) !important;
+        max-width: 350px !important;
+        height: 450px !important;
+        bottom: 20px !important;
+        right: 20px !important;
       }
       
       .voice-circle {
-        width: 100px;
-        height: 100px;
+        width: 100px !important;
+        height: 100px !important;
       }
       
       .mic-icon {
-        font-size: 28px;
+        font-size: 28px !important;
       }
     }
   </style>
@@ -391,7 +416,7 @@
         </div>
         
         <!-- Подсказка -->
-        <div class="hint-text" id="hintText">Нажмите на круг, чтобы начать говорить</div>
+        <div class="hint-text" id="hintText">Слушаю вас...</div>
         
         <!-- Аудио визуализация -->
         <div class="audio-visualization" id="audioVisualization">
@@ -486,13 +511,42 @@
       // Показываем окно чата
       chatWindow.classList.add('active');
       
+      // Изменяем размер iframe, если мы в iframe
+      if (isInIframe()) {
+        try {
+          // Отправляем сообщение родительскому окну
+          window.parent.postMessage({
+            action: 'wellcomeAiExpanded',
+            width: 350,
+            height: 500
+          }, '*');
+          
+          // Для совместимости с Tilda и другими платформами, обновляем размер iframe напрямую
+          if (window.frameElement) {
+            window.frameElement.style.width = '350px';
+            window.frameElement.style.height = '500px';
+            window.frameElement.style.position = 'fixed';
+            window.frameElement.style.bottom = '20px';
+            window.frameElement.style.right = '20px';
+            window.frameElement.style.zIndex = '2147483647';
+            window.frameElement.style.border = 'none';
+          }
+        } catch (e) {
+          console.warn('Не удалось изменить размер iframe:', e);
+        }
+      }
+      
       widgetMode = 'expanded';
       
-      // Если нет сообщений и соединение установлено, добавляем приветствие
-      if (messageHistory.length === 0 && isConnected) {
+      // Если соединение установлено, начинаем слушать 
+      if (isConnected) {
         setTimeout(() => {
-          addMessage('Привет! Я голосовой ассистент WellcomeAI. Чем могу помочь?');
-          // Начинаем слушать, если мы не слушаем уже
+          // Показываем приветственное сообщение, если история пуста
+          if (messageHistory.length === 0) {
+            addMessage('Привет! Я голосовой ассистент WellcomeAI. Чем могу помочь?');
+          }
+          
+          // Автоматически начинаем слушать без необходимости нажимать на микрофон
           if (!isListening && !isPlayingAudio) {
             startListening();
           }
@@ -507,6 +561,40 @@
       
       // Скрываем окно чата
       chatWindow.classList.remove('active');
+      
+      // Останавливаем прослушивание
+      isListening = false;
+      
+      // Обновляем подсказку для следующего открытия
+      hintText.textContent = "Слушаю вас...";
+      
+      // Сбрасываем эффекты активности
+      voiceCircle.classList.remove('listening');
+      
+      // Изменяем размер iframe, если мы в iframe
+      if (isInIframe()) {
+        try {
+          // Отправляем сообщение родительскому окну
+          window.parent.postMessage({
+            action: 'wellcomeAiCollapsed',
+            width: 70,
+            height: 70
+          }, '*');
+          
+          // Для совместимости с Tilda и другими платформами, обновляем размер iframe напрямую
+          if (window.frameElement) {
+            window.frameElement.style.width = '70px';
+            window.frameElement.style.height = '70px';
+            window.frameElement.style.position = 'fixed';
+            window.frameElement.style.bottom = '20px';
+            window.frameElement.style.right = '20px';
+            window.frameElement.style.zIndex = '2147483647';
+            window.frameElement.style.border = 'none';
+          }
+        } catch (e) {
+          console.warn('Не удалось изменить размер iframe:', e);
+        }
+      }
       
       widgetMode = 'compact';
     }
@@ -849,7 +937,7 @@
         voiceCircle.classList.remove('speaking');
         
         // Обновляем подсказку
-        hintText.textContent = "Нажмите на круг, чтобы начать говорить";
+        hintText.textContent = "Слушаю вас...";
         
         // Снова начинаем слушать
         if (!isListening && isConnected) {
@@ -1027,7 +1115,7 @@
             else if (data.type === 'response.done') {
               // Обновляем подсказку
               if (!isPlayingAudio) {
-                hintText.textContent = "Нажмите на круг, чтобы начать говорить";
+                hintText.textContent = "Слушаю вас...";
                 
                 // Начинаем снова слушать автоматически
                 if (!isListening && !reconnecting) {
@@ -1084,7 +1172,7 @@
       log("Начало записи голоса");
       
       // Обновляем подсказку
-      hintText.textContent = "Говорите после щелчка...";
+      hintText.textContent = "Слушаю вас...";
       
       // Отправляем команду для очистки буфера ввода
       if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -1125,9 +1213,32 @@
       }
     }
     
+    // Устанавливаем правильные размеры iframe при загрузке
+    function setupIframe() {
+      if (isInIframe() && window.frameElement) {
+        try {
+          // Устанавливаем начальные размеры
+          window.frameElement.style.width = '70px';
+          window.frameElement.style.height = '70px';
+          window.frameElement.style.position = 'fixed';
+          window.frameElement.style.bottom = '20px';
+          window.frameElement.style.right = '20px';
+          window.frameElement.style.zIndex = '2147483647';
+          window.frameElement.style.border = 'none';
+          window.frameElement.style.transition = 'width 0.3s, height 0.3s';
+          window.frameElement.style.overflow = 'visible';
+        } catch (e) {
+          console.warn('Не удалось установить стили для iframe:', e);
+        }
+      }
+    }
+    
     // Инициализация
     async function init() {
       try {
+        // Устанавливаем правильные размеры iframe
+        setupIframe();
+        
         // Настраиваем обработчики событий
         robotButton.addEventListener('click', expandWidget);
         
@@ -1136,6 +1247,18 @@
         voiceCircle.addEventListener('click', function() {
           if (!isListening && !isPlayingAudio) {
             startListening();
+          }
+        });
+        
+        // Добавляем слушатель событий для окна, чтобы обрабатывать события внешнего iframe
+        window.addEventListener('message', function(event) {
+          // Обработка сообщений от родительского окна
+          if (event.data && event.data.action) {
+            if (event.data.action === 'expandWidget') {
+              expandWidget();
+            } else if (event.data.action === 'collapseWidget') {
+              collapseWidget();
+            }
           }
         });
         
