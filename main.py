@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("claude-voice")
+logger = logging.getLogger("wellcome-ai")
 logger.setLevel(logging.DEBUG)
 
 # Загружаем переменные окружения
@@ -24,7 +24,7 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = int(os.getenv('PORT', 5050))
 REALTIME_WS_URL = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01'
 SYSTEM_MESSAGE = (
-    "Ты Claude Sonnet - умный голосовой помощник. Отвечай на вопросы пользователя коротко, "
+    "Ты WellcomeAI - умный голосовой помощник. Отвечай на вопросы пользователя коротко, "
     "информативно и с небольшой ноткой юмора, когда это уместно. Стремись быть полезным "
     "и предоставлять точную информацию."
 )
@@ -49,7 +49,7 @@ static_dir = os.path.join(os.getcwd(), "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir)
     with open(os.path.join(static_dir, "index.html"), "w") as f:
-        f.write("<html><body><h1>Placeholder</h1></body></html>")
+        f.write("<html><body><h1>WellcomeAI</h1></body></html>")
     logger.info(f"Создана директория static с заглушкой index.html")
 
 # Монтируем статические файлы
@@ -71,21 +71,9 @@ client_connections = {}
 @app.get("/")
 async def index_page():
     """Возвращает HTML страницу с интерфейсом голосового помощника"""
-    try:
-        index_path = os.path.join(static_dir, "index.html")
-        if os.path.exists(index_path):
-            with open(index_path, "r") as file:
-                content = file.read()
-            return HTMLResponse(content=content)
-        else:
-            logger.warning(f"Файл {index_path} не найден")
-            return {"message": "Файл index.html не найден в директории static"}
-    except Exception as e:
-        logger.error(f"Ошибка при отдаче главной страницы: {str(e)}")
-        return JSONResponse(
-            status_code=500,
-            content={"message": f"Ошибка сервера: {str(e)}"}
-        )
+    with open(os.path.join(os.path.dirname(__file__), "index.html"), "r", encoding="utf-8") as f:
+        content = f.read()
+    return HTMLResponse(content=content)
 
 @app.get("/api/check")
 async def check_api():
@@ -229,12 +217,20 @@ async def forward_client_to_openai(client_ws: WebSocket, openai_ws, client_id: i
                     # Обновляем настройки сессии
                     session_data = data.get("session", {})
                     
+                    # Проверяем наличие обновлений настроек
+                    updated = False
+                    
                     # Если указан голос, обновляем его
                     if "voice" in session_data:
                         voice = session_data["voice"]
                         if voice in AVAILABLE_VOICES:
                             client_connections[client_id]["voice"] = voice
                             logger.info(f"Голос для клиента {client_id} изменен на {voice}")
+                            updated = True
+                    
+                    # Если есть обновления настроек, передаем их в OpenAI
+                    if updated:
+                        logger.info(f"Отправка обновленных настроек на сервер")
                 
                 # Выводим информацию о сообщении в логи
                 logger.debug(f"[Клиент {client_id} -> OpenAI] {msg_type}")
@@ -268,6 +264,18 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
                     # Логируем определенные типы событий
                     if response.get('type') in LOG_EVENT_TYPES:
                         logger.info(f"[OpenAI -> Клиент {client_id}] {response.get('type')}")
+                    
+                    # Обрабатываем ошибки сервера
+                    if response.get('type') == 'error':
+                        error_msg = response.get('error', {}).get('message', 'Неизвестная ошибка')
+                        logger.error(f"Ошибка от OpenAI: {error_msg}")
+                        
+                        # Если это ошибка связана с голосом
+                        if 'voice' in error_msg.lower():
+                            logger.error(f"Ошибка голоса. Пробуем установить голос по умолчанию.")
+                            # Возвращаем голос по умолчанию и отправляем обновление настроек
+                            client_connections[client_id]["voice"] = DEFAULT_VOICE
+                            await send_session_update(openai_ws, DEFAULT_VOICE)
                     
                     # Пересылаем сообщение клиенту
                     await client_ws.send_text(openai_message)
@@ -310,7 +318,8 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
         "type": "server_vad",
         "threshold": 0.5,
         "prefix_padding_ms": 300,
-        "silence_duration_ms": 500
+        "silence_duration_ms": 500,
+        "create_response": True  # Автоматически создавать ответ при завершении речи
     } if turn_detection_enabled else None
     
     session_update = {
@@ -323,11 +332,16 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
             "instructions": SYSTEM_MESSAGE,     # Системное сообщение
             "modalities": ["text", "audio"],    # Поддерживаемые модальности
             "temperature": 0.7,                 # Температура генерации
+            "max_response_output_tokens": 300   # Лимит токенов в ответе для скорости
         }
     }
     
     logger.info(f"Отправка настроек сессии с голосом {voice}")
-    await openai_ws.send(json.dumps(session_update))
+    try:
+        await openai_ws.send(json.dumps(session_update))
+    except Exception as e:
+        logger.error(f"Ошибка при отправке настроек сессии: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     import uvicorn
