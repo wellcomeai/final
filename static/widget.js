@@ -1,12 +1,63 @@
 /**
  * WellcomeAI Widget Loader Script
- * Версия: 1.0
+ * Версия: 1.0.1
  * 
  * Этот скрипт динамически создает и встраивает виджет голосового ассистента
  * на любой сайт, в том числе на Tilda и другие конструкторы сайтов.
  */
 
 (function() {
+  // Функция для определения URL сервера
+  const getServerUrl = () => {
+    // Сначала проверяем, есть ли атрибут data-server на скрипте
+    const scriptTags = document.querySelectorAll('script');
+    let serverUrl = null;
+    
+    // Ищем скрипт, который загрузил текущий файл или содержит data-server
+    for (let i = 0; i < scriptTags.length; i++) {
+      const src = scriptTags[i].getAttribute('src');
+      if (src && (
+          src.includes('widget.js') || 
+          scriptTags[i].hasAttribute('data-server')
+        )) {
+        // Если нашли скрипт с data-server
+        if (scriptTags[i].hasAttribute('data-server')) {
+          serverUrl = scriptTags[i].getAttribute('data-server');
+          break;
+        }
+        // Если нашли скрипт виджета, извлекаем домен из src
+        if (src.includes('widget.js')) {
+          try {
+            const url = new URL(src);
+            serverUrl = url.origin;
+            break;
+          } catch (e) {
+            // Если src относительный, используем текущий домен
+            if (src.startsWith('/')) {
+              serverUrl = window.location.origin;
+              break;
+            }
+          }
+        }
+      }
+    }
+    
+    // Если не нашли, используем текущий домен (для локальной отладки)
+    if (!serverUrl) {
+      console.log('WellcomeAI Widget: Unable to determine server URL from script tag, using current origin');
+      serverUrl = window.location.origin;
+    }
+    
+    return serverUrl.replace(/\/$/, ''); // Убираем конечный слеш, если есть
+  };
+
+  // Определяем URL сервера и WebSocket
+  const SERVER_URL = getServerUrl();
+  const WS_URL = SERVER_URL.replace(/^http/, 'ws') + '/ws';
+  
+  console.log('WellcomeAI Widget: Using server URL:', SERVER_URL);
+  console.log('WellcomeAI Widget: WebSocket URL:', WS_URL);
+
   // Создаем стили для виджета
   function createStyles() {
     const styleEl = document.createElement('style');
@@ -919,9 +970,9 @@
         loaderModal.classList.add('active');
         log("Подключение...");
         
-        // Используем WebSocket-соединение с нашим сервером
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        // Используем настроенный WebSocket URL
+        const wsUrl = WS_URL;
+        log(`Connecting to WebSocket at: ${wsUrl}`);
         
         // Создаем новое WebSocket соединение
         websocket = new WebSocket(wsUrl);
@@ -993,8 +1044,8 @@
           }
         };
         
-        websocket.onclose = function() {
-          log("Соединение закрыто");
+        websocket.onclose = function(event) {
+          log(`Соединение закрыто: ${event.code} ${event.reason}`);
           isConnected = false;
           isListening = false;
           reconnecting = false;
@@ -1012,6 +1063,8 @@
         
         websocket.onerror = function(error) {
           log("Ошибка соединения", "error");
+          console.error("WebSocket error:", error);
+          
           if (isWidgetOpen) {
             showMessage("Ошибка соединения с сервером");
           }
@@ -1067,6 +1120,13 @@
     // Добавляем обработчики событий для интерфейса
     widgetButton.addEventListener('click', openWidget);
     widgetClose.addEventListener('click', closeWidget);
+    
+    // Обработчик для основного круга (для запуска распознавания голоса)
+    mainCircle.addEventListener('click', function() {
+      if (isWidgetOpen && !isListening && !isPlayingAudio && !reconnecting) {
+        startListening();
+      }
+    });
     
     // Создаем WebSocket соединение
     connectWebSocket();
