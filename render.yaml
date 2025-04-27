@@ -1,10 +1,12 @@
 services:
   - type: web
-    name: jarvis-voice-assistant
+    name: wellcome-ai
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
         sync: false
-    plan: starter # Выберите подходящий план
+      - key: PORT
+        value: 5050
+    plan: starter
