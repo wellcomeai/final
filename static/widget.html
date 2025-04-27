@@ -15,148 +15,43 @@
     
     body {
       background-color: transparent;
-      overflow: hidden;
-    }
-    
-    /* Контейнер виджета */
-    .widget-container {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 9999;
-      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-    
-    /* Кнопка виджета (свернутое состояние) */
-    .widget-button {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #4a86e8, #2b59c3);
-      box-shadow: 0 4px 15px rgba(74, 134, 232, 0.4);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-      z-index: 2;
-    }
-    
-    .widget-button:hover {
-      transform: scale(1.05);
-      box-shadow: 0 6px 20px rgba(74, 134, 232, 0.5);
-    }
-    
-    .widget-button::before {
-      content: '';
-      position: absolute;
-      width: 150%;
-      height: 150%;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.2));
-      transform: rotate(45deg);
-      top: -30%;
-      left: -30%;
-      transition: all 0.6s ease;
-    }
-    
-    .widget-button:hover::before {
-      transform: rotate(90deg);
-    }
-    
-    .widget-icon {
-      color: white;
-      font-size: 22px;
-      z-index: 2;
-      transition: all 0.3s ease;
-    }
-    
-    /* Расширенный виджет (развернутое состояние) */
-    .widget-expanded {
-      position: absolute;
-      bottom: 0;
-      right: 0;
-      width: 320px;
-      height: 0;
-      opacity: 0;
-      pointer-events: none;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-      overflow: hidden;
-      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      color: #333;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      z-index: 1;
-    }
-    
-    /* Когда виджет активен */
-    .widget-container.active .widget-expanded {
-      height: 400px;
-      opacity: 1;
-      pointer-events: all;
-    }
-    
-    .widget-container.active .widget-button {
-      transform: scale(0.9);
-      box-shadow: 0 2px 10px rgba(74, 134, 232, 0.3);
-    }
-    
-    /* Заголовок развернутого виджета */
-    .widget-header {
-      padding: 15px 20px;
-      background: linear-gradient(135deg, #4a86e8, #2b59c3);
-      color: white;
-      display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      border-radius: 20px 20px 0 0;
+      overflow: hidden;
     }
     
-    .widget-title {
-      font-weight: 600;
-      font-size: 16px;
-      letter-spacing: 0.3px;
-    }
-    
-    .widget-close {
-      background: none;
-      border: none;
-      color: white;
-      font-size: 18px;
-      cursor: pointer;
-      opacity: 0.8;
-      transition: all 0.2s;
-    }
-    
-    .widget-close:hover {
-      opacity: 1;
-      transform: scale(1.1);
-    }
-    
-    /* Основной контент виджета */
-    .widget-content {
+    /* Главный контейнер */
+    .container {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+      padding: 20px;
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #f9fafc;
       position: relative;
-      padding: 20px;
     }
     
     /* Основной элемент - круг */
     .main-circle {
-      width: 180px;
-      height: 180px;
+      width: 200px;
+      height: 200px;
       border-radius: 50%;
       background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
       position: relative;
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transition: all 0.3s ease;
+      z-index: 5;
     }
     
     .main-circle::before {
@@ -223,13 +118,28 @@
       background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3));
     }
     
-    /* Аудио визуализация */
+    /* Иконка микрофона */
+    .mic-icon {
+      font-size: 48px;
+      color: #4a86e8;
+      z-index: 10;
+    }
+    
+    .main-circle.listening .mic-icon {
+      color: #2196f3;
+    }
+    
+    .main-circle.speaking .mic-icon {
+      color: #4caf50;
+    }
+    
+    /* Аудио визуализация (скрытая) */
     .audio-visualization {
       position: absolute;
       width: 100%;
-      max-width: 160px;
+      max-width: 200px;
       height: 30px;
-      bottom: -5px;
+      bottom: 10px;
       opacity: 0.8;
     }
     
@@ -261,7 +171,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 10000;
+      z-index: 1000;
       opacity: 0;
       visibility: hidden;
       transition: all 0.3s;
@@ -273,9 +183,9 @@
     }
     
     .loader {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(74, 134, 232, 0.3);
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(74, 134, 232, 0.3);
       border-radius: 50%;
       border-top-color: #4a86e8;
       animation: spin 1s linear infinite;
@@ -287,85 +197,136 @@
     
     /* Сообщение */
     .message-display {
-      position: absolute;
-      width: 90%;
+      position: fixed;
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
       background: white;
-      padding: 12px 15px;
-      border-radius: 12px;
+      padding: 10px 15px;
+      border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      max-width: 80%;
       text-align: center;
-      font-size: 14px;
-      line-height: 1.4;
       opacity: 0;
       transition: all 0.3s;
-      max-height: 100px;
-      overflow-y: auto;
     }
     
     .message-display.show {
       opacity: 1;
     }
     
-    /* Кнопка активации (пульсация на кнопке) */
-    @keyframes button-pulse {
-      0% { box-shadow: 0 0 0 0 rgba(74, 134, 232, 0.7); }
-      70% { box-shadow: 0 0 0 10px rgba(74, 134, 232, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(74, 134, 232, 0); }
+    /* Стили для встраивания */
+    .widget-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 50%;
+      transition: all 0.3s ease;
     }
     
-    .pulse-animation {
-      animation: button-pulse 2s infinite;
+    /* Кнопка закрытия для раскрытого виджета */
+    .close-widget {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      width: 30px;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 1001;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border: none;
+      opacity: 0;
+      transform: scale(0);
+      transition: all 0.3s ease;
+    }
+
+    .close-widget.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+    
+    .close-widget i {
+      font-size: 18px;
+      color: #555;
+    }
+    
+    /* Стили для виджета в компактном режиме */
+    body.compact-mode .container {
+      padding: 0;
+      max-width: 100%;
+    }
+    
+    body.compact-mode .main-circle {
+      width: 70px;
+      height: 70px;
+      cursor: pointer;
+    }
+    
+    body.compact-mode .mic-icon {
+      font-size: 24px;
+    }
+    
+    body.compact-mode .audio-visualization {
+      display: none;
+    }
+    
+    body.compact-mode .message-display {
+      display: none;
+    }
+    
+    body.expanded-mode .widget-wrapper {
+      border-radius: 15px;
+      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Анимация перехода между режимами */
+    body.transitioning * {
+      transition: all 0.3s ease !important;
     }
   </style>
 </head>
-<body>
-  <!-- Модальное окно загрузки -->
-  <div id="loader-modal" class="loader-modal active">
-    <div class="loader"></div>
-  </div>
-  
-  <!-- Виджет-кнопка -->
-  <div class="widget-container" id="widget-container">
-    <!-- Кнопка (минимизированное состояние) -->
-    <div class="widget-button" id="widget-button">
-      <i class="fas fa-robot widget-icon"></i>
+<body class="compact-mode">
+  <!-- Кнопка закрытия для раскрытого виджета -->
+  <button class="close-widget" id="close-widget">
+    <i class="fas fa-times"></i>
+  </button>
+
+  <div class="widget-wrapper">
+    <!-- Модальное окно загрузки -->
+    <div id="loader-modal" class="loader-modal active">
+      <div class="loader"></div>
     </div>
     
-    <!-- Развернутый виджет -->
-    <div class="widget-expanded">
-      <div class="widget-header">
-        <div class="widget-title">WellcomeAI</div>
-        <button class="widget-close" id="widget-close">
-          <i class="fas fa-times"></i>
-        </button>
+    <div class="container">
+      <!-- Основной элемент - круг -->
+      <div class="main-circle" id="main-circle">
+        <i class="fas fa-microphone mic-icon"></i>
       </div>
-      <div class="widget-content">
-        <!-- Основной элемент - круг без иконки -->
-        <div class="main-circle" id="main-circle">
-          <!-- Аудио визуализация -->
-          <div class="audio-visualization" id="audio-visualization">
-            <div class="audio-bars" id="audio-bars"></div>
-          </div>
-        </div>
-        
-        <!-- Сообщение -->
-        <div class="message-display" id="message-display"></div>
+      
+      <!-- Аудио визуализация -->
+      <div class="audio-visualization" id="audio-visualization">
+        <div class="audio-bars" id="audio-bars"></div>
       </div>
     </div>
   </div>
+  
+  <!-- Сообщение -->
+  <div class="message-display" id="message-display"></div>
 
   <script>
     // Элементы UI
-    const widgetContainer = document.getElementById('widget-container');
-    const widgetButton = document.getElementById('widget-button');
-    const widgetClose = document.getElementById('widget-close');
     const mainCircle = document.getElementById('main-circle');
     const audioBars = document.getElementById('audio-bars');
     const loaderModal = document.getElementById('loader-modal');
     const messageDisplay = document.getElementById('message-display');
+    const closeButton = document.getElementById('close-widget');
+    const body = document.body;
     
     // Переменные для обработки аудио
     let audioChunksBuffer = [];
@@ -381,7 +342,7 @@
     let mediaStream = null;
     let audioProcessor = null;
     let isConnected = false;
-    let isWidgetOpen = false;
+    let widgetMode = 'compact'; // 'compact' или 'expanded'
     
     // Конфигурация для оптимизации потока аудио
     const AUDIO_CONFIG = {
@@ -407,6 +368,71 @@
       }, duration);
     }
     
+    // Переключение между компактным и расширенным режимом
+    function toggleWidgetMode() {
+      if (widgetMode === 'compact') {
+        expandWidget();
+      } else {
+        collapseWidget();
+      }
+    }
+    
+    // Разворачиваем виджет
+    function expandWidget() {
+      // Отправляем сообщение родительскому окну, чтобы расширить iframe
+      window.parent.postMessage({ 
+        action: 'expandWidget',
+        source: 'wellcomeAI' 
+      }, '*');
+      
+      // Добавляем класс для анимации перехода
+      body.classList.add('transitioning');
+      
+      // Меняем класс на body
+      body.classList.remove('compact-mode');
+      body.classList.add('expanded-mode');
+      
+      // Отображаем кнопку закрытия
+      setTimeout(() => {
+        closeButton.classList.add('visible');
+      }, 300);
+      
+      widgetMode = 'expanded';
+      
+      // Убираем класс анимации через некоторое время
+      setTimeout(() => {
+        body.classList.remove('transitioning');
+      }, 350);
+    }
+    
+    // Сворачиваем виджет
+    function collapseWidget() {
+      // Отправляем сообщение родительскому окну, чтобы свернуть iframe
+      window.parent.postMessage({ 
+        action: 'collapseWidget',
+        source: 'wellcomeAI' 
+      }, '*');
+      
+      // Добавляем класс для анимации перехода
+      body.classList.add('transitioning');
+      
+      // Скрываем кнопку закрытия
+      closeButton.classList.remove('visible');
+      
+      // Меняем класс на body
+      setTimeout(() => {
+        body.classList.remove('expanded-mode');
+        body.classList.add('compact-mode');
+      }, 50);
+      
+      widgetMode = 'compact';
+      
+      // Убираем класс анимации через некоторое время
+      setTimeout(() => {
+        body.classList.remove('transitioning');
+      }, 350);
+    }
+    
     // Создаем аудио-бары для визуализации
     function createAudioBars(count = 20) {
       audioBars.innerHTML = '';
@@ -417,26 +443,6 @@
       }
     }
     createAudioBars();
-    
-    // Открыть виджет
-    function openWidget() {
-      widgetContainer.classList.add('active');
-      isWidgetOpen = true;
-      
-      // Запускаем прослушивание при открытии
-      if (isConnected && !isListening && !isPlayingAudio && !reconnecting) {
-        startListening();
-      }
-      
-      // Убираем пульсацию с кнопки
-      widgetButton.classList.remove('pulse-animation');
-    }
-    
-    // Закрыть виджет
-    function closeWidget() {
-      widgetContainer.classList.remove('active');
-      isWidgetOpen = false;
-    }
     
     // Инициализация микрофона и AudioContext
     async function initAudio() {
@@ -625,6 +631,11 @@
         event_id: `commit_${Date.now()}`
       }));
       
+      // Расширяем виджет при первом взаимодействии, если он в компактном режиме
+      if (widgetMode === 'compact') {
+        expandWidget();
+      }
+      
       // Начинаем обработку и сбрасываем флаги
       hasAudioData = false;
       audioDataStartTime = 0;
@@ -756,18 +767,6 @@
         isPlayingAudio = false;
         // Сбрасываем эффект говорения, когда все аудио воспроизведено
         mainCircle.classList.remove('speaking');
-        
-        // Добавляем пульсацию на кнопку, если есть непрочитанные сообщения и виджет закрыт
-        if (!isWidgetOpen) {
-          widgetButton.classList.add('pulse-animation');
-        }
-        
-        // Начинаем слушать снова
-        if (isWidgetOpen) {
-          setTimeout(() => {
-            startListening();
-          }, 300);
-        }
         return;
       }
       
@@ -848,10 +847,8 @@
           isConnected = true;
           loaderModal.classList.remove('active');
           
-          // Автоматически начинаем слушать если виджет открыт
-          if (isWidgetOpen) {
-            startListening();
-          }
+          // Автоматически начинаем слушать
+          startListening();
         };
         
         websocket.onmessage = function(event) {
@@ -866,11 +863,6 @@
             else if (data.type === 'response.text.delta') {
               if (data.delta) {
                 showMessage(data.delta, 10000);
-                
-                // Если виджет закрыт, добавляем пульсацию на кнопку
-                if (!isWidgetOpen) {
-                  widgetButton.classList.add('pulse-animation');
-                }
               }
             }
             // Обработка аудио
@@ -889,12 +881,12 @@
             }
             // Ответ завершен
             else if (data.type === 'response.done') {
-              // Начинаем снова слушать автоматически, если виджет открыт
-              if (isWidgetOpen && !isPlayingAudio && !reconnecting) {
-                setTimeout(() => {
+              // Начинаем снова слушать автоматически
+              setTimeout(() => {
+                if (!isPlayingAudio && !reconnecting) {
                   startListening();
-                }, 300);
-              }
+                }
+              }, 300);
             }
           } catch (error) {
             log(`Ошибка обработки сообщения: ${error.message}`, "error");
@@ -907,10 +899,8 @@
           isListening = false;
           reconnecting = false;
           
-          // Показываем сообщение пользователю, если виджет открыт
-          if (isWidgetOpen) {
-            showMessage("Соединение прервано. Переподключение...");
-          }
+          // Показываем сообщение пользователю
+          showMessage("Соединение прервано. Переподключение...");
           
           // Пытаемся переподключиться
           setTimeout(() => {
@@ -920,25 +910,21 @@
         
         websocket.onerror = function(error) {
           log("Ошибка соединения", "error");
-          if (isWidgetOpen) {
-            showMessage("Ошибка соединения с сервером");
-          }
+          showMessage("Ошибка соединения с сервером");
         };
         
         return true;
       } catch (error) {
         log(`Ошибка при установке соединения: ${error.message}`, "error");
         loaderModal.classList.remove('active');
-        if (isWidgetOpen) {
-          showMessage("Не удалось подключиться к серверу");
-        }
+        showMessage("Не удалось подключиться к серверу");
         return false;
       }
     }
     
     // Начало записи голоса
     async function startListening() {
-      if (!isConnected || isPlayingAudio || reconnecting || isListening) {
+      if (!isConnected || isPlayingAudio || reconnecting) {
         return;
       }
       
@@ -972,14 +958,48 @@
       }
     }
     
+    // Проверка, находимся ли мы в iframe
+    function isInIframe() {
+      try {
+        return window.self !== window.top;
+      } catch (e) {
+        return true; // При ошибке доступа предполагаем, что мы в iframe
+      }
+    }
+    
     // Инициализация
     async function init() {
+      // Настраиваем обработчики событий
+      mainCircle.addEventListener('click', function() {
+        if (widgetMode === 'compact') {
+          // В компактном режиме - разворачиваем при клике
+          expandWidget();
+        } else if (!isListening && !isPlayingAudio) {
+          // В развернутом режиме - начинаем слушать, если не слушаем уже
+          startListening();
+        }
+      });
+      
+      // Обработчик для кнопки закрытия
+      closeButton.addEventListener('click', function(e) {
+        e.stopPropagation(); // Предотвращаем всплытие события
+        collapseWidget();
+      });
+      
+      // Обработчик сообщений от родительского окна
+      window.addEventListener('message', function(event) {
+        // Для безопасности можно добавить проверку источника сообщения
+        if (event.data && event.data.action) {
+          switch (event.data.action) {
+            case 'toggleWidget':
+              toggleWidgetMode();
+              break;
+          }
+        }
+      });
+      
       // Создаем WebSocket соединение
       await connectWebSocket();
-      
-      // Добавляем обработчики событий для интерфейса
-      widgetButton.addEventListener('click', openWidget);
-      widgetClose.addEventListener('click', closeWidget);
     }
     
     // Запускаем инициализацию
