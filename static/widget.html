@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WellcomeAI</title>
+  <title>WellcomeAI Widget</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     * {
@@ -13,53 +13,40 @@
       font-family: 'Segoe UI', 'Roboto', sans-serif;
     }
     
-    body {
-      background-color: transparent;
-      color: #333;
+    html, body {
+      width: 100%;
+      height: 100%;
       overflow: hidden;
+      background: transparent;
     }
     
-    /* Контейнер виджета */
-    .wellcome-ai-widget {
+    /* Основной контейнер виджета - фиксированное позиционирование */
+    #wellcomeAiContainer {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      z-index: 9999;
-      transition: all 0.3s ease;
+      z-index: 999999;
+      font-family: 'Segoe UI', 'Roboto', sans-serif;
     }
     
-    /* Компактный режим (бот в углу) */
-    .wellcome-ai-widget.compact {
-      width: 70px;
-      height: 70px;
-    }
-    
-    /* Развернутый режим (окно чата) */
-    .wellcome-ai-widget.expanded {
-      width: 350px;
-      height: 500px;
-      bottom: 30px;
-      right: 30px;
-      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
-      border-radius: 15px;
-      background-color: white;
-      overflow: hidden;
-    }
-    
-    /* Кнопка робота (компактный режим) */
+    /* Кнопка-робот */
     .robot-button {
       width: 70px;
       height: 70px;
       border-radius: 50%;
       background: linear-gradient(135deg, #4a86e8, #2965c7);
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       position: relative;
       overflow: hidden;
-      transition: all 0.3s ease;
+      transition: transform 0.3s ease;
+    }
+    
+    .robot-button:hover {
+      transform: scale(1.05);
     }
     
     .robot-button::before {
@@ -83,23 +70,24 @@
       z-index: 2;
     }
     
-    /* Окно чата (развернутый режим) */
+    /* Чат-окно */
     .chat-window {
-      display: none;
-      width: 100%;
-      height: 100%;
-      flex-direction: column;
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: 350px;
+      height: 500px;
       background-color: white;
       border-radius: 15px;
-      overflow: hidden;
-    }
-    
-    .wellcome-ai-widget.expanded .chat-window {
-      display: flex;
-    }
-    
-    .wellcome-ai-widget.expanded .robot-button {
+      box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
       display: none;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 999999;
+    }
+    
+    .chat-window.active {
+      display: flex;
     }
     
     /* Заголовок чата */
@@ -118,10 +106,6 @@
       display: flex;
       align-items: center;
       gap: 10px;
-    }
-    
-    .chat-title .robot-icon {
-      font-size: 18px;
     }
     
     .close-button {
@@ -203,6 +187,7 @@
       justify-content: center;
       transition: all 0.3s ease;
       z-index: 5;
+      cursor: pointer;
     }
     
     .voice-circle::before {
@@ -354,23 +339,13 @@
       to { transform: rotate(360deg); }
     }
     
-    /* Вспомогательные классы */
-    .hidden {
-      display: none !important;
-    }
-    
-    /* Код для встраивания (будет скрыт) */
-    .embed-code {
-      position: absolute;
-      left: -9999px;
-      visibility: hidden;
-    }
-    
-    /* Адаптивность */
+    /* Мобильная адаптация */
     @media (max-width: 480px) {
-      .wellcome-ai-widget.expanded {
+      .chat-window {
         width: 300px;
         height: 450px;
+        bottom: 20px;
+        right: 20px;
       }
       
       .voice-circle {
@@ -385,13 +360,14 @@
   </style>
 </head>
 <body>
-  <div class="wellcome-ai-widget compact" id="wellcomeAiWidget">
-    <!-- Кнопка робота (компактный режим) -->
+  <!-- Основной контейнер виджета -->
+  <div id="wellcomeAiContainer">
+    <!-- Кнопка-робот -->
     <div class="robot-button" id="robotButton">
       <i class="fas fa-robot robot-icon"></i>
     </div>
     
-    <!-- Окно чата (развернутый режим) -->
+    <!-- Чат-окно -->
     <div class="chat-window" id="chatWindow">
       <!-- Заголовок -->
       <div class="chat-header">
@@ -424,24 +400,18 @@
       </div>
       
       <!-- Модальное окно загрузки -->
-      <div class="loader-modal active" id="loaderModal">
+      <div class="loader-modal" id="loaderModal">
         <div class="loader"></div>
       </div>
     </div>
   </div>
-  
-  <!-- Код для встраивания (скрытый элемент) -->
-  <div class="embed-code">
-    <!-- Пример кода для встраивания:
-    <iframe src="https://your-domain.com/widget.html" width="100" height="100" 
-    style="position:fixed; bottom:20px; right:20px; border:none; z-index:9999;" 
-    allow="microphone" id="wellcomeAiFrame"></iframe>
-    -->
-  </div>
 
   <script>
+    // Проверка, находимся ли мы в iframe
+    function isInIframe() { try { return window.self !== window.top; } catch (e) { return true; } }
+
     // Элементы UI
-    const widget = document.getElementById('wellcomeAiWidget');
+    const container = document.getElementById('wellcomeAiContainer');
     const robotButton = document.getElementById('robotButton');
     const chatWindow = document.getElementById('chatWindow');
     const closeButton = document.getElementById('closeButton');
@@ -470,10 +440,10 @@
     
     // Конфигурация для оптимизации потока аудио
     const AUDIO_CONFIG = {
-      silenceThreshold: 0.01,      // Порог для определения тишины
-      silenceDuration: 300,        // Длительность тишины для отправки (мс)
-      bufferCheckInterval: 50,     // Частота проверки буфера (мс)
-      soundDetectionThreshold: 0.02 // Чувствительность к звуку
+      silenceThreshold: 0.01,
+      silenceDuration: 300,
+      bufferCheckInterval: 50,
+      soundDetectionThreshold: 0.02
     };
     
     // Функция логирования
@@ -510,16 +480,12 @@
     
     // Разворачиваем виджет
     function expandWidget() {
-      // Отправляем сообщение родительскому окну для информирования
-      if (window.parent !== window) {
-        window.parent.postMessage({ 
-          action: 'wellcomeAiExpanded',
-          source: 'wellcomeAI'
-        }, '*');
-      }
+      // Скрываем кнопку робота
+      robotButton.style.display = 'none';
       
-      widget.classList.remove('compact');
-      widget.classList.add('expanded');
+      // Показываем окно чата
+      chatWindow.classList.add('active');
+      
       widgetMode = 'expanded';
       
       // Если нет сообщений и соединение установлено, добавляем приветствие
@@ -536,16 +502,12 @@
     
     // Сворачиваем виджет
     function collapseWidget() {
-      // Отправляем сообщение родительскому окну для информирования
-      if (window.parent !== window) {
-        window.parent.postMessage({ 
-          action: 'wellcomeAiCollapsed',
-          source: 'wellcomeAI'
-        }, '*');
-      }
+      // Показываем кнопку робота
+      robotButton.style.display = 'flex';
       
-      widget.classList.remove('expanded');
-      widget.classList.add('compact');
+      // Скрываем окно чата
+      chatWindow.classList.remove('active');
+      
       widgetMode = 'compact';
     }
     
@@ -1163,83 +1125,33 @@
       }
     }
     
-    // Генерация кода для встраивания
-    function generateEmbedCode() {
-      // Получаем текущий URL
-      const currentUrl = window.location.origin + window.location.pathname;
-      
-      return `<iframe src="${currentUrl}" width="100" height="100" 
-style="position:fixed; bottom:20px; right:20px; border:none; z-index:9999;" 
-allow="microphone" id="wellcomeAiFrame"></iframe>
-
-<script>
-// Слушаем сообщения от iframe
-window.addEventListener('message', function(event) {
-  // Проверяем источник сообщения для безопасности
-  if (event.data && event.data.source === 'wellcomeAI') {
-    const frame = document.getElementById('wellcomeAiFrame');
-    
-    // Обрабатываем сообщения от виджета
-    if (event.data.action === 'wellcomeAiExpanded') {
-      // Расширяем iframe при разворачивании виджета
-      frame.style.width = '350px';
-      frame.style.height = '500px';
-    } else if (event.data.action === 'wellcomeAiCollapsed') {
-      // Сворачиваем iframe при закрытии виджета
-      frame.style.width = '100px';
-      frame.style.height = '100px';
-    }
-  }
-});
-</script>`;
-    }
-    
-    // Проверка, находимся ли мы в iframe
-    function isInIframe() {
-      try {
-        return window.self !== window.top;
-      } catch (e) {
-        return true; // При ошибке доступа предполагаем, что мы в iframe
-      }
-    }
-    
     // Инициализация
     async function init() {
-      // Настраиваем обработчики событий
-      robotButton.addEventListener('click', expandWidget);
-      
-      closeButton.addEventListener('click', collapseWidget);
-      
-      voiceCircle.addEventListener('click', function() {
-        if (!isListening && !isPlayingAudio) {
-          startListening();
-        }
-      });
-      
-      // Обработчик сообщений от родительского окна
-      window.addEventListener('message', function(event) {
-        // Для безопасности можно добавить проверку источника сообщения
-        if (event.data && event.data.action) {
-          switch (event.data.action) {
-            case 'toggleWidget':
-              toggleWidgetMode();
-              break;
+      try {
+        // Настраиваем обработчики событий
+        robotButton.addEventListener('click', expandWidget);
+        
+        closeButton.addEventListener('click', collapseWidget);
+        
+        voiceCircle.addEventListener('click', function() {
+          if (!isListening && !isPlayingAudio) {
+            startListening();
           }
-        }
-      });
-      
-      // Создаем WebSocket соединение
-      await connectWebSocket();
-      
-      // Обновляем код для встраивания
-      const embedCode = document.querySelector('.embed-code');
-      if (embedCode) {
-        embedCode.textContent = generateEmbedCode();
+        });
+        
+        // Создаем WebSocket соединение
+        await connectWebSocket();
+      } catch (error) {
+        console.error("Ошибка инициализации виджета:", error);
       }
     }
     
     // Запускаем инициализацию
-    document.addEventListener('DOMContentLoaded', init);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   </script>
 </body>
 </html>
