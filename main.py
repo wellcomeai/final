@@ -64,8 +64,18 @@ SYSTEM_MESSAGE = (
     "и предоставлять точную информацию. Избегай длинных вступлений и лишних фраз."
 )
 
-# Допустимые голоса - ИСПРАВЛЕНО
+# Допустимые голоса с русскими названиями для интерфейса
 AVAILABLE_VOICES = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"]
+VOICE_NAMES = {
+    "alloy": "Эллой",
+    "ash": "Эш",
+    "ballad": "Баллад",
+    "coral": "Корал",
+    "echo": "Эхо",
+    "sage": "Сейдж",
+    "shimmer": "Шиммер",
+    "verse": "Верс"
+}
 DEFAULT_VOICE = "alloy"
 
 # Проверяем наличие директории static и создаем ее, если она не существует
@@ -164,7 +174,8 @@ async def check_api():
             "status": "success",
             "api_key_valid": True,
             "openai_api_version": "Realtime API",
-            "available_voices": AVAILABLE_VOICES
+            "available_voices": AVAILABLE_VOICES,
+            "voice_names": VOICE_NAMES
         }
     except Exception as e:
         logger.error(f"Ошибка при проверке API: {str(e)}")
@@ -201,9 +212,13 @@ async def websocket_endpoint(websocket: WebSocket):
                 extra_headers={
                     "Authorization": f"Bearer {OPENAI_API_KEY}",
                     "OpenAI-Beta": "realtime=v1"
-                }
+                },
+                # Увеличены буферы для более надежной передачи аудио
+                max_size=10 * 1024 * 1024,  # 10MB max message size
+                ping_interval=20,
+                ping_timeout=60
             ),
-            timeout=10.0  # Уменьшенный таймаут для быстрой обработки ошибок соединения
+            timeout=15.0  # Увеличенный таймаут для надежного соединения
         )
         
         client_connections[client_id]["openai_ws"] = openai_ws
@@ -300,19 +315,41 @@ async def forward_client_to_openai(client_ws: WebSocket, openai_ws, client_id: i
                     if "voice" in session_data:
                         voice = session_data["voice"]
                         if voice in AVAILABLE_VOICES:
-                            client_connections[client_id]["voice"] = voice
-                            logger.info(f"Голос для клиента {client_id} изменен на {voice}")
-                            updated = True
+                            old_voice = client_connections[client_id]["voice"]
+                            if old_voice != voice:
+                                # Уведомляем клиента об изменении голоса
+                                client_connections[client_id]["voice"] = voice
+                                voice_name = VOICE_NAMES.get(voice, voice)
+                                logger.info(f"Голос для клиента {client_id} изменен на {voice} ({voice_name})")
+                                
+                                # Отправляем уведомление клиенту
+                                try:
+                                    await client_ws.send_json({
+                                        "type": "voice_changed",
+                                        "voice": voice,
+                                        "voice_name": voice_name
+                                    })
+                                except Exception as e:
+                                    logger.error(f"Ошибка при уведомлении о смене голоса: {str(e)}")
+                                
+                                updated = True
                         else:
-                            # Если голос недоступен, меняем на запрос на допустимый голос
+                            # Если голос недоступен, меняем запрос на допустимый голос
                             logger.warning(f"Запрошенный голос {voice} недоступен. Используем {DEFAULT_VOICE}")
                             data["session"]["voice"] = DEFAULT_VOICE
                             client_connections[client_id]["voice"] = DEFAULT_VOICE
+                            
+                            # Уведомляем клиента об использовании голоса по умолчанию
+                            try:
+                                await client_ws.send_json({
+                                    "type": "voice_changed",
+                                    "voice": DEFAULT_VOICE,
+                                    "voice_name": VOICE_NAMES.get(DEFAULT_VOICE, DEFAULT_VOICE),
+                                    "message": "Запрошенный голос недоступен. Используем голос по умолчанию."
+                                })
+                            except Exception as e:
+                                logger.error(f"Ошибка при уведомлении о смене голоса: {str(e)}")
                     
-                    # Если есть обновления настроек, передаем их в OpenAI
-                    if updated:
-                        logger.info(f"Отправка обновленных настроек на сервер")
-                
                 # Выводим информацию о сообщении в логи только для важных типов сообщений
                 if msg_type != "input_audio_buffer.append":
                     logger.debug(f"[Клиент {client_id} -> OpenAI] {msg_type}")
@@ -355,17 +392,23 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
                         # Если это ошибка связана с голосом
                         if 'voice' in error_msg.lower():
                             logger.error(f"Ошибка голоса. Пробуем установить голос по умолчанию.")
+                            old_voice = client_connections[client_id]["voice"]
                             # Возвращаем голос по умолчанию и отправляем обновление настроек
                             client_connections[client_id]["voice"] = DEFAULT_VOICE
+                            
+                            # Уведомляем клиента об ошибке голоса
+                            try:
+                                await client_ws.send_json({
+                                    "type": "voice_changed",
+                                    "voice": DEFAULT_VOICE,
+                                    "voice_name": VOICE_NAMES.get(DEFAULT_VOICE, DEFAULT_VOICE),
+                                    "message": f"Ошибка при использовании голоса '{old_voice}'. Используем голос по умолчанию."
+                                })
+                            except Exception as e:
+                                logger.error(f"Ошибка при уведомлении о смене голоса: {str(e)}")
+                            
                             await send_session_update(openai_ws, DEFAULT_VOICE)
                     
-                    # Оптимизация: проверяем если это output_audio_buffer.started,
-                    # начинаем обрабатывать следующий буфер аудио
-                    if response.get('type') == 'output_audio_buffer.started':
-                        # Оптимизация: если начали получать аудио, запускаем подготовку к следующему слушанию
-                        # в параллельном таске, чтобы не терять время
-                        asyncio.create_task(prepare_next_listening(client_id))
-
                     # Пересылаем сообщение клиенту
                     await client_ws.send_text(openai_message)
                 else:
@@ -399,25 +442,6 @@ async def forward_openai_to_client(openai_ws, client_ws: WebSocket, client_id: i
         logger.error(traceback.format_exc())
         raise
 
-async def prepare_next_listening(client_id):
-    """Подготавливает следующее слушание параллельно с воспроизведением аудио"""
-    if client_id not in client_connections or not client_connections[client_id]["active"]:
-        return
-    
-    # Небольшая задержка для уверенности
-    await asyncio.sleep(0.05)
-    
-    # Отправляем команду для очистки буфера ввода
-    try:
-        ws = client_connections[client_id]["openai_ws"]
-        if ws:
-            await ws.send(json.stringify({
-                "type": "input_audio_buffer.clear",
-                "event_id": f"prepare_{Date.now()}"
-            }))
-    except Exception as e:
-        logger.debug(f"Не удалось подготовить следующее слушание: {str(e)}")
-
 async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_enabled=True):
     """Отправляет настройки сессии в WebSocket OpenAI"""
     
@@ -426,7 +450,7 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
         "type": "server_vad",
         "threshold": 0.25,                 # Уменьшен порог для более чувствительного определения голоса
         "prefix_padding_ms": 100,          # Уменьшено начальное время записи
-        "silence_duration_ms": 150,        # Уменьшено время ожидания до 150мс (было 300мс)
+        "silence_duration_ms": 150,        # Уменьшено время ожидания до 150мс
         "create_response": True            # Автоматически создавать ответ при завершении речи
     } if turn_detection_enabled else None
     
@@ -440,7 +464,7 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
             "instructions": SYSTEM_MESSAGE,     # Системное сообщение
             "modalities": ["text", "audio"],    # Поддерживаемые модальности
             "temperature": 0.7,                 # Температура генерации
-            "max_response_output_tokens": 200   # Уменьшен лимит для более быстрого ответа
+            "max_response_output_tokens": 500   # Увеличен лимит для полных ответов
         }
     }
     
@@ -460,6 +484,6 @@ if __name__ == "__main__":
         host="0.0.0.0", 
         port=PORT,
         log_level="info",
-        timeout_keep_alive=65,  # Увеличенный таймаут для поддержания соединения
-        loop="auto"             # Использовать оптимальный цикл событий для платформы
+        timeout_keep_alive=120,  # Увеличенный таймаут для длинных ответов
+        loop="auto"              # Использовать оптимальный цикл событий для платформы
     )
