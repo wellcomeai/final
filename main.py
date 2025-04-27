@@ -7,7 +7,7 @@ import traceback
 import shutil
 import websockets
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -1200,6 +1200,73 @@ async def proxy_widget_dialog_api(request: Request):
     
     # Возвращаем HTML страницу
     return HTMLResponse(content=html_content)
+
+# Путь к файлу widget.js
+@app.get("/widget.js", response_class=Response)
+async def get_widget_js():
+    """Возвращает JavaScript файл с кодом виджета"""
+    widget_js_path = os.path.join(os.getcwd(), "widget.js")
+    
+    # Проверяем наличие файла в корне
+    if not os.path.exists(widget_js_path):
+        # Проверяем в директории static
+        widget_js_path = os.path.join(static_dir, "widget.js")
+        if not os.path.exists(widget_js_path):
+            # Если файл не найден нигде, возвращаем ошибку или пустой скрипт
+            logger.warning("Файл widget.js не найден")
+            return Response(
+                content="// WellcomeAI Widget not found", 
+                media_type="application/javascript"
+            )
+    
+    # Читаем содержимое файла
+    try:
+        with open(widget_js_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        # Возвращаем с правильным Content-Type для JavaScript
+        return Response(content=content, media_type="application/javascript")
+    except Exception as e:
+        logger.error(f"Ошибка при чтении файла widget.js: {str(e)}")
+        return Response(
+            content=f"// Error loading widget: {str(e)}", 
+            media_type="application/javascript"
+        )
+
+# Дополнительный эндпоинт для проверки статуса виджета
+@app.get("/api/widget/status")
+async def widget_status(request: Request):
+    """Проверка статуса виджета"""
+    # Определяем базовый URL для виджета
+    base_url = str(request.base_url)
+    
+    return {
+        "status": "active",
+        "version": "1.0.0",
+        "widget_url": f"{base_url}widget.js",
+        "api_healthy": OPENAI_API_KEY is not None,
+        "available_voices": AVAILABLE_VOICES
+    }
+
+# API-эндпоинт для получения кода для вставки виджета на сайт
+@app.get("/api/widget/embed")
+async def get_widget_embed_code(request: Request):
+    """Возвращает HTML-код для встраивания виджета на сайт"""
+    # Определяем базовый URL для виджета
+    base_url = str(request.base_url)
+    
+    # Формируем HTML-код для вставки
+    embed_code = f"""
+<!-- WellcomeAI Widget Code -->
+<script src="{base_url}widget.js" defer></script>
+<!-- End WellcomeAI Widget Code -->
+"""
+    
+    return {
+        "status": "success",
+        "embed_code": embed_code,
+        "instructions": "Скопируйте этот код и вставьте его перед закрывающим тегом </body> на вашем сайте."
+    }
 
 if __name__ == "__main__":
     import uvicorn
