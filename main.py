@@ -430,7 +430,11 @@ async def send_session_update(openai_ws, voice=DEFAULT_VOICE, turn_detection_ena
     
     try:
         # Отправляем настройки и ожидаем небольшое время для применения
-        await openai_ws.send(json.dumps(session_update))import os
+        await openai_ws.send(json.dumps(session_update))
+        logger.info(f"Настройки сессии с голосом {voice} отправлены")
+    except Exception as e:
+        logger.error(f"Ошибка при отправке настроек сессии: {str(e)}")
+        raise
 import json
 import base64
 import asyncio
