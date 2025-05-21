@@ -1,12 +1,13 @@
 services:
   - type: web
-    name: wellcome-ai
-    env: python
+    name: mini-voice-assistant
+    runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT
     envVars:
       - key: OPENAI_API_KEY
-        sync: false
+        sync: false  # Значение добавляется вручную в панели Render
+      - key: PYTHONUNBUFFERED
+        value: true
       - key: PORT
-        value: 5050
-    plan: starter
+        value: 8000
