@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List, Any, ClassVar
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -7,13 +8,18 @@ class Settings(BaseSettings):
     DEFAULT_VOICE: str = "alloy"
     DEFAULT_SYSTEM_MESSAGE: str = "Ты полезный голосовой ассистент. Отвечай кратко и по делу на русском языке."
     
-    # Настройки для ассистента по умолчанию
-    DEFAULT_ASSISTANT_CONFIG = {
+    # Аннотация типа для DEFAULT_ASSISTANT_CONFIG или использование ClassVar
+    DEFAULT_ASSISTANT_CONFIG: ClassVar[Dict[str, Any]] = {
         "name": "Тестовый голосовой ассистент",
         "voice": "alloy",
         "language": "ru",
         "system_prompt": DEFAULT_SYSTEM_MESSAGE,
         "functions": []  # Здесь можно добавить разрешенные функции
     }
+
+    class Config:
+        # Настройки модели для Pydantic 2.x
+        env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()
