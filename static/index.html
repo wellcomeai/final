@@ -1,1491 +1,432 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WellcomeAI</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    /* Reset и базовые стили */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Segoe UI', 'Roboto', sans-serif;
-    }
-    
-    body {
-      background-color: #ffffff;
-      color: #333;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
-    }
-    
-    /* Главный контейнер */
-    .container {
-      width: 100%;
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-    
-    /* Настройки */
-    .settings-button {
-      position: absolute;
-      right: 20px;
-      top: 20px;
-      background: none;
-      border: none;
-      color: #777;
-      font-size: 20px;
-      cursor: pointer;
-      opacity: 0.7;
-      transition: opacity 0.3s, transform 0.3s;
-      z-index: 10;
-    }
-    
-    .settings-button:hover {
-      opacity: 1;
-      transform: rotate(30deg);
-    }
-    
-    /* Telegram кнопка */
-    .telegram-button {
-      position: absolute;
-      left: 20px;
-      top: 20px;
-      background: none;
-      border: none;
-      color: #0088cc;
-      font-size: 24px;
-      cursor: pointer;
-      opacity: 0.8;
-      transition: opacity 0.3s, transform 0.3s;
-      z-index: 10;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    
-    .telegram-button:hover {
-      opacity: 1;
-      transform: scale(1.05);
-    }
-    
-    .telegram-button span {
-      font-size: 14px;
-      font-weight: 500;
-    }
-    
-    /* Основной элемент - круг */
-    .main-circle {
-      width: 280px;
-      height: 280px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #ffffff, #e1f5fe, #4a86e8);
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-      position: relative;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-      z-index: 5;
-    }
-    
-    .main-circle::before {
-      content: '';
-      position: absolute;
-      width: 140%;
-      height: 140%;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.3), rgba(74, 134, 232, 0.2));
-      animation: wave 8s linear infinite;
-      border-radius: 40%;
-    }
-    
-    /* Анимация основной волны */
-    @keyframes wave {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    /* Состояние прослушивания */
-    .main-circle.listening {
-      background: linear-gradient(135deg, #ffffff, #e3f2fd, #2196f3);
-      box-shadow: 0 0 30px rgba(33, 150, 243, 0.6);
-    }
-    
-    .main-circle.listening::before {
-      animation: wave 4s linear infinite;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(33, 150, 243, 0.3));
-    }
-    
-    /* Дополнительный эффект пульсации для прослушивания */
-    .main-circle.listening::after {
-      content: '';
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      border: 3px solid rgba(33, 150, 243, 0.5);
-      animation: pulse 1.5s ease-out infinite;
-    }
-    
-    @keyframes pulse {
-      0% { 
-        transform: scale(0.95);
-        opacity: 0.7;
-      }
-      50% { 
-        transform: scale(1.05);
-        opacity: 0.3;
-      }
-      100% { 
-        transform: scale(0.95);
-        opacity: 0.7;
-      }
-    }
-    
-    /* Состояние говорения */
-    .main-circle.speaking {
-      background: linear-gradient(135deg, #ffffff, #e8f5e9, #4caf50);
-      box-shadow: 0 0 30px rgba(76, 175, 80, 0.6);
-    }
-    
-    .main-circle.speaking::before {
-      animation: wave 3s linear infinite;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(76, 175, 80, 0.3));
-    }
-    
-    /* Волновой эффект для говорения */
-    .main-circle.speaking::after {
-      content: '';
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, transparent 50%, rgba(76, 175, 80, 0.1) 100%);
-      border-radius: 50%;
-      animation: ripple 2s ease-out infinite;
-    }
-    
-    @keyframes ripple {
-      0% { 
-        transform: scale(0.8);
-        opacity: 0;
-      }
-      50% { 
-        opacity: 0.5;
-      }
-      100% { 
-        transform: scale(1.2);
-        opacity: 0;
-      }
-    }
-    
-    /* Состояние переключения голоса */
-    .main-circle.voice-switching {
-      background: linear-gradient(135deg, #ffffff, #fff8e1, #ffc107);
-      box-shadow: 0 0 30px rgba(255, 193, 7, 0.6);
-    }
-    
-    .main-circle.voice-switching::before {
-      animation: wave 2s linear infinite;
-      background: linear-gradient(45deg, rgba(255, 255, 255, 0.5), rgba(255, 193, 7, 0.3));
-    }
-    
-    /* Эффект вращения для переключения голоса */
-    .main-circle.voice-switching::after {
-      content: '';
-      position: absolute;
-      width: 80%;
-      height: 80%;
-      border: 5px dashed rgba(255, 193, 7, 0.4);
-      border-radius: 50%;
-      animation: rotate 2s linear infinite;
-    }
-    
-    @keyframes rotate {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    /* Аудио визуализация (скрытая) */
-    .audio-visualization {
-      position: absolute;
-      width: 100%;
-      max-width: 400px;
-      height: 60px;
-      opacity: 0;
-      pointer-events: none;
-    }
-    
-    .audio-bars {
-      display: flex;
-      align-items: flex-end;
-      height: 40px;
-      gap: 3px;
-      width: 100%;
-      justify-content: center;
-    }
-    
-    .audio-bar {
-      width: 4px;
-      height: 2px;
-      background-color: #4a86e8;
-      border-radius: 2px;
-      transition: height 0.1s ease;
-    }
-    
-    /* Чат-контейнер (скрытый, но функциональный) */
-    .chat-container {
-      position: fixed;
-      width: 100%;
-      height: 100%;
-      left: 0;
-      top: 0;
-      opacity: 0;
-      pointer-events: none;
-    }
-    
-    .messages {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-    }
-    
-    /* Статус загрузки (скрытый) */
-    .status {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      opacity: 0;
-    }
-    
-    /* Транскрипция (скрытая) */
-    .transcript {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      opacity: 0;
-    }
-    
-    /* Модальное окно */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      opacity: 0;
-      visibility: hidden;
-      transition: all 0.3s;
-    }
-    
-    .modal.active {
-      opacity: 1;
-      visibility: visible;
-    }
-    
-    .modal-content {
-      background-color: white;
-      padding: 30px;
-      border-radius: 16px;
-      max-width: 500px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-      transform: scale(0.9);
-      transition: transform 0.3s;
-    }
-    
-    .modal.active .modal-content {
-      transform: scale(1);
-    }
-    
-    .modal h2 {
-      color: #4a86e8;
-      margin-top: 0;
-      margin-bottom: 20px;
-    }
-    
-    .modal p {
-      margin-bottom: 20px;
-      color: #555;
-    }
-    
-    /* Модальное окно загрузки */
-    .spinner {
-      display: inline-block;
-      width: 50px;
-      height: 50px;
-      border: 3px solid rgba(74, 134, 232, 0.3);
-      border-radius: 50%;
-      border-top-color: #4a86e8;
-      animation: spin 1s linear infinite;
-      margin-bottom: 20px;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    /* Модальное окно настроек */
-    .settings-modal .modal-content {
-      text-align: left;
-    }
-    
-    .settings-group {
-      margin-bottom: 20px;
-    }
-    
-    .settings-group h3 {
-      margin-bottom: 10px;
-      font-size: 18px;
-      color: #333;
-    }
-    
-    .settings-option {
-      margin-bottom: 15px;
-    }
-    
-    .settings-option label {
-      display: block;
-      margin-bottom: 5px;
-      color: #555;
-    }
-    
-    .settings-voice-selector {
-      width: 100%;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid #ddd;
-      font-size: 16px;
-    }
-    
-    .setting-buttons {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 20px;
-    }
-    
-    .setting-button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    
-    .setting-button.cancel {
-      background-color: #f5f5f5;
-      color: #333;
-      margin-right: 10px;
-    }
-    
-    .setting-button.save {
-      background-color: #4a86e8;
-      color: white;
-    }
-    
-    .setting-button:hover {
-      opacity: 0.9;
-    }
-    
-    /* Уведомление */
-    .notification {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      padding: 15px 20px;
-      background-color: rgba(76, 175, 80, 0.9);
-      color: white;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-      z-index: 1000;
-      transform: translateY(100px);
-      opacity: 0;
-      transition: all 0.3s ease;
-    }
-    
-    .notification.show {
-      transform: translateY(0);
-      opacity: 1;
-    }
-    
-    .notification.error {
-      background-color: rgba(244, 67, 54, 0.9);
-    }
-    
-    /* Мобильная версия */
-    @media (max-width: 768px) {      
-      .main-circle {
-        width: 220px;
-        height: 220px;
-      }
-      
-      .telegram-button {
-        top: auto;
-        bottom: 20px;
-        left: 20px;
-      }
-    }
-    
-    @media (max-width: 480px) {
-      .main-circle {
-        width: 180px;
-        height: 180px;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Голосовой Ассистент с WebRTC VAD</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        #micStatus { 
+            width: 150px; height: 150px; 
+            border-radius: 75px; 
+            background-color: #4CAF50; 
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            text-align: center;
+            transition: transform 0.1s, background-color 0.3s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        #micStatus.listening { background-color: #FF5722; }
+        #micStatus.assistant-speaking { background-color: #2196F3; }
+        #micStatus.disabled { background-color: #ccc; }
+        
+        #status, #transcript { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #status {
+            background-color: #e3f2fd;
+            font-weight: bold;
+            text-align: center;
+        }
+        #transcript {
+            background-color: white;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .user {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .assistant {
+            color: #2196F3;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-  <!-- Модальное окно загрузки -->
-  <div id="loading-modal" class="modal active">
-    <div class="modal-content">
-      <div class="spinner"></div>
-      <h2>WellcomeAI</h2>
-      <p>Подключение...</p>
-      <div id="loading-status">Инициализация...</div>
-    </div>
-  </div>
-  
-  <!-- Модальное окно настроек -->
-  <div id="settings-modal" class="modal settings-modal">
-    <div class="modal-content">
-      <h2>Настройки</h2>
-      
-      <div class="settings-group">
-        <h3>Голос ассистента</h3>
-        <div class="settings-option">
-          <label for="voice-selector">Выберите голос:</label>
-          <select id="voice-selector" class="settings-voice-selector">
-            <option value="alloy">Alloy</option>
-            <option value="ash">Ash</option>
-            <option value="ballad">Ballad</option>
-            <option value="coral">Coral</option>
-            <option value="echo">Echo</option>
-            <option value="sage">Sage</option>
-            <option value="shimmer">Shimmer</option>
-            <option value="verse">Verse</option>
-          </select>
-        </div>
-      </div>
-      
-      <div class="setting-buttons">
-        <button class="setting-button cancel" id="settings-cancel">Отмена</button>
-        <button class="setting-button save" id="settings-save">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Уведомление -->
-  <div id="notification" class="notification">
-    Сообщение уведомления
-  </div>
-
-  <div class="container">
-    <!-- Ссылка на Telegram канал -->
-    <a href="https://t.me/wellcome_AI" target="_blank" class="telegram-button">
-      <i class="fab fa-telegram"></i>
-      <span>Подписаться</span>
-    </a>
+    <h1>Голосовой Ассистент</h1>
     
-    <button class="settings-button" id="settings-button">
-      <i class="fas fa-cog"></i>
-    </button>
+    <div id="micStatus">Подключение...</div>
     
-    <div class="main-circle" id="main-circle"></div>
+    <div id="status">Инициализация...</div>
+    <div id="transcript">История диалога появится здесь</div>
     
-    <div class="audio-visualization" id="audio-visualization">
-      <div class="audio-bars" id="audio-bars"></div>
-    </div>
+    <!-- Подключаем WebRTC Voice Activity Detection (VAD) -->
+    <script src="https://cdn.jsdelivr.net/npm/voice-activity-detection@0.0.5/voice-activity-detection.min.js"></script>
     
-    <div class="transcript" id="transcript"></div>
-    
-    <div class="chat-container">
-      <div class="messages" id="messages"></div>
-    </div>
-    
-    <div class="status" id="status"></div>
-  </div>
-
-  <script>
-    // НАСТРОЙКИ
-    
-    // Элементы UI
-    const mainCircle = document.getElementById('main-circle');
-    const messagesContainer = document.getElementById('messages');
-    const statusElement = document.getElementById('status');
-    const transcriptElement = document.getElementById('transcript');
-    const loadingModal = document.getElementById('loading-modal');
-    const loadingStatus = document.getElementById('loading-status');
-    const audioBars = document.getElementById('audio-bars');
-    const notification = document.getElementById('notification');
-    
-    // Элементы настроек
-    const settingsButton = document.getElementById('settings-button');
-    const settingsModal = document.getElementById('settings-modal');
-    const settingsSave = document.getElementById('settings-save');
-    const settingsCancel = document.getElementById('settings-cancel');
-    const voiceSelector = document.getElementById('voice-selector');
-    
-    // Настройки пользователя
-    let userSettings = {
-      voice: "alloy"
-    };
-    
-    // Переменные для обработки аудио
-    let audioChunksBuffer = []; // Буфер для хранения аудио чанков
-    let audioPlaybackQueue = []; // Очередь для полного воспроизведения аудио
-    let isPlayingAudio = false; // Флаг воспроизведения аудио
-    let hasAudioData = false;   // Флаг наличия аудиоданных в буфере
-    let audioDataStartTime = 0; // Время начала записи аудио
-    let minimumAudioLength = 300; // Минимальная длительность аудио (мс)
-    let reconnecting = false;   // Флаг переподключения/смены голоса
-    
-    // Функция логирования
-    function log(message, level = 'info') {
-      const timestamp = new Date().toLocaleTimeString();
-      // Отфильтровываем сообщения о WebSocket URL
-      if (message && message.includes("WebSocket URL:")) {
-        return;
-      }
-      console.log(`[${level.toUpperCase()}] ${message}`);
-      
-      // Обновляем статус загрузки, если это информационное сообщение
-      if (level === 'info' && loadingModal.classList.contains('active')) {
-        loadingStatus.textContent = message;
-      }
-    }
-    
-    // Показать уведомление
-    function showNotification(message, isError = false) {
-      // Пропускаем сообщения об ошибках с пустым буфером
-      if (message && (message.includes("Недостаточно аудио") || message.includes("буфер"))) {
-        return;
-      }
-      
-      // Очищаем предыдущие таймауты
-      if (notification.timeout) {
-        clearTimeout(notification.timeout);
-      }
-      
-      // Устанавливаем сообщение и стиль
-      notification.textContent = message;
-      notification.classList.remove('show', 'error');
-      
-      if (isError) {
-        notification.classList.add('error');
-      }
-      
-      // Показываем уведомление с небольшой задержкой
-      setTimeout(() => {
-        notification.classList.add('show');
-      }, 10);
-      
-      // Скрываем уведомление через 3 секунды
-      notification.timeout = setTimeout(() => {
-        notification.classList.remove('show');
-      }, 3000);
-    }
-    
-    // Создаем аудио-бары для визуализации
-    function createAudioBars(count = 30) {
-      audioBars.innerHTML = '';
-      for (let i = 0; i < count; i++) {
-        const bar = document.createElement('div');
-        bar.className = 'audio-bar';
-        audioBars.appendChild(bar);
-      }
-    }
-    createAudioBars();
-    
-    // Состояние
-    let isConnected = false;
-    let isListening = false;
-    let isProcessing = false;
-    let websocket = null;
-    let audioContext = null;
-    let mediaStream = null;
-    let audioProcessor = null;
-    let lastSilenceTime = 0;
-    let audioBufferTimeoutId = null;
-    
-    // Конфигурация для оптимизации потока аудио
-    const AUDIO_CONFIG = {
-      silenceThreshold: 0.01,      // Порог для определения тишины
-      silenceDuration: 300,        // Длительность тишины для отправки (мс)
-      bufferCheckInterval: 50,     // Частота проверки буфера (мс)
-      soundDetectionThreshold: 0.02 // Чувствительность к звуку
-    };
-    
-    // Инициализация микрофона и AudioContext
-    async function initAudio() {
-      try {
-        log("Запрос разрешения на доступ к микрофону...");
+    <script>
+        let socket;
+        let mediaRecorder;
+        let audioContext;
+        let audioChunks = [];
+        let isConnected = false;
+        let stream;
+        let isListening = false;
+        let isSpeaking = false;
+        let isAssistantSpeaking = false;
+        let assistantAudio = null;
+        let vad = null;
         
-        // Проверяем поддержку getUserMedia
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("Ваш браузер не поддерживает доступ к микрофону");
+        // Время, после которого мы считаем, что пользователь закончил говорить (мс)
+        const SILENCE_DURATION = 1500;
+        let silenceTimer = null;
+        
+        // Время игнорирования звуков после остановки воспроизведения (мс)
+        const IGNORE_AUDIO_AFTER_STOP = 500;
+        let lastAudioStopTime = 0;
+        
+        // Элементы страницы
+        const micStatusDiv = document.getElementById('micStatus');
+        const statusDiv = document.getElementById('status');
+        const transcriptDiv = document.getElementById('transcript');
+        
+        // Нажатие на индикатор микрофона для ручного включения/выключения
+        micStatusDiv.addEventListener('click', toggleListening);
+        
+        // Автоматически подключаемся при загрузке страницы
+        window.addEventListener('load', init);
+        
+        async function init() {
+            connectWebSocket();
+            await setupAudioProcessing();
         }
         
-        // Запрашиваем доступ к микрофону с оптимальными настройками
-        mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            sampleRate: 24000
-          } 
-        });
-        
-        log("Доступ к микрофону получен");
-        
-        // Создаем AudioContext с нужной частотой дискретизации
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-        log(`AudioContext создан с частотой ${audioContext.sampleRate} Гц`);
-        
-        // Создаем обработчик аудиопотока
-        const streamSource = audioContext.createMediaStreamSource(mediaStream);
-        
-        // Выбираем размер буфера
-        const bufferSize = 2048; // Меньший размер буфера для меньшей задержки
-        
-        // Проверяем, доступен ли ScriptProcessorNode
-        if (audioContext.createScriptProcessor) {
-          audioProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
-          log("Создан ScriptProcessorNode для обработки аудио");
-        } else {
-          throw new Error("Ваш браузер не поддерживает ScriptProcessorNode");
-        }
-        
-        // Переменные для отслеживания звука
-        let isSilent = true;
-        let silenceStartTime = Date.now();
-        let lastCommitTime = 0;
-        let hasSentAudioInCurrentSegment = false;
-        
-        // Обработчик аудио с оптимизированной логикой
-        audioProcessor.onaudioprocess = function(e) {
-          if (isListening && websocket && websocket.readyState === WebSocket.OPEN && !reconnecting) {
-            // Получаем данные с микрофона
-            const inputData = e.inputBuffer.getChannelData(0);
+        function toggleListening() {
+            if (!isConnected || !stream) return;
             
-            // Вычисляем максимальную амплитуду
-            let maxAmplitude = 0;
-            for (let i = 0; i < inputData.length; i++) {
-              const absValue = Math.abs(inputData[i]);
-              maxAmplitude = Math.max(maxAmplitude, absValue);
-            }
-            
-            // Определяем, есть ли звук
-            const hasSound = maxAmplitude > AUDIO_CONFIG.soundDetectionThreshold;
-            
-            // Обновляем визуализацию
-            updateAudioVisualization(inputData);
-            
-            // Отправляем все аудиоданные для лучшего качества распознавания
-            // Преобразуем float32 в int16
-            const pcm16Data = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) {
-              pcm16Data[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32767)));
-            }
-            
-            // Отправляем данные через WebSocket
-            try {
-              const message = JSON.stringify({
-                type: "input_audio_buffer.append",
-                event_id: `audio_${Date.now()}`,
-                audio: arrayBufferToBase64(pcm16Data.buffer)
-              });
-              
-              websocket.send(message);
-              hasSentAudioInCurrentSegment = true;
-              
-              // Отмечаем наличие аудиоданных
-              if (!hasAudioData && hasSound) {
-                hasAudioData = true;
-                audioDataStartTime = Date.now();
-                log("Начало записи аудиоданных");
-              }
-              
-            } catch (error) {
-              log(`Ошибка отправки аудио: ${error.message}`, "error");
-            }
-            
-            // Логика определения тишины и автоматической отправки
-            const now = Date.now();
-            
-            if (hasSound) {
-              // Сбрасываем время начала тишины
-              isSilent = false;
-              silenceStartTime = now;
-              
-              // Активируем визуальное состояние прослушивания
-              if (!mainCircle.classList.contains('listening') && 
-                  !mainCircle.classList.contains('speaking') && 
-                  !mainCircle.classList.contains('voice-switching')) {
-                mainCircle.classList.add('listening');
-              }
-              
-              // Очищаем предыдущий таймаут, если был запланирован
-              if (audioBufferTimeoutId) {
-                clearTimeout(audioBufferTimeoutId);
-                audioBufferTimeoutId = null;
-              }
-            } else if (!isSilent) {
-              // Если наступила тишина
-              const silenceDuration = now - silenceStartTime;
-              
-              if (silenceDuration > AUDIO_CONFIG.silenceDuration) {
-                isSilent = true;
-                
-                // Если прошло достаточно времени с последней отправки и были данные
-                if (now - lastCommitTime > 1000 && hasSentAudioInCurrentSegment) {
-                  // Отправляем буфер с небольшой задержкой, чтобы убедиться в завершении речи
-                  if (!audioBufferTimeoutId) {
-                    audioBufferTimeoutId = setTimeout(() => {
-                      // Проверяем снова, не появился ли звук
-                      if (isSilent && isListening && !isProcessing && !reconnecting) {
-                        commitAudioBuffer();
-                        lastCommitTime = Date.now();
-                        hasSentAudioInCurrentSegment = false;
-                      }
-                      audioBufferTimeoutId = null;
-                    }, 100); // Малая задержка перед отправкой для уверенности
-                  }
-                }
-              }
-            }
-          }
-        };
-        
-        // Подключаем обработчик
-        streamSource.connect(audioProcessor);
-        audioProcessor.connect(audioContext.destination);
-        
-        log("Аудио инициализировано успешно");
-        return true;
-      } catch (error) {
-        log(`Ошибка инициализации аудио: ${error.message}`, "error");
-        showNotification("Ошибка доступа к микрофону. Проверьте настройки браузера.", true);
-        return false;
-      }
-    }
-    
-    // Функция для отправки аудиобуфера
-    function commitAudioBuffer() {
-      if (!isListening || isProcessing || !websocket || websocket.readyState !== WebSocket.OPEN || reconnecting) return;
-      
-      // Проверяем, есть ли в буфере достаточно аудиоданных
-      if (!hasAudioData) {
-        log("Не отправляем пустой аудиобуфер", "warn");
-        return;
-      }
-      
-      // Проверяем минимальную длительность аудио (300мс требуется для корректной работы)
-      const audioLength = Date.now() - audioDataStartTime;
-      if (audioLength < minimumAudioLength) {
-        log(`Аудиобуфер слишком короткий (${audioLength}мс), ожидаем больше данных`, "warn");
-        
-        // Продолжаем запись еще немного времени
-        setTimeout(() => {
-          // Повторно пытаемся отправить буфер
-          if (isListening && !isProcessing && hasAudioData && !reconnecting) {
-            log(`Отправка аудиобуфера после дополнительной записи (${Date.now() - audioDataStartTime}мс)`);
-            sendCommitBuffer();
-          }
-        }, minimumAudioLength - audioLength + 50); // Добавляем небольшой запас
-        
-        return;
-      }
-      
-      // Если все проверки пройдены, отправляем буфер
-      sendCommitBuffer();
-    }
-    
-    // Функция для фактической отправки буфера
-    function sendCommitBuffer() {
-      log("Отправка аудиобуфера");
-      
-      // Сбрасываем эффект активности
-      mainCircle.classList.remove('listening');
-      
-      // Отправляем команду для завершения буфера
-      websocket.send(JSON.stringify({
-        type: "input_audio_buffer.commit",
-        event_id: `commit_${Date.now()}`
-      }));
-      
-      // Начинаем обработку и сбрасываем флаги
-      isProcessing = true;
-      hasAudioData = false;
-      audioDataStartTime = 0;
-    }
-    
-    // Преобразование ArrayBuffer в Base64
-    function arrayBufferToBase64(buffer) {
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      return btoa(binary);
-    }
-    
-    // Преобразование Base64 в ArrayBuffer
-    function base64ToArrayBuffer(base64) {
-      try {
-        const binaryString = atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        return bytes.buffer;
-      } catch (e) {
-        log(`Ошибка при декодировании base64: ${e.message}`, "error");
-        return new ArrayBuffer(0);
-      }
-    }
-    
-    // Обновление визуализации аудио
-    function updateAudioVisualization(audioData) {
-      const bars = audioBars.querySelectorAll('.audio-bar');
-      const step = Math.floor(audioData.length / bars.length);
-      
-      for (let i = 0; i < bars.length; i++) {
-        // Вычисляем среднее значение амплитуды для этого "отрезка" аудиоданных
-        let sum = 0;
-        for (let j = 0; j < step; j++) {
-          const index = i * step + j;
-          if (index < audioData.length) {
-            sum += Math.abs(audioData[index]);
-          }
-        }
-        const average = sum / step;
-        
-        // Нормализуем значение для высоты полосы (от 2px до 40px)
-        const height = 2 + Math.min(38, Math.floor(average * 100));
-        bars[i].style.height = `${height}px`;
-      }
-    }
-    
-    // Сброс визуализации аудио
-    function resetAudioVisualization() {
-      const bars = audioBars.querySelectorAll('.audio-bar');
-      bars.forEach(bar => {
-        bar.style.height = '2px';
-      });
-    }
-    
-    // Создаём простой WAV из PCM данных
-    function createWavFromPcm(pcmBuffer, sampleRate = 24000) {
-      // Создаём заголовок WAV
-      const wavHeader = new ArrayBuffer(44);
-      const view = new DataView(wavHeader);
-      
-      // "RIFF" chunk descriptor
-      view.setUint8(0, 'R'.charCodeAt(0));
-      view.setUint8(1, 'I'.charCodeAt(0));
-      view.setUint8(2, 'F'.charCodeAt(0));
-      view.setUint8(3, 'F'.charCodeAt(0));
-      
-      view.setUint32(4, 36 + pcmBuffer.byteLength, true); // Размер всего файла - 8
-      
-      // "WAVE" формат
-      view.setUint8(8, 'W'.charCodeAt(0));
-      view.setUint8(9, 'A'.charCodeAt(0));
-      view.setUint8(10, 'V'.charCodeAt(0));
-      view.setUint8(11, 'E'.charCodeAt(0));
-      
-      // "fmt " субчанк
-      view.setUint8(12, 'f'.charCodeAt(0));
-      view.setUint8(13, 'm'.charCodeAt(0));
-      view.setUint8(14, 't'.charCodeAt(0));
-      view.setUint8(15, ' '.charCodeAt(0));
-      
-      view.setUint32(16, 16, true); // Размер fmt субчанка
-      view.setUint16(20, 1, true);  // Формат аудио (1 = PCM)
-      view.setUint16(22, 1, true);  // Число каналов (1 = моно)
-      view.setUint32(24, sampleRate, true); // Частота дискретизации
-      view.setUint32(28, sampleRate * 2, true); // Байт в секунду (SampleRate * NumChannels * BitsPerSample/8)
-      view.setUint16(32, 2, true);  // Байт на сэмпл (NumChannels * BitsPerSample/8)
-      view.setUint16(34, 16, true); // Бит на сэмпл
-      
-      // "data" субчанк
-      view.setUint8(36, 'd'.charCodeAt(0));
-      view.setUint8(37, 'a'.charCodeAt(0));
-      view.setUint8(38, 't'.charCodeAt(0));
-      view.setUint8(39, 'a'.charCodeAt(0));
-      
-      view.setUint32(40, pcmBuffer.byteLength, true); // Размер данных
-      
-      // Объединяем заголовок и PCM данные
-      const wavBuffer = new ArrayBuffer(wavHeader.byteLength + pcmBuffer.byteLength);
-      const wavBytes = new Uint8Array(wavBuffer);
-      
-      wavBytes.set(new Uint8Array(wavHeader), 0);
-      wavBytes.set(new Uint8Array(pcmBuffer), wavHeader.byteLength);
-      
-      return wavBuffer;
-    }
-    
-    // Добавить аудио в очередь воспроизведения
-    function addAudioToPlaybackQueue(audioBase64) {
-      if (!audioBase64 || typeof audioBase64 !== 'string') return;
-      
-      // Добавляем аудио в очередь
-      audioPlaybackQueue.push(audioBase64);
-      
-      // Если не запущено воспроизведение, запускаем
-      if (!isPlayingAudio) {
-        playNextAudio();
-      }
-    }
-    
-    // Воспроизведение следующего аудио в очереди
-    function playNextAudio() {
-      if (audioPlaybackQueue.length === 0) {
-        isPlayingAudio = false;
-        // Сбрасываем эффект говорения, когда все аудио воспроизведено
-        mainCircle.classList.remove('speaking');
-        return;
-      }
-      
-      isPlayingAudio = true;
-      
-      // Активируем визуальное состояние говорения
-      mainCircle.classList.add('speaking');
-      mainCircle.classList.remove('listening');
-      mainCircle.classList.remove('voice-switching');
-      
-      const audioBase64 = audioPlaybackQueue.shift();
-      
-      try {
-        // Декодируем Base64 в ArrayBuffer
-        const audioData = base64ToArrayBuffer(audioBase64);
-        
-        // Проверяем размер данных
-        if (audioData.byteLength === 0) {
-          playNextAudio(); // Пропускаем пустой аудио-чанк
-          return;
-        }
-        
-        // Предполагаем, что данные в формате PCM16, конвертируем в WAV для воспроизведения
-        const wavBuffer = createWavFromPcm(audioData);
-        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(blob);
-        
-        // Воспроизводим звук
-        const audio = new Audio(audioUrl);
-        
-        audio.oncanplaythrough = function() {
-          audio.play().catch(err => {
-            log(`Ошибка при воспроизведении: ${err.message}`, "error");
-            playNextAudio(); // В случае ошибки переходим к следующему аудио
-          });
-        };
-        
-        // После окончания воспроизведения
-        audio.onended = function() {
-          URL.revokeObjectURL(audioUrl);
-          playNextAudio(); // Переходим к следующему аудио
-        };
-        
-        // В случае ошибки
-        audio.onerror = function() {
-          URL.revokeObjectURL(audioUrl);
-          playNextAudio(); // Переходим к следующему аудио
-        };
-      } catch (error) {
-        log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
-        playNextAudio(); // В случае ошибки переходим к следующему аудио
-      }
-    }
-    
-    // Добавление сообщения в чат (скрытое)
-    function addMessage(text, isUser) {
-      const messageElement = document.createElement('div');
-      messageElement.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
-      messageElement.textContent = text;
-      messagesContainer.appendChild(messageElement);
-    }
-    
-    // Подключение к WebSocket серверу
-    async function connectWebSocket() {
-      return new Promise((resolve, reject) => {
-        try {
-          loadingModal.classList.add('active');
-          log("Подключение...");
-          
-          // Используем WebSocket-соединение с нашим локальным прокси
-          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          const wsUrl = `${protocol}//${window.location.host}/ws`;
-          // НЕ логируем информацию о URL соединения
-          // log(`WebSocket URL: ${wsUrl}`);
-          
-          // Создаем новое WebSocket соединение
-          websocket = new WebSocket(wsUrl);
-          
-          // Устанавливаем таймаут на открытие соединения
-          const connectionTimeout = setTimeout(() => {
-            log("Превышено время ожидания соединения", "error");
-            websocket.close();
-            reject(new Error("Таймаут соединения"));
-          }, 15000);
-          
-          websocket.onopen = function() {
-            clearTimeout(connectionTimeout);
-            log("Соединение установлено");
-            isConnected = true;
-            loadingModal.classList.remove('active');
-            
-            // Обновляем сессию с выбранным голосом
-            updateSessionSettings();
-            
-            // Автоматически начинаем слушать (всегда активно)
-            startListening();
-            
-            resolve(true);
-          };
-          
-          websocket.onmessage = function(event) {
-            handleWebSocketMessage(event.data);
-          };
-          
-          websocket.onclose = function(event) {
-            log(`Соединение закрыто`, event.wasClean ? "info" : "error");
-            isConnected = false;
-            
-            // Сбрасываем состояния
-            isListening = false;
-            isProcessing = false;
-            reconnecting = false;
-            
-            // Пытаемся переподключиться, если соединение было разорвано не чисто
-            if (!event.wasClean) {
-              mainCircle.style.boxShadow = "0 0 30px rgba(244, 67, 54, 0.3)";
-              
-              setTimeout(() => {
-                connectWebSocket().catch(err => {
-                  log(`Ошибка при переподключении: ${err.message}`, "error");
-                });
-              }, 3000);
-            }
-            
-            reject(new Error(`Соединение закрыто`));
-          };
-          
-          websocket.onerror = function(error) {
-            log(`Ошибка соединения`, "error");
-            isConnected = false;
-            reject(error);
-          };
-        } catch (error) {
-          log(`Ошибка при установке соединения: ${error.message}`, "error");
-          reject(error);
-        }
-      });
-    }
-    
-    // Обновление настроек сессии на сервере
-    function updateSessionSettings() {
-      if (!isConnected || !websocket || websocket.readyState !== WebSocket.OPEN) {
-        log("Невозможно обновить настройки: нет соединения", "warn");
-        return;
-      }
-      
-      try {
-        log(`Отправка начальных настроек сессии с голосом ${userSettings.voice}`);
-        
-        // Отправляем обновление настроек
-        const updateMessage = {
-          type: "session.update",
-          event_id: `settings_${Date.now()}`,
-          session: {
-            voice: userSettings.voice
-          }
-        };
-        
-        websocket.send(JSON.stringify(updateMessage));
-      } catch (error) {
-        log(`Ошибка при обновлении настроек: ${error.message}`, "error");
-      }
-    }
-    
-    // Обработка сообщений от сервера
-    function handleWebSocketMessage(data) {
-      try {
-        // Если данные в бинарном формате, преобразуем их в текст
-        if (data instanceof Blob) {
-          const reader = new FileReader();
-          reader.onload = function() {
-            const text = reader.result;
-            try {
-              const json = JSON.parse(text);
-              processServerEvent(json);
-            } catch (e) {
-              log(`Ошибка парсинга JSON из бинарных данных`, "error");
-            }
-          };
-          reader.readAsText(data);
-        } else {
-          try {
-            const json = typeof data === 'string' ? JSON.parse(data) : data;
-            processServerEvent(json);
-          } catch (e) {
-            log(`Ошибка парсинга JSON из текстовых данных`, "error");
-          }
-        }
-      } catch (error) {
-        log(`Ошибка обработки сообщения`, "error");
-      }
-    }
-    
-    // Обработка событий от сервера
-    let currentResponseText = "";
-    let currentResponseId = null;
-    let currentItemId = null;
-    
-    function processServerEvent(event) {
-      if (!event || !event.type) return;
-      
-      // Обрабатываем специальные типы событий
-      // Обработка события смены голоса
-      if (event.type === "voice_changed") {
-        const voiceName = event.voice_name || event.voice;
-        
-        // Обновляем настройку голоса, если смена прошла успешно
-        if (event.success) {
-          userSettings.voice = event.voice;
-          voiceSelector.value = event.voice;
-          log(`Голос успешно изменен на ${event.voice}`);
-          
-          // Показываем уведомление только если установлен флаг готовности
-          if (event.ready) {
-            showNotification(`Голос изменен на ${voiceName}`, false);
-            // Выходим из режима переключения и запускаем слушание
-            reconnecting = false;
-            mainCircle.classList.remove('voice-switching');
-            
-            // Запускаем слушание через небольшую задержку
-            setTimeout(() => {
-              if (!isListening && !isProcessing) {
+            if (isListening) {
+                // Если слушаем, останавливаем
+                stopListening();
+                micStatusDiv.textContent = 'Нажмите для начала';
+                statusDiv.textContent = 'Режим ожидания';
+            } else {
+                // Если не слушаем, начинаем
                 startListening();
-              }
-            }, 300);
-          }
-        }
-        return;
-      }
-      
-      // Состояние сессии готово
-      if (event.type === "session_ready") {
-        showNotification(`Готов к работе`, false);
-        // Выходим из режима переключения и запускаем слушание
-        reconnecting = false;
-        mainCircle.classList.remove('voice-switching');
-        
-        setTimeout(() => {
-          if (!isListening && !isProcessing) {
-            startListening();
-          }
-        }, 300);
-        return;
-      }
-      
-      // Обработка ошибки буфера - не показываем пользователю
-      if (event.type === "buffer_error") {
-        log(event.message, "warn");
-        // Автоматически перезапускаем прослушивание
-        if (!isListening && !isProcessing && !reconnecting) {
-          setTimeout(() => {
-            startListening();
-          }, 300);
-        }
-        return;
-      }
-      
-      // Обработка уведомления о пересоздании соединения
-      if (event.type === "recreating_connection") {
-        log("Переключение голоса...", "info");
-        reconnecting = true;
-        // Устанавливаем визуальное состояние переключения голоса
-        mainCircle.classList.remove('listening');
-        mainCircle.classList.remove('speaking');
-        mainCircle.classList.add('voice-switching');
-        return;
-      }
-      
-      // Сохраняем ID текущего ответа и элемента, если они есть
-      if (event.response_id && !currentResponseId) {
-        currentResponseId = event.response_id;
-      }
-      
-      if (event.item_id && !currentItemId) {
-        currentItemId = event.item_id;
-      }
-      
-      switch (event.type) {
-        case "error":
-          log(`Ошибка: ${event.error ? event.error.message : 'Неизвестная ошибка'}`, "error");
-          
-          // Анимируем круг, чтобы показать ошибку (но не показываем сообщение пользователю)
-          mainCircle.style.boxShadow = "0 0 20px rgba(244, 67, 54, 0.5)";
-          setTimeout(() => {
-            mainCircle.style.boxShadow = "";
-          }, 2000);
-          break;
-          
-        case "conversation.item.input_audio_transcription.delta":
-        case "conversation.item.input_audio_transcription.completed":
-          // Обновляем транскрипцию распознанной речи пользователя
-          if (event.transcript || event.delta) {
-            const transcript = event.transcript || event.delta;
-            
-            if (event.type === "conversation.item.input_audio_transcription.completed") {
-              addMessage(transcript, true);
+                micStatusDiv.textContent = 'Говорите';
+                statusDiv.textContent = 'Готов к общению!';
             }
-          }
-          break;
-          
-        case "response.text.delta":
-          // Обрабатываем текстовый ответ по частям
-          if (event.delta) {
-            currentResponseText += event.delta;
+        }
+        
+        // Функция подключения к WebSocket
+        function connectWebSocket() {
+            // В продакшене замените на адрес вашего сервера
+            // Для локальной разработки используйте "ws://localhost:8000/ws/demo"
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws/demo`;
             
-            // Обновляем текущее сообщение или создаем новое
-            const lastMessage = messagesContainer.lastElementChild;
-            if (lastMessage && !lastMessage.classList.contains('user-message')) {
-              lastMessage.textContent = currentResponseText;
+            socket = new WebSocket(wsUrl);
+            
+            socket.onopen = function() {
+                statusDiv.textContent = 'Соединение установлено';
+                isConnected = true;
+                micStatusDiv.textContent = 'Подготовка...';
+            };
+            
+            socket.onmessage = function(event) {
+                if (event.data instanceof Blob) {
+                    // Воспроизводим аудио от ассистента
+                    playAssistantAudio(event.data);
+                } else {
+                    // Обрабатываем JSON сообщения
+                    const data = JSON.parse(event.data);
+                    console.log('Сообщение:', data.type);
+                    
+                    // Обработка статуса соединения
+                    if (data.type === 'connection_status' && data.status === 'connected') {
+                        statusDiv.textContent = 'Готов к общению!';
+                        micStatusDiv.textContent = 'Говорите';
+                        startListening();
+                    }
+                    
+                    // Обработка транскрипций
+                    if (data.type === 'conversation.item.input_audio_transcription.completed' && data.transcript) {
+                        addToTranscript('user', data.transcript);
+                    } else if (data.type === 'response.audio_transcript.done' && data.transcript) {
+                        addToTranscript('assistant', data.transcript);
+                    }
+                    
+                    // Обработка ошибок
+                    if (data.type === 'error') {
+                        statusDiv.textContent = `Ошибка: ${data.error.message}`;
+                        console.error('Ошибка:', data.error);
+                    }
+                }
+            };
+            
+            socket.onclose = function() {
+                statusDiv.textContent = 'Соединение закрыто. Перезагрузите страницу.';
+                isConnected = false;
+                micStatusDiv.textContent = 'Отключено';
+                micStatusDiv.classList.add('disabled');
+                stopListening();
+            };
+            
+            socket.onerror = function(error) {
+                statusDiv.textContent = `Ошибка соединения`;
+                console.error('WebSocket ошибка:', error);
+            };
+        }
+        
+        // Добавление сообщений в историю диалога
+        function addToTranscript(role, text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            
+            const roleSpan = document.createElement('span');
+            roleSpan.className = role;
+            roleSpan.textContent = role === 'user' ? 'Вы: ' : 'Ассистент: ';
+            
+            messageDiv.appendChild(roleSpan);
+            messageDiv.appendChild(document.createTextNode(text));
+            
+            // Вставляем новое сообщение в начало
+            if (transcriptDiv.firstChild) {
+                transcriptDiv.insertBefore(messageDiv, transcriptDiv.firstChild);
             } else {
-              addMessage(currentResponseText, false);
+                transcriptDiv.appendChild(messageDiv);
             }
-          }
-          break;
-          
-        case "response.text.done":
-          // Текстовый ответ завершен
-          if (event.text) {
-            currentResponseText = event.text;
-            
-            // Обновляем текущее сообщение или создаем новое
-            const lastMessage = messagesContainer.lastElementChild;
-            if (lastMessage && !lastMessage.classList.contains('user-message')) {
-              lastMessage.textContent = currentResponseText;
-            } else {
-              addMessage(currentResponseText, false);
-            }
-          }
-          break;
-          
-        case "response.audio.delta":
-          // Улучшенная обработка аудиоответа - сохраняем все части
-          if (event.delta) {
-            // Добавляем аудио чанк в буфер для накопления
-            audioChunksBuffer.push(event.delta);
-          }
-          break;
-          
-        case "response.audio.done":
-          // Аудиоответ завершен, воспроизводим его полностью
-          if (audioChunksBuffer.length > 0) {
-            const fullAudio = audioChunksBuffer.join('');
-            // Добавляем в очередь воспроизведения
-            addAudioToPlaybackQueue(fullAudio);
-            // Очищаем буфер
-            audioChunksBuffer = [];
-          }
-          break;
-          
-        case "response.done":
-          // Ответ полностью завершен
-          isProcessing = false;
-          
-          // Сбрасываем состояние
-          currentResponseText = "";
-          currentResponseId = null;
-          currentItemId = null;
-          
-          // Добавляем небольшую задержку перед повторным слушанием
-          setTimeout(() => {
-            // Если не воспроизводится аудио, сбрасываем эффекты UI
-            if (!isPlayingAudio) {
-              mainCircle.classList.remove('speaking');
-            }
-            
-            // Начинаем снова слушать автоматически, если не в процессе переподключения
-            if (!isListening && !reconnecting) {
-              startListening();
-            }
-          }, 300);
-          break;
-          
-        case "input_audio_buffer.speech_started":
-          // Активируем визуальное состояние прослушивания
-          if (!reconnecting) {
-            mainCircle.classList.add('listening');
-            mainCircle.classList.remove('speaking');
-            mainCircle.classList.remove('voice-switching');
-          }
-          break;
-          
-        case "input_audio_buffer.speech_stopped":
-          // Сбрасываем визуальное состояние
-          if (!reconnecting) {
-            mainCircle.classList.remove('listening');
-          }
-          break;
-      }
-    }
-    
-    // Начало записи голоса
-    function startListening() {
-      if (!isConnected || isProcessing || reconnecting) {
-        return;
-      }
-      
-      isListening = true;
-      isProcessing = false;
-      log("Начало записи голоса");
-      
-      // Отправляем команду для очистки буфера ввода
-      if (websocket && websocket.readyState === WebSocket.OPEN) {
-        websocket.send(JSON.stringify({
-          type: "input_audio_buffer.clear",
-          event_id: `clear_${Date.now()}`
-        }));
-      }
-      
-      // Возобновляем AudioContext если он был приостановлен
-      if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-      
-      // Сбрасываем флаги аудио данных
-      hasAudioData = false;
-      audioDataStartTime = 0;
-      
-      // Активируем визуальное состояние прослушивания если не воспроизводится аудио
-      if (!isPlayingAudio && !reconnecting) {
-        mainCircle.classList.add('listening');
-        mainCircle.classList.remove('speaking');
-        mainCircle.classList.remove('voice-switching');
-      }
-    }
-    
-    // Открытие модального окна настроек
-    function openSettingsModal() {
-      // Устанавливаем текущие значения в элементы формы
-      voiceSelector.value = userSettings.voice;
-      
-      // Отображаем модальное окно
-      settingsModal.classList.add('active');
-    }
-    
-    // Закрытие модального окна настроек без сохранения
-    function closeSettingsModal() {
-      settingsModal.classList.remove('active');
-    }
-    
-    // Сохранение настроек
-    function saveSettings() {
-      // Получаем значения из формы
-      const newVoice = voiceSelector.value;
-      
-      // Проверяем, изменился ли голос
-      const voiceChanged = newVoice !== userSettings.voice;
-      
-      // Закрываем модальное окно
-      closeSettingsModal();
-      
-      // Если голос изменился и есть соединение, отправляем команду изменения голоса
-      if (voiceChanged && isConnected) {
-        // Устанавливаем флаг переподключения
-        reconnecting = true;
-        
-        // Меняем визуальное состояние на переключение голоса
-        mainCircle.classList.remove('listening');
-        mainCircle.classList.remove('speaking');
-        mainCircle.classList.add('voice-switching');
-        
-        // Останавливаем текущее слушание
-        isListening = false;
-        
-        // Отправляем специальную команду для пересоздания соединения
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
-          websocket.send(JSON.stringify({
-            type: "change_voice",
-            event_id: `voice_${Date.now()}`,
-            voice: newVoice
-          }));
-          
-          // Отображаем уведомление о смене голоса
-          showNotification(`Переключение на голос ${newVoice}...`, false);
         }
-      }
-    }
-    
-    // Инициализация всего приложения
-    async function init() {
-      try {
-        // Настраиваем обработчики событий для настроек
-        settingsButton.addEventListener('click', openSettingsModal);
-        settingsCancel.addEventListener('click', closeSettingsModal);
-        settingsSave.addEventListener('click', saveSettings);
         
-        // Инициализируем аудио
-        const audioInitialized = await initAudio();
-        
-        if (audioInitialized) {
-          // Подключаемся к WebSocket серверу
-          const connected = await connectWebSocket();
-          
-          if (connected) {
-            // Если пользователь щелкнул вне модального окна настроек, закрываем его
-            window.addEventListener('click', function(e) {
-              if (e.target === settingsModal) {
-                closeSettingsModal();
-              }
-            });
-          } else {
-            loadingModal.classList.remove('active');
-            setTimeout(() => {
-              // Повторная попытка подключения
-              connectWebSocket().catch(() => {});
-            }, 3000);
-          }
-        } else {
-          loadingModal.classList.remove('active');
-          mainCircle.style.boxShadow = "0 0 30px rgba(244, 67, 54, 0.5)";
+        // Настройка аудио обработки и WebRTC VAD
+        async function setupAudioProcessing() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    } 
+                });
+                
+                // Создаем AudioContext для WebRTC VAD
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Опции для VAD
+                const vadOptions = {
+                    audioContext: audioContext,
+                    source: audioContext.createMediaStreamSource(stream),
+                    voice_stop: function() {
+                        console.log('VAD: Голос остановлен');
+                        // Если мы в процессе записи, останавливаем через небольшую задержку
+                        if (isSpeaking && !silenceTimer) {
+                            silenceTimer = setTimeout(() => {
+                                stopRecording();
+                                silenceTimer = null;
+                            }, SILENCE_DURATION);
+                        }
+                    },
+                    voice_start: function() {
+                        console.log('VAD: Голос обнаружен');
+                        
+                        // Игнорируем звуки сразу после остановки воспроизведения
+                        const now = Date.now();
+                        if (now - lastAudioStopTime < IGNORE_AUDIO_AFTER_STOP) {
+                            return;
+                        }
+                        
+                        // Если ассистент говорит, прерываем его
+                        if (isAssistantSpeaking) {
+                            interruptAssistant();
+                        }
+                        
+                        // Сбрасываем таймер тишины
+                        if (silenceTimer) {
+                            clearTimeout(silenceTimer);
+                            silenceTimer = null;
+                        }
+                        
+                        // Начинаем запись, если еще не начали
+                        if (isListening && !isSpeaking) {
+                            startRecording();
+                        }
+                    }
+                };
+                
+                // Инициализируем VAD
+                vad = new VAD(vadOptions);
+                
+                statusDiv.textContent = 'Микрофон подключен';
+                
+            } catch (error) {
+                console.error('Ошибка доступа к микрофону:', error);
+                statusDiv.textContent = `Нет доступа к микрофону`;
+                micStatusDiv.textContent = 'Нет доступа';
+                micStatusDiv.classList.add('disabled');
+            }
         }
-      } catch (error) {
-        loadingModal.classList.remove('active');
-      }
-    }
-    
-    // Запускаем инициализацию после загрузки страницы
-    window.addEventListener('load', init);
-  </script>
+        
+        // Функция начала прослушивания
+        function startListening() {
+            if (!isConnected || !stream || isListening) return;
+            
+            isListening = true;
+            
+            // Если используем VAD, включаем его
+            if (vad) {
+                vad.connect();
+            }
+            
+            micStatusDiv.textContent = 'Говорите';
+            statusDiv.textContent = 'Готов к общению!';
+        }
+        
+        // Функция остановки прослушивания
+        function stopListening() {
+            isListening = false;
+            
+            // Останавливаем VAD
+            if (vad) {
+                vad.disconnect();
+            }
+            
+            // Если запись активна, останавливаем её
+            if (isSpeaking) {
+                stopRecording();
+            }
+        }
+        
+        // Функция прерывания ответа ассистента
+        function interruptAssistant() {
+            console.log('Прерываем ассистента');
+            
+            // Останавливаем воспроизведение
+            if (assistantAudio && !assistantAudio.paused) {
+                assistantAudio.pause();
+                assistantAudio = null;
+            }
+            
+            // Отправляем команду отмены текущего ответа
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: "response.cancel",
+                    event_id: `cancel_${Date.now()}`
+                }));
+                console.log('Отправлена команда отмены ответа');
+            }
+            
+            isAssistantSpeaking = false;
+            micStatusDiv.classList.remove('assistant-speaking');
+            micStatusDiv.textContent = 'Говорите';
+        }
+        
+        // Функция начала записи
+        function startRecording() {
+            if (!isConnected || isSpeaking) return;
+            
+            try {
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        
+                        // Отправка аудио в WebSocket
+                        const reader = new FileReader();
+                        reader.onloadend = function() {
+                            if (socket && socket.readyState === WebSocket.OPEN) {
+                                const base64Audio = reader.result.split(',')[1];
+                                socket.send(JSON.stringify({
+                                    type: "input_audio_buffer.append",
+                                    audio: base64Audio,
+                                    event_id: `audio_${Date.now()}`
+                                }));
+                            }
+                        };
+                        reader.readAsDataURL(event.data);
+                    }
+                };
+                
+                mediaRecorder.start(100); // Отправляем чанки каждые 100мс
+                isSpeaking = true;
+                micStatusDiv.classList.add('listening');
+                micStatusDiv.classList.remove('assistant-speaking');
+                micStatusDiv.textContent = 'Слушаю...';
+                statusDiv.textContent = 'Слушаю вас...';
+            } catch (error) {
+                console.error('Ошибка начала записи:', error);
+                statusDiv.textContent = `Ошибка записи голоса`;
+            }
+        }
+        
+        // Функция остановки записи
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                
+                // Отправляем команду завершения ввода
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        type: "input_audio_buffer.commit",
+                        event_id: `commit_${Date.now()}`
+                    }));
+                }
+                
+                isSpeaking = false;
+                if (silenceTimer) {
+                    clearTimeout(silenceTimer);
+                    silenceTimer = null;
+                }
+                
+                micStatusDiv.classList.remove('listening');
+                micStatusDiv.textContent = 'Обрабатываю...';
+                statusDiv.textContent = 'Обрабатываю...';
+            }
+        }
+        
+        // Функция воспроизведения аудио от ассистента
+        function playAssistantAudio(audioBlob) {
+            // Отмечаем, что ассистент начал говорить
+            isAssistantSpeaking = true;
+            micStatusDiv.classList.add('assistant-speaking');
+            micStatusDiv.textContent = 'Ассистент говорит';
+            statusDiv.textContent = 'Ассистент говорит...';
+            
+            const audioUrl = URL.createObjectURL(audioBlob);
+            assistantAudio = new Audio(audioUrl);
+            
+            assistantAudio.onended = function() {
+                URL.revokeObjectURL(audioUrl);
+                isAssistantSpeaking = false;
+                micStatusDiv.classList.remove('assistant-speaking');
+                micStatusDiv.textContent = 'Говорите';
+                statusDiv.textContent = 'Готов к общению!';
+                
+                // Запоминаем время остановки аудио для предотвращения ложных срабатываний
+                lastAudioStopTime = Date.now();
+            };
+            
+            assistantAudio.onpause = function() {
+                // Запоминаем время остановки аудио для предотвращения ложных срабатываний
+                lastAudioStopTime = Date.now();
+            };
+            
+            assistantAudio.play();
+        }
+    </script>
 </body>
 </html>
