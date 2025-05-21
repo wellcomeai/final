@@ -3,6 +3,7 @@ import json
 import uuid
 import base64
 import time
+import httpx
 import websockets
 from websockets.exceptions import ConnectionClosed
 from typing import Dict, Any, Optional
@@ -21,11 +22,92 @@ class SimpleOpenAIClient:
         self.openai_url = settings.REALTIME_WS_URL
         self.session_id = str(uuid.uuid4())
         self.current_response_id = None
+        self.session_token = None
         
         # Простой список разрешенных функций
         self.enabled_functions = []
         if "functions" in self.assistant_config:
             self.enabled_functions = [f.get("name") for f in self.assistant_config["functions"] if f.get("name")]
+
+    async def create_session(self) -> bool:
+        """Создает сессию в OpenAI Realtime API через REST запрос"""
+        if not self.api_key:
+            print("OpenAI API key не предоставлен")
+            return False
+            
+        try:
+            # Получаем настройки
+            voice = self.assistant_config.get("voice", settings.DEFAULT_VOICE)
+            system_message = self.assistant_config.get("system_prompt", settings.DEFAULT_SYSTEM_MESSAGE)
+            model = self.assistant_config.get("model", settings.DEFAULT_MODEL)
+            
+            # Подготавливаем данные для запроса на создание сессии
+            session_data = {
+                "model": model,
+                "modalities": ["audio", "text"],
+                "instructions": system_message,
+                "voice": voice,
+                "input_audio_format": "pcm16",
+                "output_audio_format": "pcm16",
+                "input_audio_transcription": {
+                    "model": "whisper-1"
+                },
+                "turn_detection": {
+                    "type": "server_vad",
+                    "threshold": 0.25,
+                    "prefix_padding_ms": 200,
+                    "silence_duration_ms": 300,
+                    "create_response": True,
+                }
+            }
+            
+            # Добавляем функции, если есть
+            if self.assistant_config.get("functions"):
+                tools = []
+                for func in self.assistant_config["functions"]:
+                    if "name" in func and "description" in func and "parameters" in func:
+                        tools.append({
+                            "type": "function",
+                            "name": func["name"],
+                            "description": func["description"],
+                            "parameters": func["parameters"]
+                        })
+                
+                if tools:
+                    session_data["tools"] = tools
+                    session_data["tool_choice"] = "auto"
+                    print(f"Добавлено {len(tools)} функций в сессию")
+            
+            # Делаем запрос на создание сессии
+            async with httpx.AsyncClient() as client:
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "OpenAI-Beta": "realtime=v1"
+                }
+                response = await client.post(
+                    settings.REALTIME_SESSION_URL,
+                    headers=headers,
+                    json=session_data,
+                    timeout=30.0
+                )
+                
+                if response.status_code != 200:
+                    print(f"Ошибка создания сессии: {response.status_code} {response.text}")
+                    return False
+                
+                session_info = response.json()
+                if "client_secret" not in session_info or not session_info["client_secret"].get("value"):
+                    print("Не удалось получить токен сессии")
+                    return False
+                
+                self.session_token = session_info["client_secret"]["value"]
+                print(f"Сессия создана успешно, получен токен: {self.session_token[:10]}...")
+                return True
+                
+        except Exception as e:
+            print(f"Ошибка создания сессии OpenAI: {e}")
+            return False
 
     async def connect(self) -> bool:
         """Устанавливает WebSocket соединение с OpenAI Realtime API"""
@@ -33,12 +115,20 @@ class SimpleOpenAIClient:
             print("OpenAI API key не предоставлен")
             return False
 
-        headers = [
-            ("Authorization", f"Bearer {self.api_key}"),
-            ("OpenAI-Beta", "realtime=v1"),
-            ("User-Agent", "MiniVoiceAssistant/1.0")
-        ]
         try:
+            # Сначала создаем сессию через REST API
+            if not await self.create_session():
+                print("Не удалось создать сессию")
+                return False
+                
+            # Подключаемся через WebSocket, используя полученный токен сессии
+            headers = [
+                ("Authorization", f"Bearer {self.session_token}"),
+                ("OpenAI-Beta", "realtime=v1"),
+                ("User-Agent", "MiniVoiceAssistant/1.0")
+            ]
+            
+            print(f"Попытка подключения к WebSocket: {self.openai_url}")
             self.ws = await asyncio.wait_for(
                 websockets.connect(
                     self.openai_url,
@@ -52,83 +142,13 @@ class SimpleOpenAIClient:
             )
             self.is_connected = True
             print(f"Подключено к OpenAI для клиента {self.client_id}")
-
-            # Получаем настройки из конфигурации
-            voice = self.assistant_config.get("voice", settings.DEFAULT_VOICE)
-            system_message = self.assistant_config.get("system_prompt", settings.DEFAULT_SYSTEM_MESSAGE)
-            
-            # Обновляем настройки сессии
-            if not await self.update_session(voice=voice, system_message=system_message):
-                print("Не удалось обновить настройки сессии")
-                await self.close()
-                return False
-
             return True
+            
         except asyncio.TimeoutError:
             print(f"Таймаут подключения к OpenAI для клиента {self.client_id}")
             return False
         except Exception as e:
             print(f"Ошибка подключения к OpenAI: {e}")
-            return False
-
-    async def update_session(self, voice: str = None, system_message: str = None) -> bool:
-        """Обновляет настройки сессии на стороне OpenAI Realtime API"""
-        if not self.is_connected or not self.ws:
-            print("Невозможно обновить сессию: нет подключения")
-            return False
-            
-        voice = voice or settings.DEFAULT_VOICE
-        system_message = system_message or settings.DEFAULT_SYSTEM_MESSAGE
-            
-        turn_detection = {
-            "type": "server_vad",
-            "threshold": 0.25,
-            "prefix_padding_ms": 200,
-            "silence_duration_ms": 300,
-            "create_response": True,
-        }
-        
-        # Упрощенные настройки без функций для минимальной версии
-        payload = {
-            "type": "session.update",
-            "session": {
-                "turn_detection": turn_detection,
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "voice": voice,
-                "instructions": system_message,
-                "modalities": ["text", "audio"],
-                "temperature": 0.7,
-                "max_response_output_tokens": 500,
-                "input_audio_transcription": {
-                    "model": "whisper-1"
-                }
-            }
-        }
-        
-        # Добавляем функции, если они есть
-        if self.assistant_config.get("functions"):
-            tools = []
-            for func in self.assistant_config["functions"]:
-                if "name" in func and "description" in func and "parameters" in func:
-                    tools.append({
-                        "type": "function",
-                        "name": func["name"],
-                        "description": func["description"],
-                        "parameters": func["parameters"]
-                    })
-            
-            if tools:
-                payload["session"]["tools"] = tools
-                payload["session"]["tool_choice"] = "auto"
-                print(f"Добавлено {len(tools)} функций в сессию")
-            
-        try:
-            await self.ws.send(json.dumps(payload))
-            print(f"Настройки сессии отправлены (voice={voice})")
-            return True
-        except Exception as e:
-            print(f"Ошибка отправки session.update: {e}")
             return False
 
     async def process_audio(self, audio_buffer: bytes) -> bool:
