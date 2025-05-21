@@ -3,8 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
+from pathlib import Path
 
 from handler import handle_websocket_connection
+
+# Создаем папку static, если её нет
+static_dir = Path("static")
+static_dir.mkdir(exist_ok=True)
 
 app = FastAPI(title="Mini Voice Assistant")
 
@@ -26,8 +31,15 @@ async def websocket_endpoint(websocket: WebSocket, assistant_id: str):
 
 @app.get("/")
 async def root():
-    return {"message": "Голосовой ассистент запущен. Откройте /static/index.html для использования веб-интерфейса."}
+    # Перенаправляем с корня на веб-интерфейс
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/static/index.html")
+
+# Проверка здоровья для Render
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
