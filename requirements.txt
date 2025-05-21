@@ -7,3 +7,4 @@ pydantic-settings==2.2.1
 openai==1.14.0  # Добавляем OpenAI SDK с подходящей версией
 python-dotenv==1.0.1  # Для работы с .env файлами
 gunicorn==21.2.0  # Для запуска в продакшене
+pydantic==2.6.3
