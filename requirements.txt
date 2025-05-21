@@ -3,8 +3,8 @@ uvicorn==0.27.1
 websockets==12.0
 python-multipart==0.0.9
 numpy==1.26.4
-pydantic-settings==2.2.1
+pydantic==2.6.3
+pydantic-settings==2.2.1  # Добавляем поддержку BaseSettings
 openai==1.14.0  # Добавляем OpenAI SDK с подходящей версией
 python-dotenv==1.0.1  # Для работы с .env файлами
 gunicorn==21.2.0  # Для запуска в продакшене
-pydantic==2.6.3
