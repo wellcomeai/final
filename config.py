@@ -4,9 +4,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
-    # Исправляем URL для WebSocket соединения с Realtime API
-    REALTIME_WS_URL: str = "wss://realtime.api.openai.com/v1"
-    # Добавляем URL для создания сессии
+    # Исправляем URL для WebSocket и REST API
     REALTIME_SESSION_URL: str = "https://api.openai.com/v1/realtime/sessions"
     DEFAULT_VOICE: str = "alloy"
     DEFAULT_SYSTEM_MESSAGE: str = "Ты полезный голосовой ассистент. Отвечай кратко и по делу на русском языке."
