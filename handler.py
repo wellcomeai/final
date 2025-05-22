@@ -7,7 +7,11 @@ import traceback
 from websockets.exceptions import ConnectionClosed
 from typing import Dict, List
 
-from client import OpenAIRealtimeClient, normalize_function_name, execute_function
+try:
+    from client import OpenAIRealtimeClient, normalize_function_name, execute_function
+except ImportError:
+    # Fallback to aiohttp version if websockets doesn't work
+    from client_aiohttp import OpenAIRealtimeClient, normalize_function_name, execute_function
 from audio_utils import base64_to_audio_buffer
 from config import settings
 
@@ -196,7 +200,7 @@ async def handle_openai_messages(openai_client: OpenAIRealtimeClient, websocket:
         
         while True:
             try:
-                raw = await openai_client.ws.recv()
+                raw = await openai_client.recv()
                 
                 try:
                     response_data = json.loads(raw)
