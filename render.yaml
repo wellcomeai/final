@@ -1,13 +1,13 @@
 services:
   - type: web
-    name: mini-voice-assistant
-    runtime: python
+    name: voice-assistant
+    env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT
+    startCommand: python main.py
     envVars:
       - key: OPENAI_API_KEY
-        sync: false  # Значение добавляется вручную в панели Render
-      - key: PYTHONUNBUFFERED
-        value: true
+        sync: false  # Устанавливаем в панели управления
       - key: PORT
-        value: 8000
+        value: 10000
+      - key: LOG_LEVEL
+        value: info
