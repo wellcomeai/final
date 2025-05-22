@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            margin: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .record { background-color: #007bff; color: white; }
+        .stop { background-color: #dc3545; color: white; }
+        .disabled { background-color: #6c757d; color: white; cursor: not-allowed; }
+        
+        .transcript {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        
+        .user-text { color: #007bff; font-weight: bold; }
+        .assistant-text { color: #28a745; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Voice Assistant</h1>
+    
+    <div id="status" class="status disconnected">
+        Disconnected
+    </div>
+    
+    <div class="controls">
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="recordBtn" onclick="startRecording()" class="record disabled" disabled>
+            Hold to Talk
+        </button>
+    </div>
+    
+    <div class="transcript">
+        <div><strong>Conversation:</strong></div>
+        <div id="conversation"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let mediaRecorder = null;
+        let audioStream = null;
+        let isConnected = false;
+        let isRecording = false;
+        
+        const statusDiv = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const conversationDiv = document.getElementById('conversation');
+        
+        // Подключение к WebSocket
+        async function connect() {
+            try {
+                ws = new WebSocket('ws://localhost:8000/ws');
+                
+                ws.onopen = function() {
+                    updateStatus('Connected', true);
+                    connectBtn.textContent = 'Disconnect';
+                    connectBtn.onclick = disconnect;
+                };
+                
+                ws.onmessage = function(event) {
+                    if (event.data instanceof Blob) {
+                        // Воспроизводим полученное аудио
+                        playAudio(event.data);
+                    } else {
+                        // Обрабатываем JSON сообщения
+                        const data = JSON.parse(event.data);
+                        handleMessage(data);
+                    }
+                };
+                
+                ws.onclose = function() {
+                    updateStatus('Disconnected', false);
+                    connectBtn.textContent = 'Connect';
+                    connectBtn.onclick = connect;
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateStatus('Connection Error', false);
+                };
+                
+            } catch (error) {
+                console.error('Connection failed:', error);
+                updateStatus('Connection Failed', false);
+            }
+        }
+        
+        // Отключение от WebSocket
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+            if (mediaRecorder && isRecording) {
+                stopRecording();
+            }
+        }
+        
+        // Обновление статуса подключения
+        function updateStatus(message, connected) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            isConnected = connected;
+            
+            if (connected) {
+                recordBtn.disabled = false;
+                recordBtn.className = 'record';
+                setupAudio();
+            } else {
+                recordBtn.disabled = true;
+                recordBtn.className = 'record disabled';
+            }
+        }
+        
+        // Настройка аудио записи
+        async function setupAudio() {
+            try {
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        sampleRate: 24000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                });
+                
+                mediaRecorder = new MediaRecorder(audioStream, {
+                    mimeType: 'audio/webm'
+                });
+                
+                const audioChunks = [];
+                
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onstop = function() {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    processAudio(audioBlob);
+                    audioChunks.length = 0;
+                };
+                
+            } catch (error) {
+                console.error('Failed to setup audio:', error);
+                alert('Microphone access required');
+            }
+        }
+        
+        // Начало записи
+        function startRecording() {
+            if (!isConnected || !mediaRecorder) return;
+            
+            if (!isRecording) {
+                isRecording = true;
+                recordBtn.textContent = 'Recording... (Release to stop)';
+                recordBtn.className = 'stop';
+                
+                mediaRecorder.start(100); // Собирать данные каждые 100мс
+                
+                // Обработчики для мыши
+                recordBtn.onmouseup = stopRecording;
+                recordBtn.onmouseleave = stopRecording;
+                
+                // Обработчики для касания
+                recordBtn.ontouchend = stopRecording;
+            }
+        }
+        
+        // Остановка записи
+        function stopRecording() {
+            if (isRecording) {
+                isRecording = false;
+                recordBtn.textContent = 'Hold to Talk';
+                recordBtn.className = 'record';
+                
+                mediaRecorder.stop();
+                
+                // Убираем обработчики
+                recordBtn.onmouseup = null;
+                recordBtn.onmouseleave = null;
+                recordBtn.ontouchend = null;
+                recordBtn.onclick = startRecording;
+            }
+        }
+        
+        // Обработка записанного аудио
+        async function processAudio(audioBlob) {
+            try {
+                // Конвертируем в PCM16 и отправляем по частям
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                // Конвертируем в PCM16
+                const pcm16Data = convertToPCM16(audioBuffer);
+                
+                // Отправляем аудио по частям
+                const chunkSize = 4096; // 4KB чанки
+                for (let i = 0; i < pcm16Data.length; i += chunkSize) {
+                    const chunk = pcm16Data.slice(i, i + chunkSize);
+                    const base64Chunk = btoa(String.fromCharCode(...chunk));
+                    
+                    ws.send(JSON.stringify({
+                        type: 'input_audio_buffer.append',
+                        audio: base64Chunk,
+                        event_id: 'audio_' + Date.now() + '_' + i
+                    }));
+                }
+                
+                // Коммитим аудио
+                ws.send(JSON.stringify({
+                    type: 'input_audio_buffer.commit',
+                    event_id: 'commit_' + Date.now()
+                }));
+                
+            } catch (error) {
+                console.error('Error processing audio:', error);
+            }
+        }
+        
+        // Конвертация в PCM16
+        function convertToPCM16(audioBuffer) {
+            const length = audioBuffer.length;
+            const pcm16 = new Int16Array(length);
+            const floatData = audioBuffer.getChannelData(0);
+            
+            for (let i = 0; i < length; i++) {
+                // Конвертируем float [-1, 1] в int16 [-32768, 32767]
+                pcm16[i] = Math.max(-32768, Math.min(32767, floatData[i] * 32767));
+            }
+            
+            return new Uint8Array(pcm16.buffer);
+        }
+        
+        // Воспроизведение полученного аудио
+        async function playAudio(audioBlob) {
+            try {
+                const audio = new Audio();
+                audio.src = URL.createObjectURL(audioBlob);
+                await audio.play();
+            } catch (error) {
+                console.error('Error playing audio:', error);
+            }
+        }
+        
+        // Обработка сообщений от сервера
+        function handleMessage(data) {
+            console.log('Received message:', data);
+            
+            switch (data.type) {
+                case 'connection_status':
+                    if (data.status === 'connected') {
+                        addToConversation('System: ' + data.message, 'system');
+                    }
+                    break;
+                    
+                case 'user_transcript':
+                    addToConversation('You: ' + data.transcript, 'user-text');
+                    break;
+                    
+                case 'assistant_transcript':
+                    addToConversation('Assistant: ' + data.transcript, 'assistant-text');
+                    break;
+                    
+                case 'error':
+                    addToConversation('Error: ' + data.error.message, 'error');
+                    break;
+                    
+                case 'warning':
+                    addToConversation('Warning: ' + data.warning.message, 'warning');
+                    break;
+            }
+        }
+        
+        // Добавление сообщения в диалог
+        function addToConversation(message, className = '') {
+            const div = document.createElement('div');
+            div.className = className;
+            div.textContent = message;
+            conversationDiv.appendChild(div);
+            conversationDiv.scrollTop = conversationDiv.scrollHeight;
+        }
+        
+        // Обработчики для кнопки записи
+        recordBtn.onmousedown = startRecording;
+        recordBtn.ontouchstart = function(e) {
+            e.preventDefault();
+            startRecording();
+        };
+    </script>
+</body>
+</html>
