@@ -33,6 +33,15 @@
       touch-action: manipulation;
     }
     
+    /* Специальные стили для iOS устройств */
+    .ios-device {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: rgba(0,0,0,0);
+      -webkit-appearance: none;
+      touch-action: manipulation;
+    }
+    
     /* Главный контейнер */
     .container {
       width: 100%;
@@ -607,6 +616,102 @@
       }
     }
     
+    /* Улучшения для iOS Safari и других браузеров */
+    .ios-device .main-circle {
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      cursor: pointer;
+      transform: translateZ(0); /* Активируем аппаратное ускорение */
+      will-change: transform; /* Оптимизируем для анимаций */
+    }
+    
+    /* Дополнительные визуальные эффекты для iOS */
+    .ios-device .main-circle:active {
+      transform: scale(0.98) translateZ(0);
+      transition: transform 0.1s ease-out;
+    }
+    
+    /* Фикс для iOS viewport */
+    .ios-device body {
+      position: fixed;
+      width: 100%;
+      height: 100vh;
+      height: -webkit-fill-available; /* iOS Safari fix */
+      overflow: hidden;
+    }
+    
+    .ios-device .container {
+      height: 100vh;
+      height: -webkit-fill-available; /* iOS Safari fix */
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    
+    /* Улучшения для состояний на iOS */
+    .ios-device .main-circle.listening {
+      animation: ios-listening-pulse 2s ease-in-out infinite;
+      transform: translateZ(0);
+    }
+    
+    @keyframes ios-listening-pulse {
+      0%, 100% {
+        transform: scale(1) translateZ(0);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.03) translateZ(0);
+        opacity: 0.95;
+      }
+    }
+    
+    .ios-device .main-circle.speaking {
+      animation: ios-speaking-bounce 1.2s ease-in-out infinite;
+      transform: translateZ(0);
+    }
+    
+    @keyframes ios-speaking-bounce {
+      0%, 100% {
+        transform: scale(1) translateZ(0);
+      }
+      25% {
+        transform: scale(1.02) translateZ(0);
+      }
+      50% {
+        transform: scale(1.05) translateZ(0);
+      }
+      75% {
+        transform: scale(1.02) translateZ(0);
+      }
+    }
+    
+    /* Оптимизации для iOS Safari */
+    .ios-device * {
+      -webkit-overflow-scrolling: touch;
+      -webkit-transform: translateZ(0);
+    }
+    
+    /* Скрытие адресной строки в iOS Safari */
+    @media screen and (max-width: 768px) {
+      .ios-device {
+        height: 100vh;
+        height: -webkit-fill-available;
+      }
+      
+      .ios-device .container {
+        min-height: 100vh;
+        min-height: -webkit-fill-available;
+      }
+    }
+    
+    /* Улучшения для уведомлений на iOS */
+    .ios-device .notification {
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
     /* Дополнительные улучшения для сенсорных устройств */
     .mobile-device * {
       -webkit-overflow-scrolling: touch;
@@ -656,12 +761,45 @@
       }
     }
     
+    /* Стили для темной темы на iOS */
+    @media (prefers-color-scheme: dark) {
+      .ios-device body {
+        background-color: #000000;
+        color: #ffffff;
+      }
+      
+      .ios-device .main-circle {
+        background: linear-gradient(135deg, #1c1c1e, #2c2c2e, #4a86e8) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+      }
+      
+      .ios-device .settings-button {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+        backdrop-filter: blur(20px);
+      }
+      
+      .ios-device .telegram-button {
+        background: rgba(0, 136, 204, 0.2);
+        color: #0a84ff;
+        backdrop-filter: blur(20px);
+      }
+    }
+    
     /* Индикатор активности микрофона для мобильных */
     .mobile-device .main-circle.listening::before {
       animation: wave 3s linear infinite !important;
     }
     
     .mobile-device .main-circle.speaking::before {
+      animation: wave 2s linear infinite !important;
+    }
+    
+    .ios-device .main-circle.listening::before {
+      animation: wave 3s linear infinite !important;
+    }
+    
+    .ios-device .main-circle.speaking::before {
       animation: wave 2s linear infinite !important;
     }
   </style>
@@ -747,6 +885,12 @@
              (navigator.maxTouchPoints > 0);
     }
     
+    // Определение iOS устройства (все браузеры)
+    function isIOS() {
+      return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+    
     // Элементы UI
     const mainCircle = document.getElementById('main-circle');
     const messagesContainer = document.getElementById('messages');
@@ -783,6 +927,13 @@
     let userInteractionOccurred = false;
     let audioElements = []; // Массив для хранения Audio элементов
     let mobileAudioEnabled = false;
+    
+    // Переменные для универсальной iOS поддержки
+    let iosAudioFullyUnlocked = false;
+    let iosPrewarmedAudio = [];
+    let iosAudioPool = [];
+    let iosUserInteractionCompleted = false;
+    let iosAudioWarmupTimeout = null;
     
     // Функция логирования
     function log(message, level = 'info') {
@@ -859,6 +1010,200 @@
       bufferCheckInterval: 50,     // Частота проверки буфера (мс)
       soundDetectionThreshold: 0.02 // Чувствительность к звуку
     };
+    
+    // ФУНКЦИИ ДЛЯ УНИВЕРСАЛЬНОЙ iOS ПОДДЕРЖКИ
+    
+    // Универсальная агрессивная активация аудио для iOS
+    async function universalIOSAudioUnlock() {
+      if (!isIOS() || iosAudioFullyUnlocked) return true;
+      
+      try {
+        log("Универсальная активация аудио для iOS (все браузеры)...");
+        
+        // 1. Активируем AudioContext максимально агрессивно
+        if (audioContext) {
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+          }
+          
+          // Создаем и воспроизводим беззвучный звук для активации
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+          oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.01);
+        }
+        
+        // 2. Создаем пул предактивированных Audio элементов
+        await createIOSAudioPool();
+        
+        // 3. Прогреваем аудио систему
+        await warmupIOSAudio();
+        
+        iosAudioFullyUnlocked = true;
+        iosUserInteractionCompleted = true;
+        
+        log("iOS аудио полностью активировано!");
+        return true;
+        
+      } catch (error) {
+        log(`Ошибка активации iOS аудио: ${error.message}`, "error");
+        return false;
+      }
+    }
+    
+    // Создание пула Audio элементов для iOS
+    async function createIOSAudioPool() {
+      if (!isIOS()) return;
+      
+      try {
+        // Создаем несколько Audio элементов заранее
+        for (let i = 0; i < 5; i++) {
+          const audio = new Audio();
+          
+          // Устанавливаем data URL с минимальным WAV файлом
+          audio.src = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUYrTp66hVFApGn+DyvmwhBLqUm";
+          
+          // Важные настройки для iOS
+          audio.preload = 'auto';
+          audio.loop = false;
+          audio.muted = true; // Начинаем с muted, потом включим
+          audio.autoplay = false;
+          audio.controls = false;
+          
+          // Добавляем в пул
+          iosAudioPool.push(audio);
+          
+          // Пытаемся загрузить и активировать
+          try {
+            audio.load();
+            // Воспроизводим беззвучно для активации
+            const playPromise = audio.play();
+            if (playPromise) {
+              await playPromise;
+              audio.pause();
+              audio.currentTime = 0;
+              audio.muted = false; // Включаем звук после активации
+            }
+          } catch (e) {
+            // Игнорируем ошибки при предварительной активации
+          }
+        }
+        
+        log(`iOS аудио пул создан: ${iosAudioPool.length} элементов`);
+        
+      } catch (error) {
+        log(`Ошибка создания iOS аудио пула: ${error.message}`, "error");
+      }
+    }
+    
+    // Прогрев аудио системы iOS
+    async function warmupIOSAudio() {
+      if (!isIOS()) return;
+      
+      try {
+        // Создаем несколько коротких аудио файлов разной частоты
+        const frequencies = [220, 440, 880];
+        
+        for (const freq of frequencies) {
+          const audio = new Audio();
+          
+          // Генерируем короткий тон
+          const duration = 0.1; // 100ms
+          const sampleRate = 24000;
+          const samples = Math.floor(sampleRate * duration);
+          
+          // Создаем WAV с тоном
+          const wavBuffer = generateToneWAV(freq, duration, sampleRate);
+          const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+          const audioUrl = URL.createObjectURL(blob);
+          
+          audio.src = audioUrl;
+          audio.volume = 0.01; // Очень тихо
+          audio.preload = 'auto';
+          
+          try {
+            audio.load();
+            const playPromise = audio.play();
+            if (playPromise) {
+              await playPromise;
+              audio.pause();
+            }
+            URL.revokeObjectURL(audioUrl);
+          } catch (e) {
+            // Игнорируем ошибки прогрева
+          }
+        }
+        
+        log("iOS аудио прогрев завершен");
+        
+      } catch (error) {
+        log(`Ошибка прогрева iOS аудио: ${error.message}`, "error");
+      }
+    }
+    
+    // Генерация WAV файла с тоном для прогрева
+    function generateToneWAV(frequency, duration, sampleRate) {
+      const samples = Math.floor(sampleRate * duration);
+      const buffer = new ArrayBuffer(44 + samples * 2);
+      const view = new DataView(buffer);
+      
+      // WAV заголовок
+      const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      };
+      
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + samples * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, samples * 2, true);
+      
+      // Генерируем синусоидальный тон
+      let offset = 44;
+      for (let i = 0; i < samples; i++) {
+        const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate);
+        view.setInt16(offset, sample * 32767 * 0.1, true); // Тихий звук
+        offset += 2;
+      }
+      
+      return buffer;
+    }
+    
+    // Получение предактивированного Audio элемента для iOS
+    function getIOSAudioElement() {
+      if (!isIOS() || iosAudioPool.length === 0) {
+        return new Audio();
+      }
+      
+      // Берем элемент из пула или создаем новый
+      let audio = iosAudioPool.shift();
+      
+      if (!audio) {
+        audio = new Audio();
+        audio.preload = 'auto';
+      }
+      
+      // Если пул опустел, пополняем его асинхронно
+      if (iosAudioPool.length < 2) {
+        setTimeout(createIOSAudioPool, 100);
+      }
+      
+      return audio;
+    }
     
     // ФУНКЦИИ ДЛЯ МОБИЛЬНОЙ ПОДДЕРЖКИ
     
@@ -1408,6 +1753,158 @@
       return wavBuffer;
     }
     
+    // Улучшенная функция воспроизведения для iOS
+    function playNextAudioIOS() {
+      if (audioPlaybackQueue.length === 0) {
+        isPlayingAudio = false;
+        mainCircle.classList.remove('speaking');
+        
+        // Начинаем слушать снова
+        setTimeout(() => {
+          if (!isListening && !reconnecting) {
+            startListening();
+          }
+        }, 300);
+        return;
+      }
+      
+      isPlayingAudio = true;
+      mainCircle.classList.add('speaking');
+      mainCircle.classList.remove('listening', 'voice-switching');
+      
+      const audioBase64 = audioPlaybackQueue.shift();
+      
+      try {
+        // Декодируем Base64 в ArrayBuffer
+        const audioData = base64ToArrayBuffer(audioBase64);
+        
+        if (audioData.byteLength === 0) {
+          playNextAudioIOS();
+          return;
+        }
+        
+        // Используем улучшенную функцию создания WAV
+        const wavBuffer = createWavFromPcmMobile(audioData);
+        if (!wavBuffer) {
+          playNextAudioIOS();
+          return;
+        }
+        
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        const audioUrl = URL.createObjectURL(blob);
+        
+        // Получаем предактивированный Audio элемент
+        const audio = getIOSAudioElement();
+        
+        // Добавляем в массив для отслеживания
+        audioElements.push(audio);
+        
+        // Быстрая настройка без лишних проверок
+        audio.preload = 'auto';
+        audio.autoplay = false;
+        audio.controls = false;
+        audio.muted = false;
+        
+        // Немедленные обработчики
+        const cleanup = () => {
+          URL.revokeObjectURL(audioUrl);
+          const index = audioElements.indexOf(audio);
+          if (index > -1) {
+            audioElements.splice(index, 1);
+          }
+          // Возвращаем элемент в пул для повторного использования
+          if (iosAudioPool.length < 5) {
+            audio.src = '';
+            audio.load();
+            iosAudioPool.push(audio);
+          }
+        };
+        
+        audio.onended = () => {
+          cleanup();
+          playNextAudioIOS();
+        };
+        
+        audio.onerror = (e) => {
+          log(`Ошибка iOS аудио: ${e.type}`, "error");
+          cleanup();
+          playNextAudioIOS();
+        };
+        
+        // Агрессивная стратегия воспроизведения для iOS
+        const attemptPlay = async () => {
+          try {
+            // Устанавливаем источник
+            audio.src = audioUrl;
+            
+            // Ждем готовности
+            if (audio.readyState < 3) { // HAVE_FUTURE_DATA
+              await new Promise((resolve, reject) => {
+                const onCanPlay = () => {
+                  audio.removeEventListener('canplay', onCanPlay);
+                  audio.removeEventListener('error', onError);
+                  resolve();
+                };
+                const onError = () => {
+                  audio.removeEventListener('canplay', onCanPlay);
+                  audio.removeEventListener('error', onError);
+                  reject(new Error('Загрузка аудио не удалась'));
+                };
+                audio.addEventListener('canplay', onCanPlay);
+                audio.addEventListener('error', onError);
+                audio.load();
+              });
+            }
+            
+            // Воспроизводим
+            const playPromise = audio.play();
+            if (playPromise) {
+              await playPromise;
+            }
+            
+            log("iOS аудио успешно воспроизводится");
+            
+          } catch (error) {
+            log(`Ошибка воспроизведения iOS аудио: ${error.message}`, "error");
+            
+            // Если не удалось воспроизвести, пробуем эмулировать касание
+            if (!iosUserInteractionCompleted) {
+              log("Попытка эмуляции пользовательского взаимодействия...");
+              
+              // Эмулируем событие касания
+              const touchEvent = new TouchEvent('touchend', {
+                bubbles: true,
+                cancelable: true,
+                touches: [],
+                targetTouches: [],
+                changedTouches: []
+              });
+              
+              document.dispatchEvent(touchEvent);
+              
+              // Пробуем снова через небольшую задержку
+              setTimeout(() => {
+                audio.play().catch(() => {
+                  cleanup();
+                  playNextAudioIOS();
+                });
+              }, 50);
+            } else {
+              cleanup();
+              playNextAudioIOS();
+            }
+          }
+        };
+        
+        // Запускаем воспроизведение
+        attemptPlay();
+        
+      } catch (error) {
+        log(`Критическая ошибка iOS воспроизведения: ${error.message}`, "error");
+        playNextAudioIOS();
+      }
+    }
+    
     // Улучшенная функция воспроизведения для мобильных устройств
     function playNextAudioMobile() {
       if (audioPlaybackQueue.length === 0) {
@@ -1625,6 +2122,22 @@
       } catch (error) {
         log(`Ошибка воспроизведения аудио: ${error.message}`, "error");
         playNextAudio(); // В случае ошибки переходим к следующему аудио
+      }
+    }
+    
+    // Добавляем аудио в очередь для iOS
+    function addAudioToPlaybackQueueIOS(audioBase64) {
+      if (!audioBase64 || typeof audioBase64 !== 'string') {
+        log("Некорректные аудио данные для iOS", "warn");
+        return;
+      }
+      
+      log(`Добавляем аудио в очередь iOS (размер: ${audioBase64.length} символов)`);
+      
+      audioPlaybackQueue.push(audioBase64);
+      
+      if (!isPlayingAudio) {
+        playNextAudioIOS();
       }
     }
     
@@ -1946,8 +2459,11 @@
           if (audioChunksBuffer.length > 0) {
             const fullAudio = audioChunksBuffer.join('');
             
-            // Используем правильную функцию в зависимости от устройства
-            if (isMobileDevice()) {
+            // Выбираем правильную функцию в зависимости от устройства
+            if (isIOS()) {
+              addAudioToPlaybackQueueIOS(fullAudio);
+              log(`Добавляем полное аудио в очередь для iOS (размер: ${fullAudio.length})`, "debug");
+            } else if (isMobileDevice()) {
               addAudioToPlaybackQueueMobile(fullAudio);
               log(`Добавляем полное аудио в очередь для мобильного (размер: ${fullAudio.length})`, "debug");
             } else {
@@ -2035,8 +2551,15 @@
       // Дополнительные проверки для мобильных устройств
       if (isMobileDevice()) {
         // Проверяем, активирован ли аудио контекст
-        if (!audioContextUnlocked) {
+        if (!audioContextUnlocked && !isIOS()) {
           log("AudioContext не активирован, требуется взаимодействие пользователя", "warn");
+          showNotification("Нажмите на круг для активации микрофона", false);
+          return;
+        }
+        
+        // Для iOS проверяем специальную активацию
+        if (isIOS() && !iosAudioFullyUnlocked) {
+          log("iOS аудио не активировано, требуется взаимодействие пользователя", "warn");
           showNotification("Нажмите на круг для активации микрофона", false);
           return;
         }
@@ -2100,7 +2623,11 @@
             log(`AudioContext не в состоянии running: ${audioContext.state}`, "warn");
             
             // Пытаемся снова активировать
-            await unlockAudioContext();
+            if (isIOS()) {
+              await universalIOSAudioUnlock();
+            } else {
+              await unlockAudioContext();
+            }
           }
         } catch (error) {
           log(`Ошибка работы с AudioContext: ${error.message}`, "error");
@@ -2110,7 +2637,11 @@
             
             // Добавляем обработчик для повторной активации
             const reactivateHandler = async () => {
-              await unlockAudioContext();
+              if (isIOS()) {
+                await universalIOSAudioUnlock();
+              } else {
+                await unlockAudioContext();
+              }
               document.removeEventListener('touchstart', reactivateHandler);
               document.removeEventListener('click', reactivateHandler);
               
@@ -2152,6 +2683,68 @@
       }
       
       log("Слушание активировано успешно");
+    }
+    
+    // Улучшенный обработчик касания главного круга для iOS
+    function handleMainCircleTouchIOS() {
+      log("Обработка касания главного круга на iOS");
+      
+      // Вибрация при нажатии
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+      
+      // Если аудио не активировано, активируем максимально агрессивно
+      if (!iosAudioFullyUnlocked) {
+        log("Активация iOS аудио при касании...");
+        
+        universalIOSAudioUnlock().then(() => {
+          log("iOS аудио активировано, начинаем слушание");
+          if (!isListening && !isPlayingAudio && !reconnecting) {
+            startListening();
+          }
+        }).catch(error => {
+          log(`Ошибка активации iOS аудио: ${error.message}`, "error");
+          showNotification("Ошибка активации аудио. Попробуйте еще раз.", true);
+        });
+        return;
+      }
+      
+      // Если уже слушаем, показываем уведомление
+      if (isListening) {
+        showNotification("Слушаю... Говорите", false);
+        return;
+      }
+      
+      // Если воспроизводится аудио, останавливаем его
+      if (isPlayingAudio) {
+        // Останавливаем все активные аудио элементы
+        audioElements.forEach(audio => {
+          if (!audio.paused) {
+            audio.pause();
+            audio.currentTime = 0;
+          }
+        });
+        
+        // Очищаем очередь
+        audioPlaybackQueue = [];
+        isPlayingAudio = false;
+        
+        mainCircle.classList.remove('speaking');
+        showNotification("Воспроизведение остановлено", false);
+        
+        // Начинаем слушание
+        setTimeout(() => {
+          startListening();
+        }, 300);
+        
+        return;
+      }
+      
+      // В остальных случаях начинаем слушание
+      if (!reconnecting) {
+        startListening();
+      }
     }
     
     // Дополнительная функция для обработки клика по главному кругу на мобильных
@@ -2338,29 +2931,64 @@
           // Добавляем класс для мобильных стилей
           document.body.classList.add('mobile-device');
           
-          // Заменяем функции на мобильные версии
-          window.addAudioToPlaybackQueue = addAudioToPlaybackQueueMobile;
-          window.playNextAudio = playNextAudioMobile;
-          window.initAudio = initAudioMobile;
+          if (isIOS()) {
+            log("iOS устройство - используем специальные iOS функции");
+            
+            // Добавляем класс для iOS стилей
+            document.body.classList.add('ios-device');
+            
+            // Заменяем функции на iOS версии
+            window.addAudioToPlaybackQueue = addAudioToPlaybackQueueIOS;
+            window.playNextAudio = playNextAudioIOS;
+            
+            // Добавляем агрессивные обработчики для iOS
+            document.addEventListener('touchstart', universalIOSAudioUnlock, { once: true });
+            document.addEventListener('touchend', universalIOSAudioUnlock, { once: true });
+            document.addEventListener('click', universalIOSAudioUnlock, { once: true });
+            
+            // Добавляем обработчики касаний для главного круга (iOS версия)
+            mainCircle.addEventListener('touchstart', handleMainCircleTouchIOS, { passive: false });
+            mainCircle.addEventListener('click', handleMainCircleTouchIOS);
+            
+            // Предотвращаем стандартное поведение для iOS
+            mainCircle.addEventListener('touchstart', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+            });
+            
+            // Предварительная подготовка аудио для iOS
+            setTimeout(() => {
+              createIOSAudioPool();
+              warmupIOSAudio();
+            }, 500);
+            
+          } else {
+            log("Android/другое мобильное устройство - используем стандартные мобильные функции");
+            
+            // Заменяем функции на мобильные версии
+            window.addAudioToPlaybackQueue = addAudioToPlaybackQueueMobile;
+            window.playNextAudio = playNextAudioMobile;
+            window.initAudio = initAudioMobile;
+            
+            // Добавляем обработчики для активации аудио
+            document.addEventListener('touchstart', enableAudioOnUserInteraction, { once: true });
+            document.addEventListener('click', enableAudioOnUserInteraction, { once: true });
+            
+            // Добавляем обработчики касаний для главного круга (Android версия)
+            mainCircle.addEventListener('touchstart', handleMainCircleTouch, { passive: true });
+            mainCircle.addEventListener('click', handleMainCircleTouch);
+            
+            // Предотвращаем двойное срабатывание на устройствах с touch и mouse
+            mainCircle.addEventListener('touchstart', function(e) {
+              e.preventDefault();
+            });
+          }
           
-          // Добавляем обработчики для активации аудио
-          document.addEventListener('touchstart', enableAudioOnUserInteraction, { once: true });
-          document.addEventListener('click', enableAudioOnUserInteraction, { once: true });
-          
-          // Обработчик для входа в полноэкранный режим на мобильных
+          // Общие обработчики для всех мобильных
           document.addEventListener('touchend', function(e) {
             if (audioContext && audioContext.state === 'suspended') {
               audioContext.resume();
             }
-          });
-          
-          // Добавляем обработчики касаний для главного круга
-          mainCircle.addEventListener('touchstart', handleMainCircleTouch, { passive: true });
-          mainCircle.addEventListener('click', handleMainCircleTouch);
-          
-          // Предотвращаем двойное срабатывание на устройствах с touch и mouse
-          mainCircle.addEventListener('touchstart', function(e) {
-            e.preventDefault();
           });
           
           // Оптимизируем для мобильных
@@ -2368,7 +2996,23 @@
         }
         
         // Инициализируем аудио (выбираем правильную функцию)
-        const audioInitialized = isMobileDevice() ? await initAudioMobile() : await initAudio();
+        let audioInitialized;
+        if (isIOS()) {
+          // Для iOS используем специальную инициализацию
+          audioInitialized = await initAudioMobile();
+          
+          // Дополнительная подготовка для iOS
+          if (audioInitialized) {
+            setTimeout(async () => {
+              await createIOSAudioPool();
+              await warmupIOSAudio();
+              log("iOS аудио система полностью подготовлена");
+            }, 1000);
+          }
+        } else {
+          // Для других устройств
+          audioInitialized = isMobileDevice() ? await initAudioMobile() : await initAudio();
+        }
         
         if (audioInitialized) {
           // Подключаемся к WebSocket серверу
