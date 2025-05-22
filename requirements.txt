@@ -1,27 +1,16 @@
 # Основные компоненты
-fastapi>=0.110.0
-uvicorn>=0.27.1
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+
+# WebSocket и HTTP клиенты
 websockets==11.0.3
-python-multipart>=0.0.9
-numpy>=1.26.4
-pydantic>=2.6.3
-pydantic-settings>=2.2.1
-openai>=1.14.0
-python-dotenv>=1.0.1
-gunicorn>=21.2.0
-httpx>=0.28.1
-aiohttp>=3.8.5
-
-# Дополнительные зависимости для улучшенной функциональности
+httpx>=0.24.1
 aiofiles>=23.1.0
-ujson>=5.8.0
-email-validator>=2.0.0
 
-# Для безопасности
-pyjwt>=2.8.0
-passlib[bcrypt]>=1.7.4
-python-jose>=3.3.0
+# Обработка аудио
+numpy>=1.24.3
 
-# Для работы с HTTP запросами
-requests>=2.28.2
-aiohttp>=3.8.5
+# Для продакшена
+gunicorn>=21.2.0
