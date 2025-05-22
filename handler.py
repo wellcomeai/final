@@ -488,8 +488,47 @@ async def handle_openai_messages(openai_client: OpenAIRealtimeClient, websocket:
                         "arguments_buffer": ""
                     }
 
-                # Обработка ответа с содержимым
-                elif msg_type == "response.content_part.added":
+                # Обработка начала ответа
+                if msg_type == "response.created":
+                    print(f"[DEBUG] Ассистент начал генерировать ответ")
+                    await websocket.send_json({
+                        "type": "assistant_thinking",
+                        "message": "Ассистент думает..."
+                    })
+                
+                # Обработка завершения ответа  
+                if msg_type == "response.done":
+                    print(f"[DEBUG] Ответ ассистента завершен")
+                    await websocket.send_json({
+                        "type": "assistant_response_complete",
+                        "message": "Ответ завершен"
+                    })
+                    
+                # Обработка аудио контента
+                if msg_type == "response.content_part.added":
+                    part = response_data.get("part", {})
+                    if part.get("type") == "audio":
+                        print(f"[DEBUG] Добавлена аудио часть ответа")
+                
+                # Обработка завершения аудио
+                if msg_type == "response.audio.done":
+                    print(f"[DEBUG] Аудио ответ завершен")
+                    
+                # Обработка текстового ответа (если нет аудио)
+                if msg_type == "response.text.delta":
+                    delta_text = response_data.get("delta", "")
+                    if delta_text:
+                        print(f"[DEBUG] Получен текст от ассистента: '{delta_text}'")
+                        assistant_transcript += delta_text
+                
+                if msg_type == "response.text.done":
+                    text = response_data.get("text", "")
+                    if text:
+                        print(f"[DEBUG] Завершен текстовый ответ: '{text}'")
+                        assistant_transcript = text
+                        
+                # Обработка ответа с содержимым (сохраняем старую логику)
+                if msg_type == "response.content_part.added":
                     # Если был вызов функции, и мы ждем ответа
                     if waiting_for_function_response:
                         print(f"Получен ответ после выполнения функции")
@@ -521,10 +560,16 @@ async def handle_openai_messages(openai_client: OpenAIRealtimeClient, websocket:
                         print(f"Получена полная транскрипция ассистента: '{assistant_transcript}'")
 
                 # Если это аудио-чанк — отдаём как bytes
-                if msg_type == "audio":
-                    b64 = response_data.get("data", "")
-                    chunk = base64.b64decode(b64)
-                    await websocket.send_bytes(chunk)
+                if msg_type == "response.audio.delta":
+                    print(f"[DEBUG] Получен аудио чанк от ассистента")
+                    b64 = response_data.get("delta", "")
+                    if b64:
+                        try:
+                            chunk = base64.b64decode(b64)
+                            await websocket.send_bytes(chunk)
+                            print(f"[DEBUG] Отправлен аудио чанк клиенту: {len(chunk)} байт")
+                        except Exception as e:
+                            print(f"[ERROR] Ошибка обработки аудио чанка: {e}")
                     continue
 
                 # Завершение ответа
