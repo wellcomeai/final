@@ -237,9 +237,9 @@
         let isProcessing = false;
         
         // Настройки VAD (Voice Activity Detection)
-        const VAD_THRESHOLD = 0.02;
-        const SILENCE_DURATION = 1500;
-        const MIN_RECORDING_TIME = 500;
+        const VAD_THRESHOLD = 0.01;  // Снижаем порог для более чувствительного обнаружения
+        const SILENCE_DURATION = 2000; // Увеличиваем время ожидания тишины
+        const MIN_RECORDING_TIME = 1000; // Увеличиваем минимальное время записи
         
         let silenceTimer = null;
         let recordingStartTime = null;
@@ -594,6 +594,21 @@
                     }
                     break;
                     
+                case 'speech_started':
+                    console.log('Speech detection started');
+                    updateStatus('🎤 Speech detected...', 'listening');
+                    break;
+                    
+                case 'speech_stopped':
+                    console.log('Speech detection stopped');
+                    updateStatus('🔄 Processing your message...', 'processing');
+                    break;
+                    
+                case 'response_started':
+                    console.log('AI started generating response');
+                    updateStatus('🤖 AI is responding...', 'processing');
+                    break;
+                    
                 case 'user_transcript':
                     addToConversation('👤 You: ' + data.transcript, 'user-text');
                     break;
@@ -623,6 +638,11 @@
                         isProcessing = false;
                         updateStatus('Connected - Ready to listen', 'connected');
                     }
+                    break;
+                    
+                default:
+                    // Логируем неизвестные типы сообщений для отладки
+                    console.log('Unknown message type:', data.type, data);
                     break;
             }
         }
