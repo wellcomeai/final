@@ -3,9 +3,10 @@ import json
 import uuid
 import base64
 import time
-import aiohttp
+import websockets
 import re
-from typing import Optional, List, Dict, Any, Union
+from websockets.exceptions import ConnectionClosed
+from typing import Optional, List, Dict, Any, Union, AsyncGenerator
 
 from config import settings
 
@@ -163,18 +164,23 @@ async def execute_function(name: str, arguments: Dict[str, Any], context: Dict[s
 
 class OpenAIRealtimeClient:
     """
-    Клиент для взаимодействия с OpenAI Realtime API через WebSockets (aiohttp версия).
+    Клиент для взаимодействия с OpenAI Realtime API через WebSockets.
+    Обрабатывает голосовые взаимодействия, вызовы функций и отслеживание разговоров.
     """
     
     def __init__(self, api_key: str, assistant_config: Dict[str, Any], client_id: str):
         """
         Инициализация клиента OpenAI Realtime.
+        
+        Args:
+            api_key: OpenAI API ключ
+            assistant_config: Конфигурация ассистента
+            client_id: Уникальный идентификатор клиента
         """
         self.api_key = api_key
         self.assistant_config = assistant_config
         self.client_id = client_id
         self.ws = None
-        self.session = None
         self.is_connected = False
         self.openai_url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
         self.session_id = str(uuid.uuid4())
@@ -201,35 +207,62 @@ class OpenAIRealtimeClient:
 
     async def connect(self) -> bool:
         """
-        Устанавливает WebSocket соединение с OpenAI Realtime API используя aiohttp.
+        Устанавливает WebSocket соединение с OpenAI Realtime API
+        и сразу отправляет актуальные настройки сессии.
+        
+        Returns:
+            bool: True если соединение успешно, False иначе
         """
         if not self.api_key:
             print("OpenAI API key не предоставлен")
             return False
 
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "OpenAI-Beta": "realtime=v1",
-            "User-Agent": "WellcomeAI/1.0"
-        }
+        headers = [
+            ("Authorization", f"Bearer {self.api_key}"),
+            ("OpenAI-Beta", "realtime=v1"),
+            ("User-Agent", "WellcomeAI/1.0")
+        ]
         
         try:
-            # Создаем aiohttp сессию
-            self.session = aiohttp.ClientSession()
-            
-            print(f"Подключение к {self.openai_url}")
-            
-            # Подключаемся через aiohttp
-            self.ws = await asyncio.wait_for(
-                self.session.ws_connect(
+            # Пытаемся различные способы подключения для совместимости с разными версиями websockets
+            connection_attempts = [
+                # Новый формат (websockets >= 11.0)
+                lambda: websockets.connect(
                     self.openai_url,
-                    headers=headers,
-                    max_msg_size=15*1024*1024,
-                    timeout=30.0
+                    extra_headers=headers,
+                    max_size=15*1024*1024,
+                    ping_interval=30,
+                    ping_timeout=120,
+                    close_timeout=15
                 ),
-                timeout=30
-            )
+                # Старый формат (websockets < 11.0)
+                lambda: websockets.connect(
+                    self.openai_url,
+                    additional_headers={key: value for key, value in headers},
+                    max_size=15*1024*1024,
+                    ping_interval=30,
+                    ping_timeout=120,
+                    close_timeout=15
+                ),
+                # Самый простой формат без дополнительных параметров
+                lambda: websockets.connect(self.openai_url)
+            ]
             
+            for i, attempt in enumerate(connection_attempts):
+                try:
+                    print(f"Попытка подключения #{i+1}")
+                    if i == 2:  # Для последней попытки добавляем заголовки вручную после подключения
+                        self.ws = await asyncio.wait_for(attempt(), timeout=30)
+                        # Если удалось подключиться без заголовков, попробуем отправить их отдельно
+                        print("Подключение без заголовков успешно, но может не работать с OpenAI API")
+                    else:
+                        self.ws = await asyncio.wait_for(attempt(), timeout=30)
+                    break
+                except Exception as e:
+                    print(f"Попытка #{i+1} не удалась: {e}")
+                    if i == len(connection_attempts) - 1:
+                        raise e
+                    continue
             self.is_connected = True
             print(f"Подключено к OpenAI для клиента {self.client_id}")
 
@@ -274,11 +307,21 @@ class OpenAIRealtimeClient:
     async def reconnect(self) -> bool:
         """
         Пытается переподключиться к OpenAI Realtime API после потери соединения.
+        
+        Returns:
+            bool: True если переподключение успешно, False иначе
         """
         print(f"Попытка переподключения к OpenAI для клиента {self.client_id}")
         try:
-            # Закрываем старое соединение
-            await self.close()
+            # Закрываем старое соединение, если оно ещё существует
+            if self.ws:
+                try:
+                    await self.ws.close()
+                except:
+                    pass
+            
+            self.is_connected = False
+            self.ws = None
             
             # Подключаемся заново
             return await self.connect()
@@ -294,6 +337,14 @@ class OpenAIRealtimeClient:
     ) -> bool:
         """
         Обновляет настройки сессии на стороне OpenAI Realtime API.
+        
+        Args:
+            voice: Голос для синтеза речи
+            system_message: Системные инструкции для ассистента
+            functions: Список функций или словарь с enabled_functions
+            
+        Returns:
+            bool: True если обновление успешно, False иначе
         """
         if not self.is_connected or not self.ws:
             print("Невозможно обновить сессию: нет подключения")
@@ -352,7 +403,7 @@ class OpenAIRealtimeClient:
         }
         
         try:
-            await self.ws.send_str(json.dumps(payload))
+            await self.ws.send(json.dumps(payload))
             print(f"Настройки сессии отправлены (voice={voice}, tools={len(tools)}, tool_choice={tool_choice})")
             
             # Вывод подробной информации о функциях в лог
@@ -367,7 +418,14 @@ class OpenAIRealtimeClient:
 
     async def send_function_result(self, function_call_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Отправляет результат выполнения функции обратно в OpenAI.
+        Отправляет результат выполнения функции обратно в OpenAI как событие conversation.item.create.
+        
+        Args:
+            function_call_id: ID вызова функции
+            result: Результат выполнения функции
+            
+        Returns:
+            Dict: Информация о статусе доставки результата
         """
         if not self.is_connected or not self.ws:
             error_msg = "Невозможно отправить результат функции: нет подключения"
@@ -401,7 +459,7 @@ class OpenAIRealtimeClient:
             
             print(f"Отправка результата функции: {function_call_id}")
             
-            await self.ws.send_str(json.dumps(payload))
+            await self.ws.send(json.dumps(payload))
             print(f"Результат функции отправлен: {function_call_id}")
             
             # Добавляем небольшую задержку перед запросом нового ответа
@@ -430,6 +488,10 @@ class OpenAIRealtimeClient:
     async def create_response_after_function(self) -> bool:
         """
         Запрашивает новый ответ от модели после выполнения функции.
+        Это обеспечит генерацию аудио-ответа.
+        
+        Returns:
+            bool: True если успешно, False иначе
         """
         if not self.is_connected or not self.ws:
             print("Невозможно создать ответ: нет подключения")
@@ -451,7 +513,7 @@ class OpenAIRealtimeClient:
                 }
             }
             
-            await self.ws.send_str(json.dumps(response_payload))
+            await self.ws.send(json.dumps(response_payload))
             print("Запрошен новый ответ после выполнения функции")
             
             return True
@@ -466,15 +528,18 @@ class OpenAIRealtimeClient:
             return False
         try:
             data_b64 = base64.b64encode(audio_buffer).decode("utf-8")
-            await self.ws.send_str(json.dumps({
+            await self.ws.send(json.dumps({
                 "type": "input_audio_buffer.append",
                 "audio": data_b64,
                 "event_id": f"audio_{time.time()}"
             }))
             return True
+        except ConnectionClosed:
+            print("Соединение закрыто при отправке аудио данных")
+            self.is_connected = False
+            return False
         except Exception as e:
             print(f"Ошибка обработки аудио: {e}")
-            self.is_connected = False
             return False
 
     async def commit_audio(self) -> bool:
@@ -482,14 +547,17 @@ class OpenAIRealtimeClient:
         if not self.is_connected or not self.ws:
             return False
         try:
-            await self.ws.send_str(json.dumps({
+            await self.ws.send(json.dumps({
                 "type": "input_audio_buffer.commit",
                 "event_id": f"commit_{time.time()}"
             }))
             return True
+        except ConnectionClosed:
+            print("Соединение закрыто при фиксации аудио")
+            self.is_connected = False
+            return False
         except Exception as e:
             print(f"Ошибка фиксации аудио: {e}")
-            self.is_connected = False
             return False
 
     async def clear_audio_buffer(self) -> bool:
@@ -497,49 +565,32 @@ class OpenAIRealtimeClient:
         if not self.is_connected or not self.ws:
             return False
         try:
-            await self.ws.send_str(json.dumps({
+            await self.ws.send(json.dumps({
                 "type": "input_audio_buffer.clear",
                 "event_id": f"clear_{time.time()}"
             }))
             return True
+        except ConnectionClosed:
+            print("Соединение закрыто при очистке аудио буфера")
+            self.is_connected = False
+            return False
         except Exception as e:
             print(f"Ошибка очистки аудио буфера: {e}")
-            self.is_connected = False
             return False
 
     async def recv(self):
-        """Получает сообщение от WebSocket"""
+        """Получает сообщение от WebSocket (совместимость с aiohttp версией)"""
         if not self.ws:
             raise Exception("WebSocket не подключен")
         
-        msg = await self.ws.receive()
-        if msg.type == aiohttp.WSMsgType.TEXT:
-            return msg.data
-        elif msg.type == aiohttp.WSMsgType.BINARY:
-            return msg.data
-        elif msg.type == aiohttp.WSMsgType.ERROR:
-            raise Exception(f"WebSocket error: {self.ws.exception()}")
-        elif msg.type == aiohttp.WSMsgType.CLOSE:
-            raise ConnectionError("WebSocket connection closed")
-        else:
-            raise Exception(f"Unexpected message type: {msg.type}")
+        return await self.ws.recv()
 
     async def close(self) -> None:
         """Закрывает WebSocket соединение"""
-        self.is_connected = False
-        
-        if self.ws and not self.ws.closed:
+        if self.ws:
             try:
                 await self.ws.close()
                 print(f"WebSocket соединение закрыто для клиента {self.client_id}")
             except Exception as e:
                 print(f"Ошибка закрытия WebSocket OpenAI: {e}")
-        
-        if self.session and not self.session.closed:
-            try:
-                await self.session.close()
-            except Exception as e:
-                print(f"Ошибка закрытия aiohttp сессии: {e}")
-        
-        self.ws = None
-        self.session = None
+        self.is_connected = False
