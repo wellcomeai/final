@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     
     # Голосовые настройки
     DEFAULT_VOICE: str = "alloy"
-    DEFAULT_SYSTEM_MESSAGE: str = "Ты полезный голосовой ассистент. Отвечай кратко и по делу на русском языке."
+    DEFAULT_SYSTEM_MESSAGE: str = "Ты полезный голосовой ассистент. Отвечай кратко и по делу на русском языке. ОБЯЗАТЕЛЬНО отвечай голосом, а не только текстом. Будь дружелюбным и говори естественно."
     
     # Модель для Realtime API
     DEFAULT_MODEL: str = "gpt-4o-realtime-preview-2024-10-01"
