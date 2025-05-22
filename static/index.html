@@ -315,7 +315,7 @@
                 audioStream.getTracks().forEach(track => track.stop());
             }
             
-            if (audioContext) {
+            if (audioContext && audioContext.state !== 'closed') {
                 await audioContext.close();
             }
             
@@ -381,6 +381,7 @@
             return new Promise((resolve, reject) => {
                 try {
                     const wsUrl = getWebSocketURL();
+                    console.log('Connecting to:', wsUrl);
                     ws = new WebSocket(wsUrl);
                     
                     ws.onopen = function() {
@@ -398,7 +399,8 @@
                         }
                     };
                     
-                    ws.onclose = function() {
+                    ws.onclose = function(event) {
+                        console.log('WebSocket closed:', event.code, event.reason);
                         updateStatus('Disconnected', 'disconnected');
                         isConnected = false;
                         if (isVoiceModeActive) {
