@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки - Голосовой Ассистент</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .status-ok {
+            border-left-color: #28a745;
+        }
+        .status-error {
+            border-left-color: #dc3545;
+        }
+        .status-label {
+            font-weight: bold;
+        }
+        .status-value {
+            color: #666;
+        }
+        .nav-links {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .nav-links a {
+            display: inline-block;
+            margin: 0 10px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .nav-links a:hover {
+            background: #0056b3;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Настройки Голосового Ассистента</h1>
+        
+        <div id="status-container">
+            <div class="loading">Загрузка статуса...</div>
+        </div>
+        
+        <div class="instructions">
+            <h3>Настройка API ключа OpenAI</h3>
+            <p>Для работы голосового ассистента необходим API ключ OpenAI:</p>
+            <ol>
+                <li>Перейдите на <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></li>
+                <li>Создайте новый API ключ</li>
+                <li>В настройках вашего хостинга (Render) добавьте переменную окружения <code>OPENAI_API_KEY</code> с этим ключом</li>
+                <li>Перезапустите сервис</li>
+            </ol>
+        </div>
+        
+        <div class="nav-links">
+            <a href="/">Главная</a>
+            <a href="#" onclick="checkStatus()">Обновить статус</a>
+        </div>
+    </div>
+
+    <script>
+        async function checkStatus() {
+            try {
+                document.getElementById('status-container').innerHTML = '<div class="loading">Проверка статуса...</div>';
+                
+                const response = await fetch('/health');
+                const health = await response.json();
+                
+                const configResponse = await fetch('/config');
+                const config = await configResponse.json();
+                
+                displayStatus(health, config);
+            } catch (error) {
+                document.getElementById('status-container').innerHTML = `
+                    <div class="status-item status-error">
+                        <span class="status-label">Ошибка:</span>
+                        <span class="status-value">${error.message}</span>
+                    </div>
+                `;
+            }
+        }
+        
+        function displayStatus(health, config) {
+            const statusContainer = document.getElementById('status-container');
+            
+            const apiKeyStatus = health.openai_configured ? 'status-ok' : 'status-error';
+            const apiKeyText = health.openai_configured ? 'Настроен' : 'НЕ НАСТРОЕН';
+            
+            statusContainer.innerHTML = `
+                <div class="status-item ${health.status === 'healthy' ? 'status-ok' : 'status-error'}">
+                    <span class="status-label">Статус сервиса:</span>
+                    <span class="status-value">${health.status}</span>
+                </div>
+                
+                <div class="status-item ${apiKeyStatus}">
+                    <span class="status-label">OpenAI API ключ:</span>
+                    <span class="status-value">${apiKeyText}</span>
+                </div>
+                
+                <div class="status-item">
+                    <span class="status-label">Модель:</span>
+                    <span class="status-value">${config.model}</span>
+                </div>
+                
+                <div class="status-item">
+                    <span class="status-label">Голос:</span>
+                    <span class="status-value">${config.voice}</span>
+                </div>
+                
+                <div class="status-item">
+                    <span class="status-label">Частота дискретизации:</span>
+                    <span class="status-value">${config.sample_rate} Hz</span>
+                </div>
+                
+                <div class="status-item">
+                    <span class="status-label">Функции:</span>
+                    <span class="status-value">${config.functions_enabled ? 'Включены' : 'Отключены'}</span>
+                </div>
+                
+                <div class="status-item">
+                    <span class="status-label">Версия:</span>
+                    <span class="status-value">${health.version}</span>
+                </div>
+            `;
+        }
+        
+        // Автоматически проверяем статус при загрузке
+        window.addEventListener('load', checkStatus);
+    </script>
+</body>
+</html>
