@@ -45,47 +45,74 @@ async def handle_websocket_connection(
         # Используем API ключ из переменной окружения
         api_key = settings.OPENAI_API_KEY
         
+        print(f"[DEBUG] API Key проверка: {'установлен' if api_key else 'НЕ УСТАНОВЛЕН'}")
+        print(f"[DEBUG] API Key длина: {len(api_key) if api_key else 0}")
+        
         if not api_key:
+            print(f"[ERROR] OPENAI_API_KEY отсутствует!")
             await websocket.send_json({
                 "type": "error",
-                "error": {"code": "no_api_key", "message": "Отсутствует ключ API OpenAI"}
+                "error": {"code": "no_api_key", "message": "Отсутствует ключ API OpenAI. Установите переменную окружения OPENAI_API_KEY."}
             })
             await websocket.close(code=1008)
             return
 
+        print(f"[DEBUG] Создание OpenAI клиента...")
+        
         # Подключаемся к OpenAI
         openai_client = OpenAIRealtimeClient(api_key, assistant_config, client_id)
-        if not await openai_client.connect():
+        
+        print(f"[DEBUG] Попытка подключения к OpenAI...")
+        connection_result = await openai_client.connect()
+        
+        print(f"[DEBUG] Результат подключения к OpenAI: {connection_result}")
+        
+        if not connection_result:
+            print(f"[ERROR] Не удалось подключиться к OpenAI API")
             await websocket.send_json({
                 "type": "error",
-                "error": {"code": "openai_connection_failed", "message": "Не удалось подключиться к OpenAI"}
+                "error": {"code": "openai_connection_failed", "message": "Не удалось подключиться к OpenAI API. Проверьте API ключ и интернет соединение."}
             })
             await websocket.close(code=1008)
             return
 
+        print(f"[SUCCESS] Успешное подключение к OpenAI!")
+        
         # Сообщаем клиенту об успешном подключении
-        await websocket.send_json({"type": "connection_status", "status": "connected", "message": "Соединение установлено"})
+        await websocket.send_json({
+            "type": "connection_status", 
+            "status": "connected", 
+            "message": "Соединение с голосовым ассистентом установлено"
+        })
 
         audio_buffer = bytearray()
         is_processing = False
 
+        print(f"[DEBUG] Запуск обработчика сообщений от OpenAI...")
+        
         # Запускаем приём сообщений от OpenAI
         openai_task = asyncio.create_task(handle_openai_messages(openai_client, websocket))
 
+        print(f"[DEBUG] Запуск основного цикла обработки клиентских сообщений...")
+        
         # Основной цикл приёма от клиента
         while True:
             try:
+                print(f"[DEBUG] Ожидание сообщения от клиента...")
                 message = await websocket.receive()
+                print(f"[DEBUG] Получено сообщение от клиента: {type(message)}")
 
                 if "text" in message:
                     data = json.loads(message["text"])
                     msg_type = data.get("type", "")
+                    print(f"[DEBUG] Тип сообщения: {msg_type}")
 
                     if msg_type == "ping":
                         await websocket.send_json({"type": "pong"})
                         continue
 
                     if msg_type == "input_audio_buffer.append":
+                        print(f"[DEBUG] Получен аудио чанк")
                         audio_chunk = base64_to_audio_buffer(data["audio"])
                         audio_buffer.extend(audio_chunk)
                         if openai_client.is_connected:
@@ -94,10 +121,12 @@ async def handle_websocket_connection(
                         continue
 
                     if msg_type == "input_audio_buffer.commit" and not is_processing:
+                        print(f"[DEBUG] Коммит аудио буфера, размер: {len(audio_buffer)} байт")
                         is_processing = True
                         
                         # Проверка минимального размера буфера
                         if not audio_buffer or len(audio_buffer) < 3200:  
+                            print(f"[WARNING] Аудио буфер слишком мал: {len(audio_buffer)} байт")
                             await websocket.send_json({
                                 "type": "warning",
                                 "warning": {"code": "audio_buffer_too_small", "message": "Аудио слишком короткое, попробуйте говорить дольше"}
@@ -107,9 +136,11 @@ async def handle_websocket_connection(
                             continue
 
                         if openai_client.is_connected:
+                            print(f"[DEBUG] Отправка аудио в OpenAI...")
                             await openai_client.commit_audio()
                             await websocket.send_json({"type": "input_audio_buffer.commit.ack", "event_id": data.get("event_id")})
                         else:
+                            print(f"[ERROR] OpenAI не подключен, попытка переподключения...")
                             # Пробуем восстановить соединение
                             if await openai_client.reconnect():
                                 await openai_client.commit_audio()
@@ -125,6 +156,7 @@ async def handle_websocket_connection(
                         continue
 
                     if msg_type == "input_audio_buffer.clear":
+                        print(f"[DEBUG] Очистка аудио буфера")
                         audio_buffer.clear()
                         if openai_client.is_connected:
                             await openai_client.clear_audio_buffer()
@@ -132,8 +164,9 @@ async def handle_websocket_connection(
                         continue
 
                     if msg_type == "response.cancel":
+                        print(f"[DEBUG] Отмена ответа")
                         if openai_client.is_connected:
-                            await openai_client.ws.send(json.dumps({
+                            await openai_client.ws.send_str(json.dumps({
                                 "type": "response.cancel",
                                 "event_id": data.get("event_id")
                             }))
@@ -141,35 +174,45 @@ async def handle_websocket_connection(
                         continue
 
                     # Любые остальные типы
+                    print(f"[WARNING] Неизвестный тип сообщения: {msg_type}")
                     await websocket.send_json({
                         "type": "error",
                         "error": {"code": "unknown_message_type", "message": f"Неизвестный тип сообщения: {msg_type}"}
                     })
 
                 elif "bytes" in message:
+                    print(f"[DEBUG] Получены raw байты: {len(message['bytes'])} байт")
                     # raw-байты от клиента
                     audio_buffer.extend(message["bytes"])
                     await websocket.send_json({"type": "binary.ack"})
 
             except (WebSocketDisconnect, ConnectionClosed):
+                print(f"[INFO] WebSocket отключен клиентом")
                 break
             except Exception as e:
-                print(f"Ошибка в цикле WebSocket: {e}")
+                print(f"[ERROR] Ошибка в цикле WebSocket: {e}")
+                print(f"[ERROR] Трассировка: {traceback.format_exc()}")
                 break
 
+        print(f"[DEBUG] Завершение основного цикла...")
+        
         # завершение
         if not openai_task.done():
             openai_task.cancel()
             await asyncio.sleep(0)
 
+    except Exception as e:
+        print(f"[ERROR] Критическая ошибка в handle_websocket_connection: {e}")
+        print(f"[ERROR] Трассировка: {traceback.format_exc()}")
     finally:
         if openai_client:
+            print(f"[DEBUG] Закрытие OpenAI клиента...")
             await openai_client.close()
         # убираем из active_connections
         conns = active_connections.get(assistant_id, [])
         if websocket in conns:
             conns.remove(websocket)
-        print(f"Удалено WebSocket соединение: client_id={client_id}")
+        print(f"[INFO] Удалено WebSocket соединение: client_id={client_id}")
 
 
 async def handle_openai_messages(openai_client: OpenAIRealtimeClient, websocket: WebSocket):
