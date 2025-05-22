@@ -1,13 +1,12 @@
 services:
   - type: web
-    name: voice-assistant
+    name: wellcome-ai
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
-        sync: false  # Устанавливаем в панели управления
+        sync: false
       - key: PORT
-        value: 10000
-      - key: LOG_LEVEL
-        value: info
+        value: 5050
+    plan: starter
