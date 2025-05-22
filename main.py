@@ -140,28 +140,59 @@ class OpenAIRealtimeClient:
             "model": "whisper-1"
         }
         
-        session_config = {
-            "type": "session.update",
-            "session": {
-                "turn_detection": turn_detection,
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "voice": "alloy",
-                "instructions": "You are a helpful voice assistant. Respond briefly and naturally.",
-                "modalities": ["text", "audio"],
-                "temperature": 0.7,
-                "max_response_output_tokens": 500,
-                "input_audio_transcription": input_audio_transcription
-            }
-        }
+        # Попробуем разные модели по порядку приоритета
+        models_to_try = [
+            "gpt-4o-realtime-preview-2024-10-01",
+            "gpt-4o-realtime-preview",
+            "gpt-4o-realtime",
+            "gpt-4-realtime-preview"
+        ]
         
-        try:
-            await self.ws.send(json.dumps(session_config))
-            logger.info(f"Сессия настроена для клиента {self.client_id}")
-            return True
-        except Exception as e:
-            logger.error(f"Ошибка настройки сессии: {e}")
-            return False
+        for model in models_to_try:
+            session_config = {
+                "type": "session.update",
+                "session": {
+                    "model": model,
+                    "turn_detection": turn_detection,
+                    "input_audio_format": "pcm16",
+                    "output_audio_format": "pcm16",
+                    "voice": "alloy",
+                    "instructions": "You are a helpful voice assistant. Respond briefly and naturally.",
+                    "modalities": ["text", "audio"],
+                    "temperature": 0.7,
+                    "max_response_output_tokens": 500,
+                    "input_audio_transcription": input_audio_transcription
+                }
+            }
+            
+            try:
+                logger.info(f"Пробуем модель: {model}")
+                await self.ws.send(json.dumps(session_config))
+                
+                # Ждем подтверждение настройки сессии
+                response = await asyncio.wait_for(self.ws.recv(), timeout=10)
+                response_data = json.loads(response)
+                
+                if response_data.get("type") == "session.updated":
+                    logger.info(f"Сессия успешно обновлена с моделью: {model}")
+                    return True
+                elif response_data.get("type") == "error":
+                    error_msg = response_data.get("error", {}).get("message", "Unknown error")
+                    logger.warning(f"Модель {model} недоступна: {error_msg}")
+                    continue  # Пробуем следующую модель
+                else:
+                    logger.warning(f"Неожиданный ответ при настройке сессии: {response_data}")
+                    return True  # Продолжаем работу
+                    
+            except asyncio.TimeoutError:
+                logger.warning(f"Таймаут при настройке с моделью {model}")
+                continue
+            except Exception as e:
+                logger.warning(f"Ошибка при настройке с моделью {model}: {e}")
+                continue
+        
+        logger.error("Не удалось настроить сессию ни с одной из доступных моделей")
+        return False
     
     async def send_audio(self, audio_data: bytes) -> bool:
         """Отправка аудио данных в OpenAI"""
