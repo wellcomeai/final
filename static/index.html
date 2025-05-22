@@ -237,9 +237,9 @@
         let isProcessing = false;
         
         // Настройки VAD (Voice Activity Detection)
-        const VAD_THRESHOLD = 0.02; // Порог обнаружения речи
-        const SILENCE_DURATION = 1500; // Время молчания для остановки записи (мс)
-        const MIN_RECORDING_TIME = 500; // Минимальное время записи (мс)
+        const VAD_THRESHOLD = 0.02;
+        const SILENCE_DURATION = 1500;
+        const MIN_RECORDING_TIME = 500;
         
         let silenceTimer = null;
         let recordingStartTime = null;
@@ -254,7 +254,6 @@
         
         // Автоматический запуск при загрузке страницы
         window.addEventListener('load', function() {
-            // Небольшая задержка для улучшения UX
             setTimeout(() => {
                 addToConversation('🤖 Welcome! Click "Start Voice Mode" to begin talking with your AI assistant.', 'system');
             }, 500);
@@ -279,12 +278,10 @@
         // Запуск голосового режима
         async function startVoiceMode() {
             try {
-                // Сначала запрашиваем доступ к микрофону
                 if (!await setupAudio()) {
                     return;
                 }
                 
-                // Затем подключаемся к WebSocket
                 if (!await connectWebSocket()) {
                     return;
                 }
@@ -293,9 +290,7 @@
                 toggleBtn.textContent = 'Stop Voice Mode';
                 toggleBtn.className = 'toggle-btn stop';
                 
-                // Запускаем мониторинг аудио
                 startAudioMonitoring();
-                
                 addToConversation('🎤 Voice mode activated. Start speaking naturally!', 'system');
                 
             } catch (error) {
@@ -308,22 +303,18 @@
         async function stopVoiceMode() {
             isVoiceModeActive = false;
             
-            // Останавливаем запись если активна
             if (isListening) {
                 stopRecording();
             }
             
-            // Закрываем WebSocket
             if (ws) {
                 ws.close();
             }
             
-            // Останавливаем аудио поток
             if (audioStream) {
                 audioStream.getTracks().forEach(track => track.stop());
             }
             
-            // Закрываем аудио контекст
             if (audioContext) {
                 await audioContext.close();
             }
@@ -339,7 +330,6 @@
         // Настройка аудио
         async function setupAudio() {
             try {
-                // Запрашиваем доступ к микрофону
                 audioStream = await navigator.mediaDevices.getUserMedia({
                     audio: {
                         sampleRate: 24000,
@@ -350,7 +340,6 @@
                     }
                 });
                 
-                // Настраиваем аудио контекст для анализа
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioContext.createAnalyser();
                 microphone = audioContext.createMediaStreamSource(audioStream);
@@ -359,7 +348,6 @@
                 analyser.smoothingTimeConstant = 0.3;
                 microphone.connect(analyser);
                 
-                // Настраиваем MediaRecorder
                 mediaRecorder = new MediaRecorder(audioStream, {
                     mimeType: 'audio/webm'
                 });
@@ -403,10 +391,8 @@
                     
                     ws.onmessage = function(event) {
                         if (event.data instanceof Blob) {
-                            // Воспроизводим полученное аудио
                             playAudio(event.data);
                         } else {
-                            // Обрабатываем JSON сообщения
                             const data = JSON.parse(event.data);
                             handleMessage(data);
                         }
@@ -426,7 +412,6 @@
                         reject(error);
                     };
                     
-                    // Таймаут подключения
                     setTimeout(() => {
                         if (!isConnected) {
                             reject(new Error('Connection timeout'));
@@ -451,27 +436,21 @@
                 
                 analyser.getByteFrequencyData(dataArray);
                 
-                // Вычисляем среднюю громкость
                 let sum = 0;
                 for (let i = 0; i < bufferLength; i++) {
                     sum += dataArray[i];
                 }
-                const average = sum / bufferLength / 255; // Нормализуем к [0, 1]
+                const average = sum / bufferLength / 255;
                 
-                // Обновляем индикатор громкости
                 updateVolumeIndicator(average);
                 
-                // Определяем наличие речи
                 const hasVoice = average > VAD_THRESHOLD;
                 
                 if (hasVoice && !isListening && !isProcessing) {
-                    // Начинаем запись
                     startRecording();
                 } else if (!hasVoice && isListening) {
-                    // Начинаем отсчет молчания
                     if (!silenceTimer) {
                         silenceTimer = setTimeout(() => {
-                            // Проверяем минимальное время записи
                             const recordingDuration = Date.now() - recordingStartTime;
                             if (recordingDuration >= MIN_RECORDING_TIME) {
                                 stopRecording();
@@ -479,12 +458,10 @@
                         }, SILENCE_DURATION);
                     }
                 } else if (hasVoice && isListening && silenceTimer) {
-                    // Отменяем таймер молчания если речь возобновилась
                     clearTimeout(silenceTimer);
                     silenceTimer = null;
                 }
                 
-                // Продолжаем мониторинг
                 requestAnimationFrame(monitor);
             }
             
@@ -494,7 +471,7 @@
         
         // Обновление индикатора громкости
         function updateVolumeIndicator(level) {
-            const percentage = Math.min(level * 300, 100); // Увеличиваем чувствительность
+            const percentage = Math.min(level * 300, 100);
             volumeLevel.style.width = percentage + '%';
         }
         
@@ -508,7 +485,7 @@
             
             if (mediaRecorder && mediaRecorder.state === 'inactive') {
                 audioChunks = [];
-                mediaRecorder.start(100); // Собираем данные каждые 100мс
+                mediaRecorder.start(100);
             }
         }
         
@@ -533,14 +510,11 @@
         // Обработка записанного аудио
         async function processAudio(audioBlob) {
             try {
-                // Конвертируем в PCM16 и отправляем
                 const arrayBuffer = await audioBlob.arrayBuffer();
                 const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
                 
-                // Конвертируем в PCM16
                 const pcm16Data = convertToPCM16(audioBuffer);
                 
-                // Отправляем аудио по частям
                 const chunkSize = 4096;
                 for (let i = 0; i < pcm16Data.length; i += chunkSize) {
                     const chunk = pcm16Data.slice(i, i + chunkSize);
@@ -555,7 +529,6 @@
                     }
                 }
                 
-                // Коммитим аудио
                 if (ws && ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({
                         type: 'input_audio_buffer.commit',
@@ -586,17 +559,13 @@
         // Воспроизведение аудио
         async function playAudio(audioBlob) {
             try {
-                // Создаем URL для аудио blob
                 const audioUrl = URL.createObjectURL(audioBlob);
                 const audio = new Audio(audioUrl);
                 
-                // Воспроизводим аудио
                 await audio.play();
                 
-                // Освобождаем URL после воспроизведения
                 audio.onended = () => {
                     URL.revokeObjectURL(audioUrl);
-                    // Возвращаемся в режим прослушивания
                     if (isVoiceModeActive) {
                         isProcessing = false;
                         updateStatus('Connected - Ready to listen', 'connected');
@@ -632,7 +601,6 @@
                     break;
                     
                 case 'response_completed':
-                    // Ответ завершен, можем снова слушать
                     if (isVoiceModeActive) {
                         isProcessing = false;
                         updateStatus('Connected - Ready to listen', 'connected');
