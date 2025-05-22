@@ -355,7 +355,7 @@ class OpenAIRealtimeClient:
             "threshold": 0.25,
             "prefix_padding_ms": 200,
             "silence_duration_ms": 300,
-            "create_response": True,
+            "create_response": True  # ВАЖНО: автоматически создавать ответ после речи
         }
         
         # Получаем нормализованные определения функций
@@ -393,8 +393,8 @@ class OpenAIRealtimeClient:
                 "output_audio_format": "pcm16",
                 "voice": voice,
                 "instructions": system_message,
-                "modalities": ["text", "audio"],
-                "temperature": 0.7,
+                "modalities": ["text", "audio"],  # ВАЖНО: оба режима
+                "temperature": 0.8,  # Повышаем температуру для более естественной речи
                 "max_response_output_tokens": 500,
                 "tools": tools,
                 "tool_choice": tool_choice,
