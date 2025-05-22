@@ -131,10 +131,10 @@ class OpenAIRealtimeClient:
         
         turn_detection = {
             "type": "server_vad",
-            "threshold": 0.25,
-            "prefix_padding_ms": 200,
-            "silence_duration_ms": 300,
-            "create_response": True
+            "threshold": 0.5,              # Увеличиваем порог для более надежного определения
+            "prefix_padding_ms": 300,      # Больше отступа в начале
+            "silence_duration_ms": 800,    # Больше времени ожидания тишины
+            "create_response": True        # Автоматически создавать ответ
         }
         
         input_audio_transcription = {
@@ -150,10 +150,10 @@ class OpenAIRealtimeClient:
                 "input_audio_format": "pcm16",
                 "output_audio_format": "pcm16",
                 "voice": "alloy",
-                "instructions": "You are a helpful voice assistant. Respond briefly and naturally.",
+                "instructions": "You are a helpful voice assistant. Respond briefly and naturally. Always respond when the user finishes speaking.",
                 "modalities": ["text", "audio"],
-                "temperature": 0.7,
-                "max_response_output_tokens": 500,
+                "temperature": 0.8,          # Увеличиваем для более естественных ответов
+                "max_response_output_tokens": 150,  # Ограничиваем для быстрых ответов
                 "input_audio_transcription": input_audio_transcription
             }
         }
@@ -286,6 +286,26 @@ class OpenAIRealtimeClient:
             logger.error(f"Ошибка отмены ответа: {e}")
             return False
     
+    async def create_response(self) -> bool:
+        """Принудительное создание ответа от ассистента"""
+        if not self.is_connected or not self.ws:
+            return False
+            
+        try:
+            await self.ws.send(json.dumps({
+                "type": "response.create",
+                "event_id": f"response_{time.time()}"
+            }))
+            logger.info("Создан принудительный запрос ответа")
+            return True
+        except ConnectionClosed:
+            logger.error("Соединение закрыто при создании ответа")
+            self.is_connected = False
+            return False
+        except Exception as e:
+            logger.error(f"Ошибка создания ответа: {e}")
+            return False
+    
     async def close(self) -> None:
         """Закрытие WebSocket соединения"""
         if self.ws:
@@ -399,6 +419,11 @@ async def handle_websocket_connection(websocket: WebSocket):
                         
                         if openai_client.is_connected:
                             await openai_client.commit_audio()
+                            
+                            # ДОБАВЛЯЕМ: Принудительно создаем ответ если VAD не сработал
+                            await asyncio.sleep(0.5)  # Небольшая пауза
+                            await openai_client.create_response()
+                            
                             await websocket.send_json({
                                 "type": "input_audio_buffer.commit.ack",
                                 "event_id": data.get("event_id")
@@ -500,6 +525,29 @@ async def handle_openai_messages(openai_client: OpenAIRealtimeClient, websocket:
                         "type": "user_transcript",
                         "transcript": transcript
                     })
+                    
+                elif msg_type == "input_audio_buffer.speech_started":
+                    logger.info("Обнаружено начало речи")
+                    await websocket.send_json({
+                        "type": "speech_started"
+                    })
+                    
+                elif msg_type == "input_audio_buffer.speech_stopped":
+                    logger.info("Обнаружено окончание речи")
+                    await websocket.send_json({
+                        "type": "speech_stopped"
+                    })
+                    
+                elif msg_type == "response.created":
+                    logger.info("OpenAI начал создавать ответ")
+                    await websocket.send_json({
+                        "type": "response_started"
+                    })
+                    
+                elif msg_type == "response.audio_transcript.delta":
+                    delta = response_data.get("delta", "")
+                    if delta:
+                        logger.info(f"Фрагмент ответа: '{delta}'")
                     
                 elif msg_type == "response.audio_transcript.done":
                     transcript = response_data.get("transcript", "")
