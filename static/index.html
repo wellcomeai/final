@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Голосовой Ассистент с WebRTC VAD</title>
+    <title>Голосовой Ассистент</title>
     <style>
         body { 
             font-family: Arial, sans-serif; 
@@ -35,7 +35,7 @@
         #micStatus.assistant-speaking { background-color: #2196F3; }
         #micStatus.disabled { background-color: #ccc; }
         
-        #status, #transcript { 
+        #status, #transcript, #debug { 
             margin: 20px 0; 
             padding: 15px; 
             border-radius: 8px;
@@ -52,6 +52,13 @@
             overflow-y: auto;
             line-height: 1.5;
         }
+        #debug {
+            background-color: #f0f0f0;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
         .message {
             margin-bottom: 15px;
             padding-bottom: 15px;
@@ -65,6 +72,15 @@
             color: #2196F3;
             font-weight: bold;
         }
+        .debug-toggle {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -75,8 +91,8 @@
     <div id="status">Инициализация...</div>
     <div id="transcript">История диалога появится здесь</div>
     
-    <!-- Подключаем WebRTC Voice Activity Detection (VAD) -->
-    <script src="https://cdn.jsdelivr.net/npm/voice-activity-detection@0.0.5/voice-activity-detection.min.js"></script>
+    <button class="debug-toggle" onclick="toggleDebug()">Показать/скрыть отладку</button>
+    <div id="debug" style="display: none;">Логи отладки появятся здесь</div>
     
     <script>
         let socket;
@@ -89,20 +105,26 @@
         let isSpeaking = false;
         let isAssistantSpeaking = false;
         let assistantAudio = null;
-        let vad = null;
-        
-        // Время, после которого мы считаем, что пользователь закончил говорить (мс)
-        const SILENCE_DURATION = 1500;
-        let silenceTimer = null;
-        
-        // Время игнорирования звуков после остановки воспроизведения (мс)
-        const IGNORE_AUDIO_AFTER_STOP = 500;
-        let lastAudioStopTime = 0;
         
         // Элементы страницы
         const micStatusDiv = document.getElementById('micStatus');
         const statusDiv = document.getElementById('status');
         const transcriptDiv = document.getElementById('transcript');
+        const debugDiv = document.getElementById('debug');
+        
+        // Функция отладки
+        function log(message, level = 'INFO') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] [${level}] ${message}`;
+            console.log(logMessage);
+            
+            debugDiv.innerHTML += logMessage + '\n';
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+        
+        function toggleDebug() {
+            debugDiv.style.display = debugDiv.style.display === 'none' ? 'block' : 'none';
+        }
         
         // Нажатие на индикатор микрофона для ручного включения/выключения
         micStatusDiv.addEventListener('click', toggleListening);
@@ -111,36 +133,41 @@
         window.addEventListener('load', init);
         
         async function init() {
+            log('Инициализация приложения');
             connectWebSocket();
             await setupAudioProcessing();
         }
         
         function toggleListening() {
-            if (!isConnected || !stream) return;
+            if (!isConnected || !stream) {
+                log('Нельзя переключить прослушивание: нет соединения или стрима', 'WARN');
+                return;
+            }
             
             if (isListening) {
-                // Если слушаем, останавливаем
                 stopListening();
                 micStatusDiv.textContent = 'Нажмите для начала';
                 statusDiv.textContent = 'Режим ожидания';
+                log('Прослушивание остановлено пользователем');
             } else {
-                // Если не слушаем, начинаем
                 startListening();
                 micStatusDiv.textContent = 'Говорите';
                 statusDiv.textContent = 'Готов к общению!';
+                log('Прослушивание запущено пользователем');
             }
         }
         
         // Функция подключения к WebSocket
         function connectWebSocket() {
-            // В продакшене замените на адрес вашего сервера
-            // Для локальной разработки используйте "ws://localhost:8000/ws/demo"
             const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${wsProtocol}//${window.location.host}/ws/demo`;
+            
+            log(`Подключение к WebSocket: ${wsUrl}`);
             
             socket = new WebSocket(wsUrl);
             
             socket.onopen = function() {
+                log('WebSocket соединение открыто');
                 statusDiv.textContent = 'Соединение установлено';
                 isConnected = true;
                 micStatusDiv.textContent = 'Подготовка...';
@@ -148,36 +175,41 @@
             
             socket.onmessage = function(event) {
                 if (event.data instanceof Blob) {
+                    log('Получено аудио от ассистента');
                     // Воспроизводим аудио от ассистента
                     playAssistantAudio(event.data);
                 } else {
                     // Обрабатываем JSON сообщения
                     const data = JSON.parse(event.data);
-                    console.log('Сообщение:', data.type);
+                    log(`Получено сообщение: ${data.type}`);
                     
                     // Обработка статуса соединения
                     if (data.type === 'connection_status' && data.status === 'connected') {
                         statusDiv.textContent = 'Готов к общению!';
                         micStatusDiv.textContent = 'Говорите';
-                        startListening();
+                        log('Соединение с ассистентом установлено');
+                        // Автоматически не начинаем слушать, ждем клика пользователя
                     }
                     
                     // Обработка транскрипций
                     if (data.type === 'conversation.item.input_audio_transcription.completed' && data.transcript) {
                         addToTranscript('user', data.transcript);
+                        log(`Транскрипция пользователя: ${data.transcript}`);
                     } else if (data.type === 'response.audio_transcript.done' && data.transcript) {
                         addToTranscript('assistant', data.transcript);
+                        log(`Транскрипция ассистента: ${data.transcript}`);
                     }
                     
                     // Обработка ошибок
                     if (data.type === 'error') {
                         statusDiv.textContent = `Ошибка: ${data.error.message}`;
-                        console.error('Ошибка:', data.error);
+                        log(`Ошибка: ${data.error.message}`, 'ERROR');
                     }
                 }
             };
             
-            socket.onclose = function() {
+            socket.onclose = function(event) {
+                log(`WebSocket соединение закрыто: код ${event.code}, причина: ${event.reason}`, 'WARN');
                 statusDiv.textContent = 'Соединение закрыто. Перезагрузите страницу.';
                 isConnected = false;
                 micStatusDiv.textContent = 'Отключено';
@@ -186,8 +218,8 @@
             };
             
             socket.onerror = function(error) {
+                log(`WebSocket ошибка: ${error}`, 'ERROR');
                 statusDiv.textContent = `Ошибка соединения`;
-                console.error('WebSocket ошибка:', error);
             };
         }
         
@@ -211,68 +243,26 @@
             }
         }
         
-        // Настройка аудио обработки и WebRTC VAD
+        // Настройка аудио обработки
         async function setupAudioProcessing() {
             try {
+                log('Запрос доступа к микрофону');
                 stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: { 
                         echoCancellation: true,
                         noiseSuppression: true,
-                        autoGainControl: true
+                        autoGainControl: true,
+                        sampleRate: 24000
                     } 
                 });
                 
-                // Создаем AudioContext для WebRTC VAD
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Опции для VAD
-                const vadOptions = {
-                    audioContext: audioContext,
-                    source: audioContext.createMediaStreamSource(stream),
-                    voice_stop: function() {
-                        console.log('VAD: Голос остановлен');
-                        // Если мы в процессе записи, останавливаем через небольшую задержку
-                        if (isSpeaking && !silenceTimer) {
-                            silenceTimer = setTimeout(() => {
-                                stopRecording();
-                                silenceTimer = null;
-                            }, SILENCE_DURATION);
-                        }
-                    },
-                    voice_start: function() {
-                        console.log('VAD: Голос обнаружен');
-                        
-                        // Игнорируем звуки сразу после остановки воспроизведения
-                        const now = Date.now();
-                        if (now - lastAudioStopTime < IGNORE_AUDIO_AFTER_STOP) {
-                            return;
-                        }
-                        
-                        // Если ассистент говорит, прерываем его
-                        if (isAssistantSpeaking) {
-                            interruptAssistant();
-                        }
-                        
-                        // Сбрасываем таймер тишины
-                        if (silenceTimer) {
-                            clearTimeout(silenceTimer);
-                            silenceTimer = null;
-                        }
-                        
-                        // Начинаем запись, если еще не начали
-                        if (isListening && !isSpeaking) {
-                            startRecording();
-                        }
-                    }
-                };
-                
-                // Инициализируем VAD
-                vad = new VAD(vadOptions);
-                
                 statusDiv.textContent = 'Микрофон подключен';
+                log('Микрофон подключен успешно');
                 
             } catch (error) {
-                console.error('Ошибка доступа к микрофону:', error);
+                log(`Ошибка доступа к микрофону: ${error}`, 'ERROR');
                 statusDiv.textContent = `Нет доступа к микрофону`;
                 micStatusDiv.textContent = 'Нет доступа';
                 micStatusDiv.classList.add('disabled');
@@ -281,27 +271,21 @@
         
         // Функция начала прослушивания
         function startListening() {
-            if (!isConnected || !stream || isListening) return;
-            
-            isListening = true;
-            
-            // Если используем VAD, включаем его
-            if (vad) {
-                vad.connect();
+            if (!isConnected || !stream || isListening) {
+                log('Нельзя начать прослушивание', 'WARN');
+                return;
             }
             
+            log('Начало прослушивания');
+            isListening = true;
             micStatusDiv.textContent = 'Говорите';
             statusDiv.textContent = 'Готов к общению!';
         }
         
         // Функция остановки прослушивания
         function stopListening() {
+            log('Остановка прослушивания');
             isListening = false;
-            
-            // Останавливаем VAD
-            if (vad) {
-                vad.disconnect();
-            }
             
             // Если запись активна, останавливаем её
             if (isSpeaking) {
@@ -311,7 +295,7 @@
         
         // Функция прерывания ответа ассистента
         function interruptAssistant() {
-            console.log('Прерываем ассистента');
+            log('Прерывание ассистента');
             
             // Останавливаем воспроизведение
             if (assistantAudio && !assistantAudio.paused) {
@@ -325,7 +309,7 @@
                     type: "response.cancel",
                     event_id: `cancel_${Date.now()}`
                 }));
-                console.log('Отправлена команда отмены ответа');
+                log('Отправлена команда отмены ответа');
             }
             
             isAssistantSpeaking = false;
@@ -335,9 +319,13 @@
         
         // Функция начала записи
         function startRecording() {
-            if (!isConnected || isSpeaking) return;
+            if (!isConnected || isSpeaking) {
+                log('Нельзя начать запись', 'WARN');
+                return;
+            }
             
             try {
+                log('Начало записи');
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
                 
@@ -355,6 +343,7 @@
                                     audio: base64Audio,
                                     event_id: `audio_${Date.now()}`
                                 }));
+                                log('Отправлен аудио чанк');
                             }
                         };
                         reader.readAsDataURL(event.data);
@@ -367,8 +356,9 @@
                 micStatusDiv.classList.remove('assistant-speaking');
                 micStatusDiv.textContent = 'Слушаю...';
                 statusDiv.textContent = 'Слушаю вас...';
+                log('Запись началась');
             } catch (error) {
-                console.error('Ошибка начала записи:', error);
+                log(`Ошибка начала записи: ${error}`, 'ERROR');
                 statusDiv.textContent = `Ошибка записи голоса`;
             }
         }
@@ -376,6 +366,7 @@
         // Функция остановки записи
         function stopRecording() {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                log('Остановка записи');
                 mediaRecorder.stop();
                 
                 // Отправляем команду завершения ввода
@@ -384,13 +375,10 @@
                         type: "input_audio_buffer.commit",
                         event_id: `commit_${Date.now()}`
                     }));
+                    log('Отправлена команда commit');
                 }
                 
                 isSpeaking = false;
-                if (silenceTimer) {
-                    clearTimeout(silenceTimer);
-                    silenceTimer = null;
-                }
                 
                 micStatusDiv.classList.remove('listening');
                 micStatusDiv.textContent = 'Обрабатываю...';
@@ -400,6 +388,7 @@
         
         // Функция воспроизведения аудио от ассистента
         function playAssistantAudio(audioBlob) {
+            log('Воспроизведение аудио ассистента');
             // Отмечаем, что ассистент начал говорить
             isAssistantSpeaking = true;
             micStatusDiv.classList.add('assistant-speaking');
@@ -410,23 +399,48 @@
             assistantAudio = new Audio(audioUrl);
             
             assistantAudio.onended = function() {
+                log('Воспроизведение завершено');
                 URL.revokeObjectURL(audioUrl);
                 isAssistantSpeaking = false;
                 micStatusDiv.classList.remove('assistant-speaking');
                 micStatusDiv.textContent = 'Говорите';
                 statusDiv.textContent = 'Готов к общению!';
-                
-                // Запоминаем время остановки аудио для предотвращения ложных срабатываний
-                lastAudioStopTime = Date.now();
             };
             
             assistantAudio.onpause = function() {
-                // Запоминаем время остановки аудио для предотвращения ложных срабатываний
-                lastAudioStopTime = Date.now();
+                log('Воспроизведение приостановлено');
             };
             
             assistantAudio.play();
         }
+        
+        // Обработчики для клавиатуры
+        document.addEventListener('keydown', function(event) {
+            // Пробел для начала/остановки записи
+            if (event.code === 'Space' && !event.repeat) {
+                event.preventDefault();
+                if (isListening && !isSpeaking) {
+                    startRecording();
+                }
+            }
+        });
+        
+        document.addEventListener('keyup', function(event) {
+            // Отпускание пробела для остановки записи
+            if (event.code === 'Space') {
+                event.preventDefault();
+                if (isSpeaking) {
+                    stopRecording();
+                }
+            }
+        });
+        
+        // Показываем инструкции пользователю
+        setTimeout(() => {
+            if (isConnected) {
+                statusDiv.innerHTML = 'Нажмите на кружок или используйте пробел для записи голоса';
+            }
+        }, 3000);
     </script>
 </body>
 </html>
