@@ -3,266 +3,272 @@ import json
 import uuid
 import base64
 import time
-import httpx
 import websockets
-import socket
+import re
 from websockets.exceptions import ConnectionClosed
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Optional, List, Dict, Any, Union, AsyncGenerator
 
 from config import settings
 
-class SimpleOpenAIClient:
-    """Упрощенный клиент для работы с OpenAI Realtime API через WebSockets"""
+DEFAULT_VOICE = "alloy"
+DEFAULT_SYSTEM_MESSAGE = "Ты полезный голосовой ассистент. Отвечай кратко и по делу на русском языке."
+
+def normalize_function_name(name: str) -> Optional[str]:
+    """Нормализует имя функции к стандартному формату"""
+    if not name:
+        return None
     
-    def __init__(self, api_key: Optional[str] = None, assistant_config: Optional[Dict] = None):
-        self.api_key = api_key or settings.OPENAI_API_KEY
-        self.assistant_config = assistant_config or settings.DEFAULT_ASSISTANT_CONFIG
-        self.client_id = str(uuid.uuid4())
-        self.ws = None
-        self.is_connected = False
-        self.session_id = None
-        self.current_response_id = None
-        self.session_token = None
-        
-        # Простой список разрешенных функций
-        self.enabled_functions = []
-        if "functions" in self.assistant_config:
-            self.enabled_functions = [f.get("name") for f in self.assistant_config["functions"] if f.get("name")]
+    # Убираем пробелы и приводим к нижнему регистру
+    normalized = name.strip().lower()
+    
+    # Заменяем пробелы и дефисы на подчеркивания
+    normalized = re.sub(r'[-\s]+', '_', normalized)
+    
+    # Убираем все символы кроме букв, цифр и подчеркиваний
+    normalized = re.sub(r'[^a-zA-Z0-9_]', '', normalized)
+    
+    return normalized if normalized else None
 
-    async def resolve_hostname(self, hostname: str) -> List[Tuple[str, str]]:
-        """Вспомогательная функция для резолвинга IP-адресов по имени хоста"""
-        try:
-            # Получаем информацию о хосте
-            result = []
-            addr_info = socket.getaddrinfo(hostname, 443, family=socket.AF_INET, 
-                                         type=socket.SOCK_STREAM)
-            
-            for family, socktype, proto, canonname, sockaddr in addr_info:
-                ip, port = sockaddr
-                result.append((ip, canonname or hostname))
-                
-            return result
-        except socket.gaierror as e:
-            print(f"Ошибка резолвинга {hostname}: {e}")
-            return []
-
-    async def create_session(self) -> bool:
-        """Создает сессию в OpenAI Realtime API через REST запрос"""
-        if not self.api_key:
-            print("OpenAI API key не предоставлен")
-            return False
-            
-        try:
-            # Получаем настройки
-            voice = self.assistant_config.get("voice", settings.DEFAULT_VOICE)
-            system_message = self.assistant_config.get("system_prompt", settings.DEFAULT_SYSTEM_MESSAGE)
-            model = self.assistant_config.get("model", settings.DEFAULT_MODEL)
-            
-            print(f"Создание сессии с моделью {model}, голосом {voice}")
-            
-            # Подготавливаем данные для запроса на создание сессии
-            session_data = {
-                "model": model,
-                "modalities": ["audio", "text"],
-                "instructions": system_message,
-                "voice": voice,
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "input_audio_transcription": {
-                    "model": "whisper-1"
+def normalize_functions(assistant_functions):
+    """
+    Преобразует список функций из UI в полные определения с параметрами.
+    """
+    if not assistant_functions:
+        return []
+    
+    # Извлекаем имена функций
+    enabled_names = []
+    
+    # Обработка формата {"enabled_functions": [...]}
+    if isinstance(assistant_functions, dict) and "enabled_functions" in assistant_functions:
+        enabled_names = [normalize_function_name(name) for name in assistant_functions.get("enabled_functions", [])]
+    # Обработка списка объектов из UI
+    else:
+        enabled_names = [normalize_function_name(func.get("name")) for func in assistant_functions if func.get("name")]
+    
+    # Базовые определения функций
+    function_definitions = {
+        "send_webhook": {
+            "name": "send_webhook",
+            "description": "Отправляет данные на webhook URL для интеграции с внешними системами",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL вебхука для отправки данных"
+                    },
+                    "event": {
+                        "type": "string", 
+                        "description": "Тип события или действия"
+                    },
+                    "data": {
+                        "type": "object",
+                        "description": "Данные для отправки"
+                    }
                 },
-                "turn_detection": {
-                    "type": "server_vad",
-                    "threshold": 0.25,
-                    "prefix_padding_ms": 200,
-                    "silence_duration_ms": 300,
-                    "create_response": True,
+                "required": ["url", "event"]
+            }
+        }
+    }
+    
+    # Возвращаем определения для включенных функций
+    result = []
+    for name in enabled_names:
+        if name and name in function_definitions:
+            result.append(function_definitions[name])
+    
+    return result
+
+def extract_webhook_url_from_prompt(prompt: str) -> Optional[str]:
+    """Извлекает URL вебхука из системного промпта ассистента."""
+    if not prompt:
+        return None
+        
+    # Ищем URL с помощью регулярного выражения
+    pattern1 = r'URL\s+(?:вебхука|webhook):\s*(https?://[^\s"\'<>]+)'
+    pattern2 = r'(?:вебхука|webhook)\s+URL:\s*(https?://[^\s"\'<>]+)'
+    pattern3 = r'https?://[^\s"\'<>]+'
+    
+    for pattern in [pattern1, pattern2, pattern3]:
+        matches = re.findall(pattern, prompt, re.IGNORECASE)
+        if matches:
+            return matches[0]
+            
+    return None
+
+def generate_short_id(prefix: str = "") -> str:
+    """Генерирует короткий уникальный идентификатор длиной до 32 символов."""
+    raw_id = str(uuid.uuid4()).replace("-", "")
+    max_id_len = 32 - len(prefix)
+    return f"{prefix}{raw_id[:max_id_len]}"
+
+async def execute_function(name: str, arguments: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Выполняет функцию по имени с переданными аргументами.
+    """
+    try:
+        if name == "send_webhook":
+            # Импортируем httpx для отправки HTTP запросов
+            import httpx
+            
+            url = arguments.get("url")
+            event = arguments.get("event", "unknown")
+            data = arguments.get("data", {})
+            
+            if not url:
+                return {
+                    "error": "URL not provided",
+                    "status": "error"
                 }
+            
+            # Подготавливаем данные для отправки
+            payload = {
+                "event": event,
+                "data": data,
+                "timestamp": time.time()
             }
             
-            # Добавляем функции, если они есть
-            if self.assistant_config.get("functions"):
-                tools = []
-                for func in self.assistant_config["functions"]:
-                    if "name" in func and "description" in func and "parameters" in func:
-                        tools.append({
-                            "type": "function",
-                            "name": func["name"],
-                            "description": func["description"],
-                            "parameters": func["parameters"]
-                        })
-                
-                if tools:
-                    session_data["tools"] = tools
-                    session_data["tool_choice"] = "auto"
-            
-            # Делаем запрос на создание сессии
-            print(f"Отправка запроса на: {settings.REALTIME_SESSION_URL}")
-            
-            # Пробуем предварительно разрешить домен
-            api_host = "api.openai.com"
-            resolved_ips = await self.resolve_hostname(api_host)
-            if resolved_ips:
-                for ip, name in resolved_ips:
-                    print(f"✓ Успешно разрешен {api_host} -> {ip}")
-            else:
-                print(f"⚠ Не удалось разрешить {api_host}")
-            
+            # Отправляем POST запрос
             async with httpx.AsyncClient() as client:
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "OpenAI-Beta": "realtime=v1"
-                }
-                
                 try:
                     response = await client.post(
-                        settings.REALTIME_SESSION_URL,
-                        headers=headers,
-                        json=session_data,
-                        timeout=30.0
+                        url,
+                        json=payload,
+                        timeout=10.0
                     )
                     
-                    if response.status_code != 200:
-                        print(f"Ошибка создания сессии: {response.status_code} {response.text}")
-                        return False
-                    
-                    session_info = response.json()
-                    if "client_secret" not in session_info or not session_info["client_secret"].get("value"):
-                        print("Не удалось получить токен сессии")
-                        return False
-                    
-                    self.session_token = session_info["client_secret"]["value"]
-                    self.session_id = session_info["id"]
-                    
-                    print(f"Сессия создана успешно, получен токен: {self.session_token[:10]}...")
-                    return True
-                    
-                except httpx.ConnectError as e:
-                    print(f"Ошибка подключения к API OpenAI: {e}")
-                    # Проверяем прямое подключение по IP, если домен разрешен
-                    if resolved_ips:
-                        ip = resolved_ips[0][0]
-                        print(f"Пробуем подключиться напрямую к IP: {ip}")
-                        try:
-                            # Создаем URL с IP-адресом
-                            direct_url = f"https://{ip}/v1/realtime/sessions"
-                            headers["Host"] = api_host  # Важно добавить заголовок Host
-                            
-                            response = await client.post(
-                                direct_url,
-                                headers=headers,
-                                json=session_data,
-                                timeout=30.0
-                            )
-                            
-                            if response.status_code != 200:
-                                print(f"Ошибка создания сессии по IP: {response.status_code} {response.text}")
-                                return False
-                            
-                            session_info = response.json()
-                            if "client_secret" not in session_info or not session_info["client_secret"].get("value"):
-                                print("Не удалось получить токен сессии (IP)")
-                                return False
-                            
-                            self.session_token = session_info["client_secret"]["value"]
-                            self.session_id = session_info["id"]
-                            
-                            print(f"Сессия создана успешно через прямой IP, получен токен: {self.session_token[:10]}...")
-                            return True
-                            
-                        except Exception as inner_e:
-                            print(f"Ошибка подключения по IP: {inner_e}")
-                            return False
-                    return False
-                
-        except Exception as e:
-            print(f"Ошибка создания сессии OpenAI: {e}")
-            return False
+                    return {
+                        "status": response.status_code,
+                        "success": response.status_code < 400,
+                        "response": response.text[:500],  # Ограничиваем размер ответа
+                        "message": f"Webhook sent successfully with status {response.status_code}"
+                    }
+                except httpx.RequestError as e:
+                    return {
+                        "error": str(e),
+                        "status": "error",
+                        "success": False
+                    }
+        else:
+            return {
+                "error": f"Unknown function: {name}",
+                "status": "error"
+            }
+            
+    except Exception as e:
+        return {
+            "error": str(e),
+            "status": "error"
+        }
+
+class OpenAIRealtimeClient:
+    """
+    Клиент для взаимодействия с OpenAI Realtime API через WebSockets.
+    Обрабатывает голосовые взаимодействия, вызовы функций и отслеживание разговоров.
+    """
+    
+    def __init__(self, api_key: str, assistant_config: Dict[str, Any], client_id: str):
+        """
+        Инициализация клиента OpenAI Realtime.
+        
+        Args:
+            api_key: OpenAI API ключ
+            assistant_config: Конфигурация ассистента
+            client_id: Уникальный идентификатор клиента
+        """
+        self.api_key = api_key
+        self.assistant_config = assistant_config
+        self.client_id = client_id
+        self.ws = None
+        self.is_connected = False
+        self.openai_url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
+        self.session_id = str(uuid.uuid4())
+        self.current_response_id = None
+        self.webhook_url = None
+        self.last_function_name = None
+        self.enabled_functions = []
+        
+        # Извлекаем список разрешенных функций
+        functions = assistant_config.get("functions", [])
+        if isinstance(functions, list):
+            self.enabled_functions = [normalize_function_name(f.get("name")) for f in functions if f.get("name")]
+        elif isinstance(functions, dict) and "enabled_functions" in functions:
+            self.enabled_functions = [normalize_function_name(name) for name in functions.get("enabled_functions", [])]
+        
+        print(f"Извлечены разрешенные функции: {self.enabled_functions}")
+        
+        # Извлекаем URL вебхука из промпта только если функция send_webhook разрешена
+        if "send_webhook" in self.enabled_functions:
+            system_prompt = assistant_config.get("system_prompt", "")
+            self.webhook_url = extract_webhook_url_from_prompt(system_prompt)
+            if self.webhook_url:
+                print(f"Извлечен URL вебхука из промпта: {self.webhook_url}")
 
     async def connect(self) -> bool:
-        """Устанавливает WebSocket соединение с OpenAI Realtime API"""
+        """
+        Устанавливает WebSocket соединение с OpenAI Realtime API
+        и сразу отправляет актуальные настройки сессии.
+        
+        Returns:
+            bool: True если соединение успешно, False иначе
+        """
         if not self.api_key:
             print("OpenAI API key не предоставлен")
             return False
 
+        headers = [
+            ("Authorization", f"Bearer {self.api_key}"),
+            ("OpenAI-Beta", "realtime=v1"),
+            ("User-Agent", "WellcomeAI/1.0")
+        ]
+        
         try:
-            # Сначала создаем сессию через REST API
-            if not await self.create_session():
-                print("Не удалось создать сессию")
+            self.ws = await asyncio.wait_for(
+                websockets.connect(
+                    self.openai_url,
+                    extra_headers=headers,
+                    max_size=15*1024*1024,
+                    ping_interval=30,
+                    ping_timeout=120,
+                    close_timeout=15
+                ),
+                timeout=30
+            )
+            self.is_connected = True
+            print(f"Подключено к OpenAI для клиента {self.client_id}")
+
+            # Получаем свежие настройки из assistant_config
+            voice = self.assistant_config.get("voice", DEFAULT_VOICE)
+            system_message = self.assistant_config.get("system_prompt", DEFAULT_SYSTEM_MESSAGE)
+            functions = self.assistant_config.get("functions", [])
+            
+            # Обновляем список разрешенных функций
+            if functions:
+                if isinstance(functions, list):
+                    self.enabled_functions = [normalize_function_name(f.get("name")) for f in functions if f.get("name")]
+                elif isinstance(functions, dict) and "enabled_functions" in functions:
+                    self.enabled_functions = [normalize_function_name(name) for name in functions.get("enabled_functions", [])]
+                
+                print(f"Обновлены разрешенные функции: {self.enabled_functions}")
+
+            # Проверяем URL вебхука в промпте, только если функция send_webhook разрешена
+            if "send_webhook" in self.enabled_functions:
+                self.webhook_url = extract_webhook_url_from_prompt(system_message)
+                if self.webhook_url:
+                    print(f"Извлечен URL вебхука из промпта: {self.webhook_url}")
+
+            # Отправляем обновленные настройки сессии
+            if not await self.update_session(
+                voice=voice,
+                system_message=system_message,
+                functions=functions
+            ):
+                print("Не удалось обновить настройки сессии")
+                await self.close()
                 return False
-                
-            # Пробуем несколько вариантов URL для WebSocket соединения
-            # Варианты URL для подключения
-            ws_urls = [
-                "wss://realtime.api.openai.com/v1/audio/speech",
-                "wss://realtime.api.openai.com/v1/audio/speech/",
-                "wss://realtime.api.openai.com/v1"
-            ]
-            
-            # Пробуем разрешить домен WebSocket
-            ws_host = "realtime.api.openai.com"
-            resolved_ips = await self.resolve_hostname(ws_host)
-            if resolved_ips:
-                for ip, name in resolved_ips:
-                    print(f"✓ Успешно разрешен {ws_host} -> {ip}")
-                    # Добавляем URL с прямым IP
-                    ws_urls.append(f"wss://{ip}/v1/audio/speech")
-            else:
-                print(f"⚠ Не удалось разрешить {ws_host}, используем только доменное имя")
-            
-            # Пробуем подключиться через proxy.hf.space (Hugging Face) для обхода ограничений Render
-            ws_urls.append("wss://proxy.hf.space/proxy/openai/realtime/v1/audio/speech")
-            
-            # Перебираем все URL и пробуем подключиться
-            last_error = None
-            for ws_url in ws_urls:
-                print(f"Попытка подключения к WebSocket: {ws_url}")
-                
-                # Подключаемся через WebSocket, используя полученный токен сессии
-                headers = [
-                    ("Authorization", f"Bearer {self.session_token}"),
-                    ("OpenAI-Beta", "realtime=v1"),
-                    ("User-Agent", "MiniVoiceAssistant/1.0")
-                ]
-                
-                # Если используем прямой IP, добавляем заголовок Host
-                if ws_url.replace("wss://", "").startswith(("192.", "10.", "172.")):
-                    headers.append(("Host", ws_host))
-                
-                try:
-                    self.ws = await asyncio.wait_for(
-                        websockets.connect(
-                            ws_url,
-                            extra_headers=headers,
-                            max_size=15*1024*1024,
-                            ping_interval=30,
-                            ping_timeout=120,
-                            close_timeout=15
-                        ),
-                        timeout=10  # Уменьшаем таймаут для каждой попытки
-                    )
-                    self.is_connected = True
-                    print(f"Подключено к OpenAI для клиента {self.client_id} через {ws_url}")
-                    
-                    # Ждем первого сообщения от сервера (должно быть session.created)
-                    try:
-                        first_message = await asyncio.wait_for(self.ws.recv(), timeout=5.0)
-                        print(f"Получено первое сообщение от сервера: {first_message[:100]}...")
-                    except asyncio.TimeoutError:
-                        print("Таймаут при ожидании первого сообщения от сервера")
-                    except Exception as e:
-                        print(f"Ошибка при получении первого сообщения: {e}")
-                    
-                    return True
-                except Exception as e:
-                    last_error = e
-                    print(f"Не удалось подключиться через {ws_url}: {e}")
-                    continue
-            
-            print(f"Все попытки подключения к WebSocket завершились неудачно. Последняя ошибка: {last_error}")
-            return False
-            
+
+            return True
         except asyncio.TimeoutError:
             print(f"Таймаут подключения к OpenAI для клиента {self.client_id}")
             return False
@@ -270,14 +276,51 @@ class SimpleOpenAIClient:
             print(f"Ошибка подключения к OpenAI: {e}")
             return False
 
-    async def update_session(self, voice: str = None, system_message: str = None) -> bool:
-        """Обновляет настройки сессии на стороне OpenAI Realtime API"""
+    async def reconnect(self) -> bool:
+        """
+        Пытается переподключиться к OpenAI Realtime API после потери соединения.
+        
+        Returns:
+            bool: True если переподключение успешно, False иначе
+        """
+        print(f"Попытка переподключения к OpenAI для клиента {self.client_id}")
+        try:
+            # Закрываем старое соединение, если оно ещё существует
+            if self.ws:
+                try:
+                    await self.ws.close()
+                except:
+                    pass
+            
+            self.is_connected = False
+            self.ws = None
+            
+            # Подключаемся заново
+            return await self.connect()
+        except Exception as e:
+            print(f"Ошибка при переподключении к OpenAI: {e}")
+            return False
+
+    async def update_session(
+        self,
+        voice: str = DEFAULT_VOICE,
+        system_message: str = DEFAULT_SYSTEM_MESSAGE,
+        functions: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
+    ) -> bool:
+        """
+        Обновляет настройки сессии на стороне OpenAI Realtime API.
+        
+        Args:
+            voice: Голос для синтеза речи
+            system_message: Системные инструкции для ассистента
+            functions: Список функций или словарь с enabled_functions
+            
+        Returns:
+            bool: True если обновление успешно, False иначе
+        """
         if not self.is_connected or not self.ws:
             print("Невозможно обновить сессию: нет подключения")
             return False
-            
-        voice = voice or settings.DEFAULT_VOICE
-        system_message = system_message or settings.DEFAULT_SYSTEM_MESSAGE
             
         turn_detection = {
             "type": "server_vad",
@@ -287,7 +330,33 @@ class SimpleOpenAIClient:
             "create_response": True,
         }
         
-        # Упрощенные настройки без функций для минимальной версии
+        # Получаем нормализованные определения функций
+        normalized_functions = normalize_functions(functions)
+        
+        # Формируем tools для API
+        tools = []
+        for func_def in normalized_functions:
+            tools.append({
+                "type": "function",
+                "name": func_def["name"],
+                "description": func_def["description"],
+                "parameters": func_def["parameters"]
+            })
+        
+        # Обновляем список разрешенных функций на основе tools
+        self.enabled_functions = [normalize_function_name(tool["name"]) for tool in tools]
+        print(f"Активированные функции для сессии: {self.enabled_functions}")
+        
+        # Устанавливаем tool_choice на основе наличия tools
+        tool_choice = "auto" if tools else "none"
+        
+        print(f"Настройка сессии с {len(tools)} функциями, tool_choice={tool_choice}")
+        
+        # Включение транскрипции аудио
+        input_audio_transcription = {
+            "model": "whisper-1"
+        }
+            
         payload = {
             "type": "session.update",
             "session": {
@@ -299,35 +368,130 @@ class SimpleOpenAIClient:
                 "modalities": ["text", "audio"],
                 "temperature": 0.7,
                 "max_response_output_tokens": 500,
-                "input_audio_transcription": {
-                    "model": "whisper-1"
-                }
+                "tools": tools,
+                "tool_choice": tool_choice,
+                "input_audio_transcription": input_audio_transcription
             }
         }
         
-        # Добавляем функции, если они есть
-        if self.assistant_config.get("functions"):
-            tools = []
-            for func in self.assistant_config["functions"]:
-                if "name" in func and "description" in func and "parameters" in func:
-                    tools.append({
-                        "type": "function",
-                        "name": func["name"],
-                        "description": func["description"],
-                        "parameters": func["parameters"]
-                    })
-            
-            if tools:
-                payload["session"]["tools"] = tools
-                payload["session"]["tool_choice"] = "auto"
-                print(f"Добавлено {len(tools)} функций в сессию")
-            
         try:
             await self.ws.send(json.dumps(payload))
-            print(f"Настройки сессии отправлены (voice={voice})")
-            return True
+            print(f"Настройки сессии отправлены (voice={voice}, tools={len(tools)}, tool_choice={tool_choice})")
+            
+            # Вывод подробной информации о функциях в лог
+            if tools:
+                for tool in tools:
+                    print(f"Включена функция: {tool['name']}")
         except Exception as e:
             print(f"Ошибка отправки session.update: {e}")
+            return False
+
+        return True
+
+    async def send_function_result(self, function_call_id: str, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Отправляет результат выполнения функции обратно в OpenAI как событие conversation.item.create.
+        
+        Args:
+            function_call_id: ID вызова функции
+            result: Результат выполнения функции
+            
+        Returns:
+            Dict: Информация о статусе доставки результата
+        """
+        if not self.is_connected or not self.ws:
+            error_msg = "Невозможно отправить результат функции: нет подключения"
+            print(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "payload": None
+            }
+        
+        try:
+            print(f"Начало отправки результата функции: {function_call_id}")
+            
+            # Генерируем короткий ID длиной до 32 символов
+            short_item_id = generate_short_id("func_")
+            
+            # Преобразуем результат в строку JSON
+            result_json = json.dumps(result)
+            
+            # Структура для отправки результата функции
+            payload = {
+                "type": "conversation.item.create",
+                "event_id": f"funcres_{time.time()}",
+                "item": {
+                    "id": short_item_id,
+                    "type": "function_call_output",
+                    "call_id": function_call_id,
+                    "output": result_json
+                }
+            }
+            
+            print(f"Отправка результата функции: {function_call_id}")
+            
+            await self.ws.send(json.dumps(payload))
+            print(f"Результат функции отправлен: {function_call_id}")
+            
+            # Добавляем небольшую задержку перед запросом нового ответа
+            await asyncio.sleep(0.5)
+            
+            # После отправки результата, запрашиваем новый ответ от модели
+            await self.create_response_after_function()
+            
+            print(f"Результат функции отправлен и запрос на новый ответ выполнен")
+            
+            return {
+                "success": True,
+                "error": None,
+                "payload": payload
+            }
+            
+        except Exception as e:
+            error_msg = f"Ошибка отправки результата функции: {e}"
+            print(error_msg)
+            return {
+                "success": False,
+                "error": error_msg,
+                "payload": None
+            }
+
+    async def create_response_after_function(self) -> bool:
+        """
+        Запрашивает новый ответ от модели после выполнения функции.
+        Это обеспечит генерацию аудио-ответа.
+        
+        Returns:
+            bool: True если успешно, False иначе
+        """
+        if not self.is_connected or not self.ws:
+            print("Невозможно создать ответ: нет подключения")
+            return False
+            
+        try:
+            print(f"Создание нового ответа после выполнения функции")
+            
+            # Запрашиваем новый ответ от модели
+            response_payload = {
+                "type": "response.create",
+                "event_id": f"resp_after_func_{time.time()}",
+                "response": {
+                    "modalities": ["text", "audio"],
+                    "voice": self.assistant_config.get("voice", DEFAULT_VOICE),
+                    "instructions": self.assistant_config.get("system_prompt", DEFAULT_SYSTEM_MESSAGE),
+                    "temperature": 0.7,
+                    "max_output_tokens": 200
+                }
+            }
+            
+            await self.ws.send(json.dumps(response_payload))
+            print("Запрошен новый ответ после выполнения функции")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Ошибка создания ответа после функции: {e}")
             return False
 
     async def process_audio(self, audio_buffer: bytes) -> bool:
@@ -384,26 +548,6 @@ class SimpleOpenAIClient:
             return False
         except Exception as e:
             print(f"Ошибка очистки аудио буфера: {e}")
-            return False
-            
-    async def cancel_response(self) -> bool:
-        """Отменяет текущий ответ ассистента"""
-        if not self.is_connected or not self.ws or not self.current_response_id:
-            return False
-        try:
-            await self.ws.send(json.dumps({
-                "type": "response.cancel",
-                "event_id": f"cancel_{time.time()}",
-                "response_id": self.current_response_id
-            }))
-            print(f"Отправлена команда отмены ответа: {self.current_response_id}")
-            return True
-        except ConnectionClosed:
-            print("Соединение закрыто при отмене ответа")
-            self.is_connected = False
-            return False
-        except Exception as e:
-            print(f"Ошибка отмены ответа: {e}")
             return False
 
     async def close(self) -> None:
