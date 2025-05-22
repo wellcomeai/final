@@ -113,25 +113,34 @@ async def handle_websocket_connection(
 
                     if msg_type == "input_audio_buffer.append":
                         print(f"[DEBUG] Получен аудио чанк")
-                        audio_chunk = base64_to_audio_buffer(data["audio"])
-                        audio_buffer.extend(audio_chunk)
-                        if openai_client.is_connected:
-                            await openai_client.process_audio(audio_chunk)
-                        await websocket.send_json({"type": "input_audio_buffer.append.ack", "event_id": data.get("event_id")})
+                        try:
+                            audio_chunk = base64_to_audio_buffer(data["audio"])
+                            audio_buffer.extend(audio_chunk)
+                            print(f"[DEBUG] Аудио чанк добавлен, размер чанка: {len(audio_chunk)} байт, общий размер буфера: {len(audio_buffer)} байт")
+                            if openai_client.is_connected:
+                                await openai_client.process_audio(audio_chunk)
+                            await websocket.send_json({"type": "input_audio_buffer.append.ack", "event_id": data.get("event_id")})
+                        except Exception as e:
+                            print(f"[ERROR] Ошибка обработки аудио чанка: {e}")
+                            await websocket.send_json({
+                                "type": "error",
+                                "error": {"code": "audio_processing_error", "message": f"Ошибка обработки аудио: {str(e)}"}
+                            })
                         continue
 
                     if msg_type == "input_audio_buffer.commit" and not is_processing:
                         print(f"[DEBUG] Коммит аудио буфера, размер: {len(audio_buffer)} байт")
                         is_processing = True
                         
-                        # Проверка минимального размера буфера
-                        if not audio_buffer or len(audio_buffer) < 3200:  
-                            print(f"[WARNING] Аудио буфер слишком мал: {len(audio_buffer)} байт")
+                        # Проверка минимального размера буфера (примерно 500мс аудио при 24kHz/16bit/mono = 24000 байт)
+                        min_buffer_size = 24000  # Увеличиваем минимальный размер
+                        if not audio_buffer or len(audio_buffer) < min_buffer_size:  
+                            print(f"[WARNING] Аудио буфер слишком мал: {len(audio_buffer)} байт (требуется минимум {min_buffer_size})")
                             await websocket.send_json({
                                 "type": "warning",
-                                "warning": {"code": "audio_buffer_too_small", "message": "Аудио слишком короткое, попробуйте говорить дольше"}
+                                "warning": {"code": "audio_buffer_too_small", "message": f"Аудио слишком короткое ({len(audio_buffer)} байт), попробуйте говорить дольше"}
                             })
-                            audio_buffer.clear()
+                            # Не очищаем буфер, даем пользователю продолжить говорить
                             is_processing = False
                             continue
 
