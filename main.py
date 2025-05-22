@@ -160,26 +160,50 @@ class OpenAIRealtimeClient:
         
         try:
             await self.ws.send(json.dumps(session_config))
-            logger.info(f"Сессия настроена для клиента {self.client_id}")
+            logger.info(f"Настройки сессии отправлены для клиента {self.client_id}")
             
             # Ждем подтверждение настройки сессии
-            response = await asyncio.wait_for(self.ws.recv(), timeout=10)
-            response_data = json.loads(response)
+            # OpenAI может отправить session.created, затем session.updated
+            session_ready = False
+            attempts = 0
+            max_attempts = 3
             
-            if response_data.get("type") == "session.updated":
-                logger.info("Сессия успешно обновлена")
+            while not session_ready and attempts < max_attempts:
+                try:
+                    response = await asyncio.wait_for(self.ws.recv(), timeout=5)
+                    response_data = json.loads(response)
+                    msg_type = response_data.get("type")
+                    
+                    if msg_type == "session.created":
+                        logger.info("Сессия создана OpenAI")
+                        attempts += 1
+                        continue  # Ждем session.updated
+                        
+                    elif msg_type == "session.updated":
+                        logger.info("Сессия успешно обновлена")
+                        session_ready = True
+                        break
+                        
+                    elif msg_type == "error":
+                        error_msg = response_data.get("error", {}).get("message", "Unknown error")
+                        logger.error(f"Ошибка от OpenAI при настройке сессии: {error_msg}")
+                        return False
+                        
+                    else:
+                        logger.debug(f"Получено сообщение при настройке сессии: {msg_type}")
+                        attempts += 1
+                        
+                except asyncio.TimeoutError:
+                    logger.warning(f"Таймаут при ожидании подтверждения сессии (попытка {attempts + 1})")
+                    attempts += 1
+                    
+            if session_ready:
+                logger.info("Сессия готова к работе")
                 return True
-            elif response_data.get("type") == "error":
-                error_msg = response_data.get("error", {}).get("message", "Unknown error")
-                logger.error(f"Ошибка от OpenAI при настройке сессии: {error_msg}")
-                return False
             else:
-                logger.warning(f"Неожиданный ответ при настройке сессии: {response_data}")
-                return True  # Продолжаем работу
+                logger.warning("Не получено подтверждение настройки сессии, но продолжаем работу")
+                return True  # Все равно пробуем работать
                 
-        except asyncio.TimeoutError:
-            logger.error("Таймаут при ожидании подтверждения настройки сессии")
-            return False
         except Exception as e:
             logger.error(f"Ошибка настройки сессии: {e}")
             return False
@@ -335,6 +359,11 @@ async def handle_websocket_connection(websocket: WebSocket):
         # Основной цикл обработки сообщений от клиента
         while True:
             try:
+                # Проверяем состояние соединения перед получением сообщения
+                if websocket.client_state.name == 'DISCONNECTED':
+                    logger.info(f"Клиент {client_id} отключен")
+                    break
+                    
                 message = await websocket.receive()
                 
                 if "text" in message:
@@ -399,9 +428,19 @@ async def handle_websocket_connection(websocket: WebSocket):
                     if openai_client.is_connected:
                         await openai_client.send_audio(message["bytes"])
                     
-            except (WebSocketDisconnect, ConnectionClosed):
-                logger.info(f"WebSocket соединение закрыто: client_id={client_id}")
+            except WebSocketDisconnect:
+                logger.info(f"WebSocket отключен: client_id={client_id}")
                 break
+            except ConnectionClosed:
+                logger.info(f"Соединение закрыто: client_id={client_id}")
+                break
+            except RuntimeError as e:
+                if "disconnect message has been received" in str(e):
+                    logger.info(f"Клиент {client_id} уже отключился")
+                    break
+                else:
+                    logger.error(f"Runtime ошибка в WebSocket цикле: {e}")
+                    break
             except Exception as e:
                 logger.error(f"Ошибка в WebSocket цикле: {e}")
                 break
