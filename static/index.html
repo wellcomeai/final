@@ -313,6 +313,9 @@
                 if (event.data instanceof Blob) {
                     log('Получено аудио от ассистента');
                     playAssistantAudio(event.data);
+                } else if (event.data instanceof ArrayBuffer) {
+                    log('Получен аудио буфер от ассистента');
+                    playAssistantAudioBuffer(event.data);
                 } else {
                     try {
                         const data = JSON.parse(event.data);
@@ -328,6 +331,28 @@
                             startListening();
                         }
                         
+                        // Обработка начала ответа ассистента
+                        if (data.type === 'assistant_thinking') {
+                            log('Ассистент начинает думать');
+                            micStatusDiv.textContent = 'Думаю...';
+                            statusDiv.textContent = 'Ассистент обдумывает ответ...';
+                        }
+                        
+                        // Обработка текстового ответа (если нет аудио)
+                        if (data.type === 'text_response') {
+                            log(`Получен текстовый ответ: ${data.text}`);
+                            addToTranscript('assistant', data.text);
+                            
+                            // Показываем, что ответ получен
+                            micStatusDiv.textContent = 'Говорите';
+                            statusDiv.textContent = 'Готов к общению!';
+                        }
+                        
+                        // Обработка завершения ответа
+                        if (data.type === 'assistant_response_complete') {
+                            log('Ответ ассистента завершен');
+                        }
+                        
                         // Обработка транскрипций
                         if (data.type === 'conversation.item.input_audio_transcription.completed' && data.transcript) {
                             addToTranscript('user', data.transcript);
@@ -335,6 +360,24 @@
                         } else if (data.type === 'response.audio_transcript.done' && data.transcript) {
                             addToTranscript('assistant', data.transcript);
                             log(`Транскрипция ассистента: ${data.transcript}`);
+                        }
+                        
+                        // Обработка создания ответа
+                        if (data.type === 'response.created') {
+                            log('Ассистент начал генерировать ответ');
+                            micStatusDiv.textContent = 'Генерирую ответ...';
+                            statusDiv.textContent = 'Ассистент генерирует ответ...';
+                        }
+                        
+                        // Обработка аудио ответа
+                        if (data.type === 'response.audio.delta') {
+                            log('Получен фрагмент аудио ответа');
+                            // Аудио будет обработано как бинарные данные
+                        }
+                        
+                        // Обработка завершения аудио
+                        if (data.type === 'response.audio.done') {
+                            log('Аудио ответ завершен');
                         }
                         
                         // Обработка ошибок
@@ -348,6 +391,16 @@
                             log('Аудио буфер успешно отправлен');
                             micStatusDiv.textContent = 'Обрабатываю...';
                             statusDiv.textContent = 'Обрабатываю запрос...';
+                        }
+                        
+                        // Обработка Speech Started (важно для Server VAD)
+                        if (data.type === 'input_audio_buffer.speech_started') {
+                            log('Сервер обнаружил начало речи');
+                        }
+                        
+                        // Обработка Speech Stopped
+                        if (data.type === 'input_audio_buffer.speech_stopped') {
+                            log('Сервер обнаружил конец речи');
                         }
                     } catch (e) {
                         log(`Ошибка парсинга сообщения: ${e}`, 'ERROR');
@@ -452,9 +505,9 @@
             }
         }
         
-        // Функция воспроизведения аудио от ассистента
+        // Функция воспроизведения аудио от ассистента (Blob)
         function playAssistantAudio(audioBlob) {
-            log('Воспроизведение аудио ассистента');
+            log('Воспроизведение аудио ассистента (Blob)');
             
             // Останавливаем прослушивание пока говорит ассистент
             isAssistantSpeaking = true;
@@ -485,6 +538,15 @@
                 isAssistantSpeaking = false;
                 micStatusDiv.classList.remove('assistant-speaking');
             });
+        }
+        
+        // Функция воспроизведения аудио от ассистента (ArrayBuffer)
+        function playAssistantAudioBuffer(arrayBuffer) {
+            log('Воспроизведение аудио ассистента (ArrayBuffer)');
+            
+            // Конвертируем ArrayBuffer в Blob
+            const audioBlob = new Blob([arrayBuffer], { type: 'audio/wav' });
+            playAssistantAudio(audioBlob);
         }
         
         // Конвертация ArrayBuffer в Base64
