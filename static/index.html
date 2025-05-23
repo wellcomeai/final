@@ -955,47 +955,49 @@
         return null;
       }
     }
+    
     // Улучшенная функция воспроизведения через Web Audio API для iOS
-async function playAudioBufferMobile(audioBase64) {
-  try {
-    // Проверяем и разблокируем AudioContext если нужно
-    if (!audioContext) {
-      await initAudioMobile();
+    async function playAudioBufferMobile(audioBase64) {
+      try {
+        // Проверяем и разблокируем AudioContext если нужно
+        if (!audioContext) {
+          await initAudioMobile();
+        }
+        
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        
+        // Декодируем Base64 в ArrayBuffer
+        const audioData = base64ToArrayBuffer(audioBase64);
+        if (audioData.byteLength === 0) return false;
+        
+        // Создаем WAV
+        const wavBuffer = createWavFromPcmMobile(audioData);
+        if (!wavBuffer) return false;
+        
+        // Декодируем аудио данные
+        const audioBuffer = await audioContext.decodeAudioData(wavBuffer);
+        
+        // Создаем источник
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        
+        // Запускаем воспроизведение
+        source.start(0);
+        
+        // Возвращаем промис завершения
+        return new Promise((resolve) => {
+          source.onended = () => resolve(true);
+        });
+        
+      } catch (error) {
+        log(`Ошибка воспроизведения через Web Audio API: ${error.message}`, "error");
+        return false;
+      }
     }
     
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
-    }
-    
-    // Декодируем Base64 в ArrayBuffer
-    const audioData = base64ToArrayBuffer(audioBase64);
-    if (audioData.byteLength === 0) return false;
-    
-    // Создаем WAV
-    const wavBuffer = createWavFromPcmMobile(audioData);
-    if (!wavBuffer) return false;
-    
-    // Декодируем аудио данные
-    const audioBuffer = await audioContext.decodeAudioData(wavBuffer);
-    
-    // Создаем источник
-    const source = audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
-    
-    // Запускаем воспроизведение
-    source.start(0);
-    
-    // Возвращаем промис завершения
-    return new Promise((resolve) => {
-      source.onended = () => resolve(true);
-    });
-    
-  } catch (error) {
-    log(`Ошибка воспроизведения через Web Audio API: ${error.message}`, "error");
-    return false;
-  }
-}
     // Функция активации аудио по взаимодействию пользователя
     async function enableAudioOnUserInteraction() {
       if (userInteractionOccurred) return;
@@ -1448,8 +1450,8 @@ async function playAudioBufferMobile(audioBase64) {
       return wavBuffer;
     }
     
-    // Улучшенная функция воспроизведения для мобильных устройств
-    function playNextAudioMobile() {
+    // Обновленная функция воспроизведения для мобильных устройств
+    async function playNextAudioMobile() {
       if (audioPlaybackQueue.length === 0) {
         isPlayingAudio = false;
         mainCircle.classList.remove('speaking');
@@ -1469,129 +1471,183 @@ async function playAudioBufferMobile(audioBase64) {
       
       const audioBase64 = audioPlaybackQueue.shift();
       
+      // Сначала пробуем воспроизвести через Web Audio API (предпочтительно для iOS)
       try {
+        // Проверяем и инициализируем AudioContext если нужно
+        if (!audioContext) {
+          const audioInitialized = await initAudioMobile();
+          if (!audioInitialized) {
+            throw new Error("Не удалось инициализировать AudioContext");
+          }
+        }
+        
+        // Возобновляем AudioContext если он приостановлен
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        
         // Декодируем Base64 в ArrayBuffer
         const audioData = base64ToArrayBuffer(audioBase64);
         
         if (audioData.byteLength === 0) {
+          log("Пустые аудио данные, пропускаем", "warn");
           playNextAudioMobile();
           return;
         }
         
-        // Используем улучшенную функцию создания WAV
+        // Создаём WAV из PCM данных
         const wavBuffer = createWavFromPcmMobile(audioData);
         if (!wavBuffer) {
-          playNextAudioMobile();
-          return;
+          throw new Error("Не удалось создать WAV буфер");
         }
         
-        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-        const audioUrl = URL.createObjectURL(blob);
+        // Декодируем аудио данные через Web Audio API
+        const audioBuffer = await audioContext.decodeAudioData(wavBuffer.slice(0));
         
-        // Создаем Audio элемент с оптимизацией для мобильных
-        const audio = new Audio();
+        // Создаем источник звука
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
         
-        // Настройки для мобильных устройств
-        audio.preload = 'auto';
-        audio.controls = false;
-        audio.autoplay = false;
+        // Подключаем к выходу
+        source.connect(audioContext.destination);
         
-        // Добавляем в массив для отслеживания
-        audioElements.push(audio);
+        // Обработчик завершения воспроизведения
+        source.onended = () => {
+          log("Воспроизведение через Web Audio API завершено");
+          playNextAudioMobile();
+        };
         
-        // Обработчики событий
-        audio.onloadeddata = function() {
-          log("Аудио загружено, начинаем воспроизведение");
+        // Запускаем воспроизведение
+        source.start(0);
+        log("Воспроизведение через Web Audio API начато");
+        
+      } catch (webAudioError) {
+        log(`Web Audio API не сработал: ${webAudioError.message}, используем fallback`, "warn");
+        
+        // Fallback на традиционный метод с Audio элементами
+        try {
+          // Декодируем Base64 в ArrayBuffer
+          const audioData = base64ToArrayBuffer(audioBase64);
           
-          // Проверяем, что аудио разблокировано
-          if (!mobileAudioEnabled && isMobileDevice()) {
-            log("Аудио не разблокировано на мобильном устройстве", "warn");
-            // Показываем уведомление пользователю
-            showNotification("Нажмите на экран для включения звука", false);
-            
-            // Добавляем обработчик клика для разблокировки
-            const unlockHandler = async () => {
-              await unlockAudioContext();
-              document.removeEventListener('touchstart', unlockHandler);
-              document.removeEventListener('click', unlockHandler);
-              
-              // Пытаемся воспроизвести снова
-              audio.play().catch(err => {
-                log(`Ошибка воспроизведения после разблокировки: ${err.message}`, "error");
-                playNextAudioMobile();
-              });
-            };
-            
-            document.addEventListener('touchstart', unlockHandler, { once: true });
-            document.addEventListener('click', unlockHandler, { once: true });
+          if (audioData.byteLength === 0) {
+            playNextAudioMobile();
             return;
           }
           
-          // Воспроизводим аудио
-          const playPromise = audio.play();
+          // Используем улучшенную функцию создания WAV
+          const wavBuffer = createWavFromPcmMobile(audioData);
+          if (!wavBuffer) {
+            playNextAudioMobile();
+            return;
+          }
           
-          if (playPromise !== undefined) {
-            playPromise
-              .then(() => {
-                log("Аудио успешно воспроизводится");
-              })
-              .catch(err => {
-                log(`Ошибка воспроизведения: ${err.message}`, "error");
+          const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+          const audioUrl = URL.createObjectURL(blob);
+          
+          // Создаем Audio элемент с оптимизацией для мобильных
+          const audio = new Audio();
+          
+          // Настройки для мобильных устройств
+          audio.preload = 'auto';
+          audio.controls = false;
+          audio.autoplay = false;
+          
+          // Добавляем в массив для отслеживания
+          audioElements.push(audio);
+          
+          // Обработчики событий
+          audio.onloadeddata = function() {
+            log("Аудио загружено, начинаем воспроизведение (fallback)");
+            
+            // Проверяем, что аудио разблокировано
+            if (!mobileAudioEnabled && isMobileDevice()) {
+              log("Аудио не разблокировано на мобильном устройстве", "warn");
+              showNotification("Нажмите на экран для включения звука", false);
+              
+              // Добавляем обработчик клика для разблокировки
+              const unlockHandler = async () => {
+                await unlockAudioContext();
+                document.removeEventListener('touchstart', unlockHandler);
+                document.removeEventListener('click', unlockHandler);
                 
-                // Если ошибка связана с политикой автовоспроизведения
-                if (err.name === 'NotAllowedError') {
-                  showNotification("Нажмите для включения звука", false);
-                  
-                  // Добавляем обработчик для пользовательского взаимодействия
-                  const interactionHandler = () => {
-                    audio.play().catch(e => log(`Повторная ошибка воспроизведения: ${e.message}`, "error"));
-                    document.removeEventListener('touchstart', interactionHandler);
-                    document.removeEventListener('click', interactionHandler);
-                  };
-                  
-                  document.addEventListener('touchstart', interactionHandler, { once: true });
-                  document.addEventListener('click', interactionHandler, { once: true });
-                } else {
+                // Пытаемся воспроизвести снова
+                audio.play().catch(err => {
+                  log(`Ошибка воспроизведения после разблокировки: ${err.message}`, "error");
                   playNextAudioMobile();
-                }
-              });
-          }
-        };
-        
-        audio.onended = function() {
-          URL.revokeObjectURL(audioUrl);
-          // Удаляем из массива
-          const index = audioElements.indexOf(audio);
-          if (index > -1) {
-            audioElements.splice(index, 1);
-          }
+                });
+              };
+              
+              document.addEventListener('touchstart', unlockHandler, { once: true });
+              document.addEventListener('click', unlockHandler, { once: true });
+              return;
+            }
+            
+            // Воспроизводим аудио
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+              playPromise
+                .then(() => {
+                  log("Аудио успешно воспроизводится (fallback)");
+                })
+                .catch(err => {
+                  log(`Ошибка воспроизведения: ${err.message}`, "error");
+                  
+                  // Если ошибка связана с политикой автовоспроизведения
+                  if (err.name === 'NotAllowedError') {
+                    showNotification("Нажмите для включения звука", false);
+                    
+                    // Добавляем обработчик для пользовательского взаимодействия
+                    const interactionHandler = () => {
+                      audio.play().catch(e => log(`Повторная ошибка воспроизведения: ${e.message}`, "error"));
+                      document.removeEventListener('touchstart', interactionHandler);
+                      document.removeEventListener('click', interactionHandler);
+                    };
+                    
+                    document.addEventListener('touchstart', interactionHandler, { once: true });
+                    document.addEventListener('click', interactionHandler, { once: true });
+                  } else {
+                    playNextAudioMobile();
+                  }
+                });
+            }
+          };
+          
+          audio.onended = function() {
+            URL.revokeObjectURL(audioUrl);
+            // Удаляем из массива
+            const index = audioElements.indexOf(audio);
+            if (index > -1) {
+              audioElements.splice(index, 1);
+            }
+            playNextAudioMobile();
+          };
+          
+          audio.onerror = function(e) {
+            log(`Ошибка аудио элемента: ${e.message || 'Неизвестная ошибка'}`, "error");
+            URL.revokeObjectURL(audioUrl);
+            // Удаляем из массива
+            const index = audioElements.indexOf(audio);
+            if (index > -1) {
+              audioElements.splice(index, 1);
+            }
+            playNextAudioMobile();
+          };
+          
+          audio.oncanplay = function() {
+            log("Аудио готово к воспроизведению (fallback)");
+          };
+          
+          // Устанавливаем источник
+          audio.src = audioUrl;
+          
+          // Загружаем аудио
+          audio.load();
+          
+        } catch (fallbackError) {
+          log(`Критическая ошибка воспроизведения: ${fallbackError.message}`, "error");
           playNextAudioMobile();
-        };
-        
-        audio.onerror = function(e) {
-          log(`Ошибка аудио элемента: ${e.message || 'Неизвестная ошибка'}`, "error");
-          URL.revokeObjectURL(audioUrl);
-          // Удаляем из массива
-          const index = audioElements.indexOf(audio);
-          if (index > -1) {
-            audioElements.splice(index, 1);
-          }
-          playNextAudioMobile();
-        };
-        
-        audio.oncanplay = function() {
-          log("Аудио готово к воспроизведению");
-        };
-        
-        // Устанавливаем источник
-        audio.src = audioUrl;
-        
-        // Загружаем аудио
-        audio.load();
-        
-      } catch (error) {
-        log(`Критическая ошибка воспроизведения: ${error.message}`, "error");
-        playNextAudioMobile();
+        }
       }
     }
     
