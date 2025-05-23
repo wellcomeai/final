@@ -955,7 +955,47 @@
         return null;
       }
     }
+    // Улучшенная функция воспроизведения через Web Audio API для iOS
+async function playAudioBufferMobile(audioBase64) {
+  try {
+    // Проверяем и разблокируем AudioContext если нужно
+    if (!audioContext) {
+      await initAudioMobile();
+    }
     
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    
+    // Декодируем Base64 в ArrayBuffer
+    const audioData = base64ToArrayBuffer(audioBase64);
+    if (audioData.byteLength === 0) return false;
+    
+    // Создаем WAV
+    const wavBuffer = createWavFromPcmMobile(audioData);
+    if (!wavBuffer) return false;
+    
+    // Декодируем аудио данные
+    const audioBuffer = await audioContext.decodeAudioData(wavBuffer);
+    
+    // Создаем источник
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.destination);
+    
+    // Запускаем воспроизведение
+    source.start(0);
+    
+    // Возвращаем промис завершения
+    return new Promise((resolve) => {
+      source.onended = () => resolve(true);
+    });
+    
+  } catch (error) {
+    log(`Ошибка воспроизведения через Web Audio API: ${error.message}`, "error");
+    return false;
+  }
+}
     // Функция активации аудио по взаимодействию пользователя
     async function enableAudioOnUserInteraction() {
       if (userInteractionOccurred) return;
