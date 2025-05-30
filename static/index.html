@@ -119,6 +119,7 @@
     <div id="debug" style="display: none;">Логи отладки появятся здесь</div>
     
     <script>
+    (function() { // IIFE Start
         let socket;
         let audioContext;
         let audioProcessor;
@@ -127,6 +128,7 @@
         let isListening = false;
         let isAssistantSpeaking = false;
         let assistantAudio = null;
+        let serverAcknowledgedProcessing = false; // New state variable
         
         // Настройки для Voice Activity Detection
         const VAD_CONFIG = {
@@ -142,6 +144,11 @@
         let silenceStartTime = Date.now();
         let audioStartTime = 0;
         let hasAudioData = false;
+
+        // Reconnection logic variables
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+        const RECONNECT_DELAY = 3000; // 3 seconds
         
         // Элементы страницы
         const micStatusDiv = document.getElementById('micStatus');
@@ -271,9 +278,13 @@
                             
                             isSilent = true;
                             hasAudioData = false;
-                            micStatusDiv.classList.remove('listening');
-                            micStatusDiv.textContent = 'Говорите';
-                            statusDiv.textContent = 'Готов к общению!';
+                            // Only revert to idle display if server isn't already processing
+                            // and assistant is not speaking.
+                            if (!serverAcknowledgedProcessing && !isAssistantSpeaking) {
+                                micStatusDiv.classList.remove('listening');
+                                micStatusDiv.textContent = 'Говорите';
+                                statusDiv.textContent = 'Готов к общению!';
+                            }
                         }
                     }
                 };
@@ -304,9 +315,14 @@
             
             socket.onopen = function() {
                 log('WebSocket соединение открыто');
+                if (reconnectAttempts > 0) {
+                    log('Переподключение успешно.');
+                }
+                reconnectAttempts = 0; // Reset on successful connection
                 statusDiv.textContent = 'Соединение установлено';
                 isConnected = true;
                 micStatusDiv.textContent = 'Подготовка...';
+                // Existing logic will eventually call startListening() via 'connection_status' message
             };
             
             socket.onmessage = function(event) {
@@ -323,6 +339,7 @@
                         
                         // Обработка статуса соединения
                         if (data.type === 'connection_status' && data.status === 'connected') {
+                            serverAcknowledgedProcessing = false;
                             statusDiv.textContent = 'Готов к общению!';
                             micStatusDiv.textContent = 'Говорите';
                             log('Соединение с ассистентом установлено');
@@ -334,23 +351,31 @@
                         // Обработка начала ответа ассистента
                         if (data.type === 'assistant_thinking') {
                             log('Ассистент начинает думать');
+                            serverAcknowledgedProcessing = true;
+                            micStatusDiv.classList.remove('listening');
                             micStatusDiv.textContent = 'Думаю...';
                             statusDiv.textContent = 'Ассистент обдумывает ответ...';
                         }
                         
                         // Обработка текстового ответа (если нет аудио)
+                        // This might be part of a final response or an interim one.
+                        // If it's interim, serverAcknowledgedProcessing should remain true.
+                        // If it's final, response.done should handle resetting.
                         if (data.type === 'text_response') {
                             log(`Получен текстовый ответ: ${data.text}`);
                             addToTranscript('assistant', data.text);
                             
-                            // Показываем, что ответ получен
-                            micStatusDiv.textContent = 'Говорите';
-                            statusDiv.textContent = 'Готов к общению!';
+                            // Avoid reverting to "Говорите" if server is still processing or assistant will speak
+                            if (!serverAcknowledgedProcessing && !isAssistantSpeaking) {
+                                micStatusDiv.textContent = 'Говорите';
+                                statusDiv.textContent = 'Готов к общению!';
+                            }
                         }
                         
                         // Обработка завершения ответа
                         if (data.type === 'assistant_response_complete') {
                             log('Ответ ассистента завершен');
+                            serverAcknowledgedProcessing = false; // Server has finished its turn.
                         }
                         
                         // Обработка транскрипций
@@ -365,6 +390,8 @@
                         // Обработка создания ответа
                         if (data.type === 'response.created') {
                             log('Ассистент начал генерировать ответ');
+                            serverAcknowledgedProcessing = true;
+                            micStatusDiv.classList.remove('listening');
                             micStatusDiv.textContent = 'Генерирую ответ...';
                             statusDiv.textContent = 'Ассистент генерирует ответ...';
                         }
@@ -389,6 +416,8 @@
                         // Обработка подтверждений
                         if (data.type === 'input_audio_buffer.commit.ack') {
                             log('Аудио буфер успешно отправлен');
+                            serverAcknowledgedProcessing = true;
+                            micStatusDiv.classList.remove('listening');
                             micStatusDiv.textContent = 'Обрабатываю...';
                             statusDiv.textContent = 'Обрабатываю запрос...';
                         }
@@ -401,6 +430,23 @@
                         // Обработка Speech Stopped
                         if (data.type === 'input_audio_buffer.speech_stopped') {
                             log('Сервер обнаружил конец речи');
+                            // Server VAD might take over now, client should reflect processing.
+                            serverAcknowledgedProcessing = true;
+                            micStatusDiv.classList.remove('listening');
+                            // UI might be updated by subsequent 'assistant_thinking' or 'response.created'
+                        }
+
+                        // Final "response.done" indicates the assistant's entire turn is complete.
+                        if (data.type === 'response.done') {
+                            log('Полный ответ ассистента получен (response.done)');
+                            serverAcknowledgedProcessing = false;
+                            // If assistant is not speaking (e.g. text-only response or function call result)
+                            // and client is in a listening state, revert UI to ready.
+                            if (!isAssistantSpeaking && isListening) {
+                                micStatusDiv.classList.remove('listening'); // Ensure this is off
+                                micStatusDiv.textContent = 'Говорите';
+                                statusDiv.textContent = 'Готов к общению!';
+                            }
                         }
                     } catch (e) {
                         log(`Ошибка парсинга сообщения: ${e}`, 'ERROR');
@@ -409,12 +455,24 @@
             };
             
             socket.onclose = function(event) {
-                log(`WebSocket соединение закрыто: код ${event.code}`, 'WARN');
-                statusDiv.textContent = 'Соединение закрыто. Перезагрузите страницу.';
+                log(`WebSocket соединение закрыто: код ${event.code}, причина: ${event.reason}`, 'WARN');
                 isConnected = false;
+                serverAcknowledgedProcessing = false; // Reset this state too
                 micStatusDiv.textContent = 'Отключено';
                 micStatusDiv.classList.add('disabled');
                 stopListening();
+
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    const reconnectMsg = `Соединение потеряно. Попытка переподключения ${reconnectAttempts} из ${MAX_RECONNECT_ATTEMPTS}...`;
+                    log(reconnectMsg, 'WARN');
+                    statusDiv.textContent = reconnectMsg;
+                    setTimeout(connectWebSocket, RECONNECT_DELAY);
+                } else {
+                    const permanentFailureMsg = "Не удалось восстановить соединение. Пожалуйста, проверьте ваше интернет-соединение и перезагрузите страницу.";
+                    log(permanentFailureMsg, 'ERROR');
+                    statusDiv.textContent = permanentFailureMsg;
+                }
             };
             
             socket.onerror = function(error) {
@@ -432,14 +490,18 @@
             
             log('Начинаем прослушивание');
             isListening = true;
+            serverAcknowledgedProcessing = false; // Reset for a new listening turn
             
             // Возобновляем AudioContext если нужно
             if (audioContext.state === 'suspended') {
                 audioContext.resume();
             }
             
-            micStatusDiv.textContent = 'Говорите';
-            statusDiv.textContent = 'Готов к общению!';
+            // Only set to "Говорите" if not currently speaking (e.g. if startListening is called programmatically)
+            if (!isAssistantSpeaking) {
+                micStatusDiv.textContent = 'Говорите';
+                statusDiv.textContent = 'Готов к общению!';
+            }
             
             // Очищаем буфер при начале нового сеанса
             clearAudioBuffer();
@@ -523,20 +585,36 @@
                 log('Воспроизведение завершено');
                 URL.revokeObjectURL(audioUrl);
                 isAssistantSpeaking = false;
+                serverAcknowledgedProcessing = false; // Assistant done, server processing also done for this turn.
                 micStatusDiv.classList.remove('assistant-speaking');
-                micStatusDiv.textContent = 'Говорите';
-                statusDiv.textContent = 'Готов к общению!';
                 
-                // Возобновляем прослушивание
+                // If client is supposed to be listening, revert to listening UI.
+                // Otherwise, it might be in an error state or stopped state.
                 if (isListening) {
+                    micStatusDiv.textContent = 'Говорите';
+                    statusDiv.textContent = 'Готов к общению!';
                     clearAudioBuffer(); // Очищаем буфер перед новым циклом
+                } else {
+                    // If not listening, reflect that (e.g. if socket closed during speech)
+                     if (!isConnected) {
+                        micStatusDiv.textContent = 'Отключено';
+                        micStatusDiv.classList.add('disabled');
+                     } else {
+                        micStatusDiv.textContent = 'Нажмите для начала'; // Or appropriate idle message
+                     }
                 }
             };
             
             assistantAudio.play().catch(error => {
                 log(`Ошибка воспроизведения: ${error}`, 'ERROR');
                 isAssistantSpeaking = false;
+                serverAcknowledgedProcessing = false;
                 micStatusDiv.classList.remove('assistant-speaking');
+                // Potentially set UI to an error or idle state here too
+                if (isListening) {
+                    micStatusDiv.textContent = 'Говорите';
+                    statusDiv.textContent = 'Готов к общению!';
+                }
             });
         }
         
@@ -566,6 +644,10 @@
                 commitAudio();
             }
         });
+
+        // Make toggleDebug globally accessible for the inline onclick handler
+        window.toggleDebug = toggleDebug;
+    })(); // IIFE End
     </script>
 </body>
 </html>

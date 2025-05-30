@@ -1,6 +1,9 @@
 import os
+import logging
 from typing import Dict, List, Any, ClassVar
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     # OpenAI настройки
@@ -138,11 +141,11 @@ def validate_config() -> bool:
     Проверяет корректность конфигурации.
     """
     if not settings.OPENAI_API_KEY:
-        print("Предупреждение: OPENAI_API_KEY не установлен")
+        logger.warning("OPENAI_API_KEY не установлен")
         return False
     
     if settings.AUDIO_SAMPLE_RATE not in [16000, 24000, 48000]:
-        print(f"Предупреждение: Неподдерживаемая частота дискретизации: {settings.AUDIO_SAMPLE_RATE}")
+        logger.warning(f"Неподдерживаемая частота дискретизации: {settings.AUDIO_SAMPLE_RATE}")
         return False
     
     return True
@@ -150,6 +153,6 @@ def validate_config() -> bool:
 # Проверяем конфигурацию при импорте
 if __name__ == "__main__":
     if validate_config():
-        print("Конфигурация корректна")
+        logger.info("Конфигурация корректна")
     else:
-        print("Обнаружены проблемы в конфигурации")
+        logger.warning("Обнаружены проблемы в конфигурации")

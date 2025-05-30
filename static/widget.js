@@ -474,9 +474,12 @@
     let hasAudioData = false;
     let audioDataStartTime = 0;
     let minimumAudioLength = 300;
-    let reconnecting = false;
+    let reconnecting = false; // This flag is already used by VAD in onaudioprocess
     let isListening = false;
     let websocket = null;
+    let widgetReconnectAttempts = 0;
+    const WIDGET_MAX_RECONNECT_ATTEMPTS = 5;
+    const WIDGET_RECONNECT_DELAY = 3000;
     let audioContext = null;
     let mediaStream = null;
     let audioProcessor = null;
@@ -979,15 +982,20 @@
         
         // Устанавливаем таймаут на открытие соединения
         const connectionTimeout = setTimeout(() => {
-          log("Превышено время ожидания соединения", "error");
-          websocket.close();
-          loaderModal.classList.remove('active');
-          showMessage("Не удалось подключиться к серверу");
+          if (websocket.readyState !== WebSocket.OPEN) {
+            log("Превышено время ожидания соединения", "error");
+            websocket.close(); // This will trigger onclose for reconnection logic
+          }
         }, 15000);
         
         websocket.onopen = function() {
           clearTimeout(connectionTimeout);
           log("Соединение установлено");
+          if (widgetReconnectAttempts > 0) {
+            log('Переподключение успешно.');
+          }
+          widgetReconnectAttempts = 0;
+          reconnecting = false;
           isConnected = true;
           loaderModal.classList.remove('active');
           
@@ -1045,37 +1053,64 @@
         };
         
         websocket.onclose = function(event) {
-          log(`Соединение закрыто: ${event.code} ${event.reason}`);
+          clearTimeout(connectionTimeout); // Clear timeout if connection closed prematurely
+          log(`Соединение закрыто: код ${event.code}, причина: ${event.reason}`, "warn");
+          stopAllAudioProcessing(); // Ensure clean state
           isConnected = false;
-          isListening = false;
-          reconnecting = false;
-          
-          // Показываем сообщение пользователю, если виджет открыт
-          if (isWidgetOpen) {
-            showMessage("Соединение прервано. Переподключение...");
+          // isListening and isPlayingAudio are reset by stopAllAudioProcessing
+
+          if (widgetReconnectAttempts < WIDGET_MAX_RECONNECT_ATTEMPTS) {
+            widgetReconnectAttempts++;
+            reconnecting = true;
+            const reconnectMsg = `Соединение потеряно. Попытка ${widgetReconnectAttempts}/${WIDGET_MAX_RECONNECT_ATTEMPTS}...`;
+            log(reconnectMsg, "warn");
+            if (isWidgetOpen) {
+              showMessage(reconnectMsg, WIDGET_RECONNECT_DELAY + 1000);
+            }
+            setTimeout(connectWebSocket, WIDGET_RECONNECT_DELAY);
+          } else {
+            reconnecting = false;
+            const permanentFailureMsg = "Не удалось восстановить соединение. Проверьте интернет и попробуйте позже.";
+            log(permanentFailureMsg, "error");
+            if (isWidgetOpen) {
+              showMessage(permanentFailureMsg, 10000);
+            }
+            loaderModal.classList.remove('active'); // Hide loader on permanent failure
           }
-          
-          // Пытаемся переподключиться
-          setTimeout(() => {
-            connectWebSocket();
-          }, 3000);
         };
         
         websocket.onerror = function(error) {
-          log("Ошибка соединения", "error");
-          console.error("WebSocket error:", error);
-          
-          if (isWidgetOpen) {
-            showMessage("Ошибка соединения с сервером");
-          }
+          log("Ошибка соединения (onerror)", "error");
+          console.error("WebSocket error details:", error);
+          // loaderModal.classList.remove('active'); // Hide loader on error
+          // showMessage("Ошибка соединения с сервером"); // onclose will handle user feedback
+          // Note: 'onclose' will usually be called after 'onerror'.
+          // If 'onclose' doesn't fire for some reason, the loader might remain.
+          // However, standard behavior is that onclose follows.
         };
         
         return true;
       } catch (error) {
-        log(`Ошибка при установке соединения: ${error.message}`, "error");
+        log(`Ошибка при вызове connectWebSocket: ${error.message}`, "error");
         loaderModal.classList.remove('active');
         if (isWidgetOpen) {
-          showMessage("Не удалось подключиться к серверу");
+          showMessage("Ошибка инициации соединения.");
+        }
+        // Attempt to reconnect even if initial call fails (e.g. network down before first connect)
+        if (widgetReconnectAttempts < WIDGET_MAX_RECONNECT_ATTEMPTS) {
+            widgetReconnectAttempts++;
+            reconnecting = true; // Set to true before scheduling reconnect
+            const reconnectMsg = `Ошибка. Попытка ${widgetReconnectAttempts}/${WIDGET_MAX_RECONNECT_ATTEMPTS}...`;
+            log(reconnectMsg, "warn");
+            if (isWidgetOpen) {
+              showMessage(reconnectMsg, WIDGET_RECONNECT_DELAY + 1000);
+            }
+            setTimeout(connectWebSocket, WIDGET_RECONNECT_DELAY);
+        } else {
+            reconnecting = false;
+            if (isWidgetOpen) {
+                 showMessage("Не удалось подключиться. Проверьте интернет.", 10000);
+            }
         }
         return false;
       }

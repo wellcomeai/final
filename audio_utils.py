@@ -1,7 +1,10 @@
 import base64
 import struct
 import numpy as np
+import logging
 from typing import Union
+
+logger = logging.getLogger(__name__)
 
 def audio_buffer_to_base64(buffer: Union[bytes, bytearray, memoryview]) -> str:
     """Конвертирует аудио буфер в base64 строку"""
@@ -10,7 +13,7 @@ def audio_buffer_to_base64(buffer: Union[bytes, bytearray, memoryview]) -> str:
             buffer = buffer.tobytes()
         return base64.b64encode(buffer).decode('utf-8')
     except Exception as e:
-        print(f"Ошибка конвертации аудио в base64: {str(e)}")
+        logger.exception(f"Ошибка конвертации аудио в base64: {str(e)}")
         raise
 
 def base64_to_audio_buffer(base64_str: str) -> bytes:
@@ -18,7 +21,7 @@ def base64_to_audio_buffer(base64_str: str) -> bytes:
     try:
         return base64.b64decode(base64_str)
     except Exception as e:
-        print(f"Ошибка конвертации base64 в аудио: {str(e)}")
+        logger.exception(f"Ошибка конвертации base64 в аудио: {str(e)}")
         raise
 
 def create_wav_from_pcm(
@@ -57,5 +60,5 @@ def create_wav_from_pcm(
         
         return wav_data
     except Exception as e:
-        print(f"Ошибка создания WAV из PCM: {str(e)}")
+        logger.exception(f"Ошибка создания WAV из PCM: {str(e)}")
         raise
