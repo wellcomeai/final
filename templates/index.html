@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElevenLabs Voice Chat - Python FastAPI Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .title {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .config-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            text-align: left;
+        }
+
+        .config-row {
+            display: flex;
+            flex-direction: column;
+            margin: 1rem 0;
+        }
+
+        .config-row label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        .config-row input {
+            padding: 0.75rem;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .config-row input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .status.disconnected {
+            background: #fee;
+            color: #c53030;
+            border-left: 4px solid #c53030;
+        }
+
+        .status.connecting {
+            background: #fef5e7;
+            color: #d69e2e;
+            border-left: 4px solid #d69e2e;
+        }
+
+        .status.connected {
+            background: #f0fff4;
+            color: #38a169;
+            border-left: 4px solid #38a169;
+        }
+
+        .status.listening {
+            background: #e6fffa;
+            color: #319795;
+            border-left: 4px solid #319795;
+            animation: listening-pulse 2s infinite;
+        }
+
+        .status.speaking {
+            background: #ebf8ff;
+            color: #3182ce;
+            border-left: 4px solid #3182ce;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status.recording {
+            background: #fed7e2;
+            color: #e53e3e;
+            border-left: 4px solid #e53e3e;
+            animation: recording-pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        @keyframes listening-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.02); }
+        }
+
+        @keyframes recording-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.9; transform: scale(1.05); }
+        }
+
+        .controls {
+            margin: 2rem 0;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #ffa502, #ff6348);
+            color: white;
+        }
+
+        .chat-area {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            min-height: 200px;
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .message {
+            margin: 0.5rem 0;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.assistant {
+            background: #e9ecef;
+            color: #333;
+            border-left: 3px solid #667eea;
+        }
+
+        .message.system {
+            background: #fff3cd;
+            color: #856404;
+            text-align: center;
+            margin: 0 auto;
+            font-style: italic;
+        }
+
+        .mic-animation {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            margin: 1rem auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .mic-animation.recording {
+            animation: mic-recording 1.5s infinite;
+            background: linear-gradient(45deg, #ff4757, #ff3742);
+        }
+
+        .mic-animation.listening {
+            animation: mic-listening 2s infinite;
+            background: linear-gradient(45deg, #2ed573, #1e90ff);
+        }
+
+        .mic-animation.speaking {
+            animation: mic-speaking 1s infinite;
+            background: linear-gradient(45deg, #3182ce, #667eea);
+        }
+
+        @keyframes mic-recording {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @keyframes mic-listening {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        @keyframes mic-speaking {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .volume-indicator {
+            width: 100%;
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+
+        .volume-bar {
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 3px;
+            transition: width 0.1s ease;
+            width: 0%;
+        }
+
+        .vad-indicator {
+            margin: 0.5rem 0;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .vad-score {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: #f0f0f0;
+            margin-left: 0.5rem;
+        }
+
+        .connection-stats {
+            margin: 0.5rem 0;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: left;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e9ecef;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🎤 ElevenLabs Voice Chat</h1>
+            <p class="subtitle">Python FastAPI Edition • Прямое подключение к ElevenLabs WebSocket</p>
+        </div>
+
+        <div class="config-panel">
+            <h3>⚙️ Конфигурация подключения</h3>
+            <div class="config-row">
+                <label for="apiKey">ElevenLabs API Key:</label>
+                <input type="password" id="apiKey" placeholder="sk_..." value="sk_95a5725ca01fdba20e15bd662d8b76152971016ff045377f">
+            </div>
+            <div class="config-row">
+                <label for="agentId">Agent ID:</label>
+                <input type="text" id="agentId" placeholder="agent_..." value="agent_01jzwcew2ferttga9m1zcn3js1">
+            </div>
+        </div>
+
+        <div id="status" class="status disconnected">
+            🔴 Отключен
+        </div>
+
+        <div class="controls">
+            <button id="connectBtn" class="btn btn-primary">
+                🔗 Подключиться
+            </button>
+            <button id="disconnectBtn" class="btn btn-danger" disabled>
+                ⛔ Отключиться
+            </button>
+            <button id="testBtn" class="btn btn-warning">
+                🧪 Тест API
+            </button>
+            <button id="diagnosisBtn" class="btn btn-warning" style="background: linear-gradient(45deg, #9b59b6, #8e44ad);">
+                🔍 Диагностика
+            </button>
+        </div>
+
+        <div class="mic-animation" id="micAnimation">
+            🎤
+        </div>
+
+        <div class="volume-indicator">
+            <div class="volume-bar" id="volumeBar"></div>
+        </div>
+
+        <div class="vad-indicator">
+            VAD Score: <span class="vad-score" id="vadScore">0.00</span>
+        </div>
+
+        <div class="connection-stats" id="connectionStats">
+            <div>Статус: <span id="connectionState">Отключен</span></div>
+            <div>Метод: <span id="connectionMethod">Python FastAPI + Прямое подключение</span></div>
+            <div>Endpoint: <span id="wsEndpoint">wss://api.elevenlabs.io/v1/convai/conversation</span></div>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div class="message system">
+                🚀 Python FastAPI сервер готов к работе!<br>
+                💡 Убедитесь что API Key и Agent ID правильные
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>🐍 Python FastAPI + ElevenLabs • Прямое подключение без промежуточного сервера</p>
+            <p>💡 Проверьте данные в ElevenLabs Dashboard</p>
+            <p style="margin-top: 0.5rem; font-size: 0.75rem; color: #999;">
+                Python FastAPI v2.1 • WebSocket без сервера • Минимальная задержка
+            </p>
+        </div>
+    </div>
+
+    <script>
+        class PythonVoiceChat {
+            constructor() {
+                console.log('🚀 PythonVoiceChat v2.1 starting - Python FastAPI Backend');
+                
+                // Основные состояния
+                this.ws = null;
+                this.isConnected = false;
+                this.isInitialized = false;
+                this.conversationId = null;
+                
+                // Аудио система
+                this.audioStream = null;
+                this.audioContext = null;
+                this.audioProcessor = null;
+                this.audioSource = null;
+                this.isAgentSpeaking = false;
+                this.vadScore = 0;
+                this.voiceActivityThreshold = 0.01;
+                
+                // Очередь аудио
+                this.audioQueue = [];
+                this.isProcessingAudio = false;
+                
+                // Управление соединением
+                this.keepAliveInterval = null;
+                this.lastActivityTime = Date.now();
+                
+                this.initializeElements();
+                this.addMessage('system', '🐍 Python FastAPI Voice Chat инициализирован');
+                this.addMessage('system', '💡 Нажмите "🧪 Тест API" для проверки настроек');
+                
+                console.log('✅ PythonVoiceChat v2.1 initialized');
+            }
+
+            initializeElements() {
+                console.log('🔧 Initializing elements...');
+                
+                this.connectBtn = document.getElementById('connectBtn');
+                this.disconnectBtn = document.getElementById('disconnectBtn');
+                this.testBtn = document.getElementById('testBtn');
+                this.diagnosisBtn = document.getElementById('diagnosisBtn');
+                this.apiKeyInput = document.getElementById('apiKey');
+                this.agentIdInput = document.getElementById('agentId');
+                this.status = document.getElementById('status');
+                this.chatArea = document.getElementById('chatArea');
+                this.micAnimation = document.getElementById('micAnimation');
+                this.volumeBar = document.getElementById('volumeBar');
+                this.vadScoreSpan = document.getElementById('vadScore');
+                this.connectionStateSpan = document.getElementById('connectionState');
+                this.wsEndpointSpan = document.getElementById('wsEndpoint');
+
+                // Добавляем обработчики событий
+                if (this.connectBtn) {
+                    this.connectBtn.addEventListener('click', () => {
+                        console.log('🖱️ Connect button clicked');
+                        this.connect();
+                    });
+                }
+                
+                if (this.disconnectBtn) {
+                    this.disconnectBtn.addEventListener('click', () => {
+                        console.log('🖱️ Disconnect button clicked');
+                        this.disconnect();
+                    });
+                }
+                
+                if (this.testBtn) {
+                    this.testBtn.addEventListener('click', () => {
+                        console.log('🖱️ Test button clicked');
+                        this.testAPI();
+                    });
+                }
+                
+                if (this.diagnosisBtn) {
+                    this.diagnosisBtn.addEventListener('click', () => {
+                        console.log('🖱️ Diagnosis button clicked');
+                        this.diagnoseSystem();
+                    });
+                }
+                
+                console.log('✅ Elements initialized');
+            }
+
+            async testAPI() {
+                const apiKey = this.apiKeyInput.value.trim();
+                const agentId = this.agentIdInput.value.trim();
+
+                if (!apiKey || !agentId) {
+                    this.addMessage('system', '❌ Введите API Key и Agent ID');
+                    return;
+                }
+
+                this.testBtn.disabled = true;
+                this.testBtn.textContent = '⏳ Тестирование...';
+                
+                try {
+                    this.addMessage('system', '🧪 Тестирование через Python FastAPI...');
+                    
+                    // Используем наш Python FastAPI сервер для тестирования
+                    const response = await fetch('/api/agent-id');
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        this.addMessage('system', `✅ Python сервер работает: ${data.status}`);
+                        this.addMessage('system', `🤖 Agent ID: ${data.agent_id}`);
+                        this.addMessage('system', `📊 Источник: ${data.source}`);
+                        this.addMessage('system', '🎉 Система готова к подключению!');
+                    } else {
+                        this.addMessage('system', `❌ Ошибка сервера: ${data.error || 'Unknown error'}`);
+                    }
+
+                } catch (error) {
+                    console.error('API test failed:', error);
+                    this.addMessage('system', `❌ Ошибка тестирования: ${error.message}`);
+                    this.addMessage('system', '💡 Проверьте что Python сервер запущен');
+                } finally {
+                    this.testBtn.disabled = false;
+                    this.testBtn.textContent = '🧪 Тест API';
+                }
+            }
+
+            async diagnoseSystem() {
+                this.diagnosisBtn.disabled = true;
+                this.diagnosisBtn.textContent = '⏳ Диагностика...';
+                
+                try {
+                    this.addMessage('system', '🔍 Запуск полной диагностики через Python FastAPI...');
+                    
+                    const response = await fetch('/api/diagnostics');
+                    const data = await response.json();
+                    
+                    this.addMessage('system', `📊 Общий статус: ${data.overall.status}`);
+                    this.addMessage('system', `🏥 Health Score: ${data.overall.health_score}`);
+                    
+                    // Показываем результаты тестов
+                    Object.entries(data.tests).forEach(([test, result]) => {
+                        const emoji = result === 'passed' ? '✅' : result === 'failed' ? '❌' : '⚠️';
+                        this.addMessage('system', `${emoji} ${test}: ${result}`);
+                    });
+                    
+                    // Показываем рекомендации
+                    if (data.recommendations && data.recommendations.length > 0) {
+                        this.addMessage('system', '💡 Рекомендации:');
+                        data.recommendations.forEach(rec => {
+                            this.addMessage('system', rec);
+                        });
+                    }
+
+                } catch (error) {
+                    console.error('Diagnostics failed:', error);
+                    this.addMessage('system', `❌ Ошибка диагностики: ${error.message}`);
+                } finally {
+                    this.diagnosisBtn.disabled = false;
+                    this.diagnosisBtn.textContent = '🔍 Диагностика';
+                }
+            }
+
+            async connect() {
+                console.log('🚀 connect function called');
+                const apiKey = this.apiKeyInput.value.trim();
+                const agentId = this.agentIdInput.value.trim();
+
+                if (!apiKey || !agentId) {
+                    this.addMessage('system', '❌ Введите API Key и Agent ID');
+                    return;
+                }
+
+                try {
+                    console.log('🚀 Starting connection via Python FastAPI');
+                    this.updateStatus('connecting', '🟡 Подключение через Python...');
+                    this.connectionStateSpan.textContent = 'Подключение...';
+                    
+                    // Запрашиваем доступ к микрофону
+                    this.addMessage('system', '🎤 Запрос доступа к микрофону...');
+                    this.audioStream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            sampleRate: 16000,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        } 
+                    });
+                    console.log('✅ Microphone access granted');
+
+                    // Пробуем получить signed URL через наш Python сервер
+                    this.addMessage('system', '🔐 Получение signed URL через Python сервер...');
+                    
+                    let wsUrl;
+                    try {
+                        const signedResponse = await fetch('/api/signed-url');
+                        if (signedResponse.ok) {
+                            const signedData = await signedResponse.json();
+                            wsUrl = signedData.signed_url;
+                            this.addMessage('system', '✅ Signed URL получен через Python!');
+                        } else {
+                            throw new Error('Signed URL failed');
+                        }
+                    } catch (error) {
+                        console.log('Signed URL failed, using direct connection');
+                        wsUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${agentId}`;
+                        this.addMessage('system', '💡 Используем прямое подключение');
+                    }
+                    
+                    this.wsEndpointSpan.textContent = wsUrl;
+                    
+                    console.log('🔗 Connecting to WebSocket:', wsUrl);
+                    this.addMessage('system', '🔗 Подключение к ElevenLabs WebSocket...');
+                    
+                    this.ws = new WebSocket(wsUrl);
+                    
+                    const connectionTimeout = setTimeout(() => {
+                        if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+                            console.log('Connection timeout (15s)');
+                            this.addMessage('system', '❌ Таймаут подключения (15 сек)');
+                            this.ws.close();
+                        }
+                    }, 15000);
+
+                    this.ws.onopen = () => {
+                        clearTimeout(connectionTimeout);
+                        this.onWebSocketOpen(apiKey);
+                    };
+                    
+                    this.ws.onmessage = (event) => this.onWebSocketMessage(event);
+                    
+                    this.ws.onclose = (event) => {
+                        clearTimeout(connectionTimeout);
+                        this.onWebSocketClose(event);
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        clearTimeout(connectionTimeout);
+                        console.error('WebSocket error:', error);
+                        this.onWebSocketError(error);
+                    };
+
+                } catch (error) {
+                    console.error('Connection failed:', error);
+                    
+                    let errorMessage = '❌ Ошибка подключения: ';
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage += 'Нет доступа к микрофону';
+                        this.addMessage('system', '💡 Обновите страницу и разрешите доступ к микрофону');
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage += 'Микрофон не найден';
+                    } else {
+                        errorMessage += error.message;
+                    }
+                    
+                    this.addMessage('system', errorMessage);
+                    this.updateStatus('disconnected', '🔴 Отключен');
+                    this.connectionStateSpan.textContent = 'Ошибка';
+                }
+            }
+
+            onWebSocketOpen(apiKey) {
+                console.log('✅ WebSocket connected via Python FastAPI');
+                this.isConnected = true;
+                this.updateStatus('connecting', '🟡 Инициализация...');
+                this.connectionStateSpan.textContent = 'Инициализация...';
+                this.addMessage('system', '🔗 Подключение через Python FastAPI установлено!');
+                
+                // Отправляем инициализационное сообщение с API ключом
+                const initMessage = {
+                    type: "conversation_initiation_client_data",
+                    xi_api_key: apiKey
+                };
+                
+                console.log('📤 Sending initialization with API key');
+                this.ws.send(JSON.stringify(initMessage));
+                
+                this.startKeepAlive();
+                
+                // Таймаут инициализации
+                this.initializationTimeout = setTimeout(() => {
+                    if (!this.isInitialized) {
+                        console.error('Initialization timeout');
+                        this.addMessage('system', '❌ Таймаут инициализации');
+                        this.addMessage('system', '💡 Проверьте API ключ и права доступа');
+                        this.disconnect();
+                    }
+                }, 10000);
+            }
+
+            onWebSocketMessage(event) {
+                try {
+                    this.lastActivityTime = Date.now();
+                    
+                    const data = JSON.parse(event.data);
+                    console.log('📨 Received:', data.type, data);
+
+                    switch (data.type) {
+                        case 'conversation_initiation_metadata':
+                            this.handleInitiation(data);
+                            break;
+                        case 'user_transcript':
+                            this.handleUserTranscript(data);
+                            break;
+                        case 'agent_response':
+                            this.handleAgentResponse(data);
+                            break;
+                        case 'agent_response_correction':
+                            this.handleAgentResponseCorrection(data);
+                            break;
+                        case 'audio':
+                            this.handleAudioResponse(data);
+                            break;
+                        case 'interruption':
+                            this.handleInterruption(data);
+                            break;
+                        case 'ping':
+                            this.handlePing(data);
+                            break;
+                        case 'pong':
+                            this.handlePong(data);
+                            break;
+                        case 'vad_score':
+                            this.handleVadScore(data);
+                            break;
+                        case 'error':
+                            this.handleServerError(data);
+                            break;
+                        case 'keep_alive_response':
+                            console.log('💓 Keep-alive acknowledged');
+                            break;
+                        default:
+                            console.log('🔍 Unknown message type:', data.type, data);
+                    }
+                } catch (error) {
+                    console.error('Error parsing WebSocket message:', error);
+                    console.error('Raw message:', event.data);
+                }
+            }
+
+            handleInitiation(data) {
+                const metadata = data.conversation_initiation_metadata_event;
+                console.log('✅ Conversation initiated:', metadata);
+                
+                if (this.initializationTimeout) {
+                    clearTimeout(this.initializationTimeout);
+                    this.initializationTimeout = null;
+                }
+                
+                this.isInitialized = true;
+                this.conversationId = metadata.conversation_id;
+                this.updateStatus('listening', '🟢 Слушаю...');
+                this.connectionStateSpan.textContent = 'Подключен (Python FastAPI)';
+                
+                this.addMessage('system', `✅ Разговор начат (ID: ${metadata.conversation_id.substring(0, 8)}...)`);
+                this.addMessage('system', '🎤 Начинайте говорить...');
+                this.addMessage('system', '🐍 Python FastAPI сервер работает отлично!');
+                
+                this.connectBtn.disabled = true;
+                this.disconnectBtn.disabled = false;
+                this.apiKeyInput.disabled = true;
+                this.agentIdInput.disabled = true;
+                
+                this.startRecording();
+            }
+
+            // Остальные методы остаются такими же как в оригинале...
+            // (handleUserTranscript, handleAgentResponse, etc.)
+
+            handleUserTranscript(data) {
+                const transcript = data.user_transcription_event.user_transcript;
+                if (transcript.trim()) {
+                    this.addMessage('user', transcript);
+                }
+            }
+
+            handleAgentResponse(data) {
+                const response = data.agent_response_event.agent_response;
+                this.addMessage('assistant', response);
+                
+                this.isAgentSpeaking = true;
+                this.updateStatus('speaking', '🎯 ИИ говорит...');
+                this.micAnimation.classList.remove('recording', 'listening');
+                this.micAnimation.classList.add('speaking');
+            }
+
+            handleAudioResponse(data) {
+                try {
+                    const audioBase64 = data.audio_event.audio_base_64;
+                    console.log('🔊 Received audio chunk, adding to queue');
+                    
+                    this.addToAudioQueue(audioBase64);
+                    
+                } catch (error) {
+                    console.error('Error handling audio response:', error);
+                }
+            }
+
+            handleInterruption(data) {
+                console.log('⚠️ Interruption detected');
+                this.clearAudioQueue();
+                this.isAgentSpeaking = false;
+                this.updateStatus('listening', '🟢 Слушаю...');
+                this.micAnimation.classList.remove('speaking');
+                this.micAnimation.classList.add('listening');
+            }
+
+            handleVadScore(data) {
+                this.vadScore = data.vad_score_event.vad_score;
+                this.vadScoreSpan.textContent = this.vadScore.toFixed(2);
+                
+                const percentage = this.vadScore * 100;
+                this.volumeBar.style.width = percentage + '%';
+                
+                if (this.vadScore > 0.8) {
+                    this.volumeBar.style.background = 'linear-gradient(45deg, #00ff00, #32cd32)';
+                    if (!this.isAgentSpeaking) {
+                        this.micAnimation.classList.add('recording');
+                        this.micAnimation.classList.remove('listening');
+                        this.updateStatus('recording', '🎤 Запись речи...');
+                    }
+                } else {
+                    this.volumeBar.style.background = 'linear-gradient(45deg, #667eea, #764ba2)';
+                    if (!this.isAgentSpeaking) {
+                        this.micAnimation.classList.remove('recording');
+                        this.micAnimation.classList.add('listening');
+                        this.updateStatus('listening', '🟢 Слушаю...');
+                    }
+                }
+            }
+
+            handleAgentResponseCorrection(data) {
+                const correction = data.agent_response_correction_event;
+                console.log('📝 Agent response correction:', correction);
+                
+                const messages = this.chatArea.querySelectorAll('.message.assistant');
+                if (messages.length > 0) {
+                    const lastMessage = messages[messages.length - 1];
+                    lastMessage.textContent = correction.corrected_agent_response;
+                }
+            }
+
+            handlePing(data) {
+                console.log('🏓 Ping received, sending pong...');
+                const pongMessage = {
+                    type: "pong",
+                    event_id: data.ping_event?.event_id || `pong_${Date.now()}`
+                };
+                
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify(pongMessage));
+                    console.log('🏓 Pong sent');
+                }
+            }
+
+            handlePong(data) {
+                console.log('🏓 Pong received');
+            }
+
+            handleServerError(data) {
+                console.error('Server error:', data);
+                const errorMsg = data.error || data.message || 'Unknown server error';
+                this.addMessage('system', `❌ Ошибка сервера: ${errorMsg}`);
+                
+                if (data.critical || data.fatal) {
+                    this.addMessage('system', '💥 Критичная ошибка, отключение...');
+                    this.disconnect();
+                }
+            }
+
+            // Аудио методы - такие же как в оригинале
+            addToAudioQueue(audioBase64) {
+                this.audioQueue.push(audioBase64);
+                if (!this.isProcessingAudio) {
+                    this.processAudioQueue();
+                }
+            }
+
+            async processAudioQueue() {
+                if (this.isProcessingAudio || this.audioQueue.length === 0) return;
+                
+                this.isProcessingAudio = true;
+                
+                while (this.audioQueue.length > 0 && this.isConnected) {
+                    const audioBase64 = this.audioQueue.shift();
+                    
+                    try {
+                        await this.playAudioChunk(audioBase64);
+                        await new Promise(resolve => setTimeout(resolve, 50));
+                    } catch (error) {
+                        console.error('Error playing audio chunk:', error);
+                        break;
+                    }
+                }
+                
+                this.isProcessingAudio = false;
+                
+                if (this.audioQueue.length === 0 && this.isConnected && this.isAgentSpeaking) {
+                    this.resumeListening();
+                }
+            }
+
+            async playAudioChunk(audioBase64) {
+                return new Promise((resolve, reject) => {
+                    try {
+                        const audioData = atob(audioBase64);
+                        const pcmArray = new Uint8Array(audioData.length);
+                        
+                        for (let i = 0; i < audioData.length; i++) {
+                            pcmArray[i] = audioData.charCodeAt(i);
+                        }
+
+                        const wavBlob = this.createWavBlob(pcmArray, 16000, 1, 16);
+                        const audioUrl = URL.createObjectURL(wavBlob);
+                        
+                        const audio = new Audio(audioUrl);
+                        audio.volume = 0.8;
+                        
+                        audio.onended = () => {
+                            URL.revokeObjectURL(audioUrl);
+                            resolve();
+                        };
+                        
+                        audio.onerror = (error) => {
+                            URL.revokeObjectURL(audioUrl);
+                            reject(error);
+                        };
+                        
+                        audio.play().catch(reject);
+                        
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            createWavBlob(pcmArray, sampleRate, numChannels, bitsPerSample) {
+                const length = pcmArray.length;
+                const arrayBuffer = new ArrayBuffer(44 + length);
+                const view = new DataView(arrayBuffer);
+                
+                const writeString = (offset, string) => {
+                    for (let i = 0; i < string.length; i++) {
+                        view.setUint8(offset + i, string.charCodeAt(i));
+                    }
+                };
+                
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + length, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * numChannels * (bitsPerSample / 8), true);
+                view.setUint16(32, numChannels * (bitsPerSample / 8), true);
+                view.setUint16(34, bitsPerSample, true);
+                writeString(36, 'data');
+                view.setUint32(40, length, true);
+                
+                for (let i = 0; i < length; i++) {
+                    view.setUint8(44 + i, pcmArray[i]);
+                }
+                
+                return new Blob([arrayBuffer], { type: 'audio/wav' });
+            }
+
+            startRecording() {
+                if (!this.audioStream) return;
+
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                        sampleRate: 16000
+                    });
+                    
+                    this.audioSource = this.audioContext.createMediaStreamSource(this.audioStream);
+                    this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+                    
+                    this.audioProcessor.onaudioprocess = (event) => {
+                        if (this.ws && 
+                            this.ws.readyState === WebSocket.OPEN && 
+                            !this.isAgentSpeaking &&
+                            this.isInitialized) {
+                            
+                            const inputBuffer = event.inputBuffer;
+                            const channelData = inputBuffer.getChannelData(0);
+                            
+                            const volume = this.calculateVolume(channelData);
+                            
+                            if (volume > this.voiceActivityThreshold) {
+                                const pcmData = this.convertToPCM16(channelData);
+                                const base64Audio = this.arrayBufferToBase64(pcmData);
+                                
+                                const audioMessage = {
+                                    user_audio_chunk: base64Audio
+                                };
+                                
+                                try {
+                                    this.ws.send(JSON.stringify(audioMessage));
+                                    this.lastActivityTime = Date.now();
+                                } catch (error) {
+                                    console.error('Error sending audio chunk:', error);
+                                }
+                            }
+                        }
+                    };
+                    
+                    this.audioSource.connect(this.audioProcessor);
+                    this.audioProcessor.connect(this.audioContext.destination);
+                    
+                    this.micAnimation.classList.add('listening');
+                    console.log('✅ Audio recording started');
+                    
+                } catch (error) {
+                    console.error('❌ Failed to start audio recording:', error);
+                    this.addMessage('system', `❌ Ошибка записи аудио: ${error.message}`);
+                }
+            }
+
+            resumeListening() {
+                setTimeout(() => {
+                    if (this.isConnected && !this.isProcessingAudio && this.audioQueue.length === 0) {
+                        this.isAgentSpeaking = false;
+                        this.updateStatus('listening', '🟢 Слушаю...');
+                        this.micAnimation.classList.remove('speaking');
+                        this.micAnimation.classList.add('listening');
+                    }
+                }, 300);
+            }
+
+            clearAudioQueue() {
+                this.audioQueue = [];
+                this.isProcessingAudio = false;
+            }
+
+            convertToPCM16(float32Array) {
+                const buffer = new ArrayBuffer(float32Array.length * 2);
+                const view = new DataView(buffer);
+                
+                for (let i = 0; i < float32Array.length; i++) {
+                    let sample = Math.max(-1, Math.min(1, float32Array[i]));
+                    const pcmSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(i * 2, pcmSample, true);
+                }
+                
+                return new Uint8Array(buffer);
+            }
+
+            arrayBufferToBase64(buffer) {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                const len = bytes.byteLength;
+                
+                for (let i = 0; i < len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                
+                return btoa(binary);
+            }
+
+            calculateVolume(channelData) {
+                let sum = 0;
+                for (let i = 0; i < channelData.length; i++) {
+                    sum += channelData[i] * channelData[i];
+                }
+                
+                const rms = Math.sqrt(sum / channelData.length);
+                return Math.min(1, rms * 10);
+            }
+
+            startKeepAlive() {
+                this.keepAliveInterval = setInterval(() => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        const keepAliveMessage = {
+                            type: "keep_alive"
+                        };
+                        this.ws.send(JSON.stringify(keepAliveMessage));
+                    }
+                }, 15000);
+            }
+
+            stopKeepAlive() {
+                if (this.keepAliveInterval) {
+                    clearInterval(this.keepAliveInterval);
+                    this.keepAliveInterval = null;
+                }
+            }
+
+            onWebSocketClose(event) {
+                console.log('WebSocket disconnected. Code:', event.code, 'Reason:', event.reason);
+                this.isConnected = false;
+                this.isAgentSpeaking = false;
+                this.connectBtn.disabled = false;
+                this.disconnectBtn.disabled = true;
+                this.apiKeyInput.disabled = false;
+                this.agentIdInput.disabled = false;
+                this.connectionStateSpan.textContent = 'Отключен';
+                this.micAnimation.classList.remove('recording', 'listening', 'speaking');
+
+                let statusMessage = '🔴 Отключен';
+                let systemMessage = '🔌 Соединение закрыто';
+                
+                if (event.code === 1000) {
+                    systemMessage = '✅ Соединение закрыто нормально';
+                } else if (event.code === 1002) {
+                    systemMessage = '❌ Агент неправильно настроен (1002)';
+                    statusMessage = '🔴 Ошибка конфигурации агента';
+                    this.addMessage('system', '💡 Проверьте настройки агента в ElevenLabs Dashboard');
+                } else if (event.code === 1006) {
+                    systemMessage = '❌ Соединение прервано неожиданно';
+                    statusMessage = '🔴 Ошибка соединения';
+                } else if (event.code !== 1000) {
+                    systemMessage = `❌ Соединение закрыто с кодом: ${event.code}`;
+                    if (event.reason) {
+                        systemMessage += ` (${event.reason})`;
+                    }
+                    statusMessage = '🔴 Ошибка';
+                }
+                
+                this.updateStatus('disconnected', statusMessage);
+                this.addMessage('system', systemMessage);
+
+                this.stopRecording();
+                this.stopKeepAlive();
+                this.clearAudioQueue();
+            }
+
+            onWebSocketError(error) {
+                console.error('WebSocket error:', error);
+                this.addMessage('system', '❌ Ошибка WebSocket подключения');
+                this.addMessage('system', '💡 Python FastAPI сервер может быть недоступен');
+                
+                this.updateStatus('disconnected', '🔴 Ошибка соединения');
+                this.connectionStateSpan.textContent = 'Ошибка';
+                this.connectBtn.disabled = false;
+                this.disconnectBtn.disabled = true;
+                this.apiKeyInput.disabled = false;
+                this.agentIdInput.disabled = false;
+            }
+
+            stopRecording() {
+                if (this.audioProcessor) {
+                    this.audioProcessor.disconnect();
+                    this.audioProcessor = null;
+                }
+                
+                if (this.audioSource) {
+                    this.audioSource.disconnect();
+                    this.audioSource = null;
+                }
+                
+                if (this.audioContext && this.audioContext.state !== 'closed') {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
+                
+                this.micAnimation.classList.remove('recording', 'listening', 'speaking');
+                this.volumeBar.style.width = '0%';
+            }
+
+            disconnect() {
+                if (this.ws) {
+                    if (this.ws.readyState === WebSocket.OPEN) {
+                        try {
+                            this.ws.send(JSON.stringify({ type: "end_of_stream" }));
+                        } catch (error) {
+                            console.log('Failed to send end_of_stream:', error);
+                        }
+                    }
+                    this.ws.close(1000, 'Normal closure');
+                }
+                
+                if (this.audioStream) {
+                    this.audioStream.getTracks().forEach(track => track.stop());
+                    this.audioStream = null;
+                }
+
+                this.stopRecording();
+                this.stopKeepAlive();
+                this.clearAudioQueue();
+
+                this.isConnected = false;
+                this.isInitialized = false;
+                this.isAgentSpeaking = false;
+                this.conversationId = null;
+                this.vadScore = 0;
+                
+                this.vadScoreSpan.textContent = '0.00';
+                this.volumeBar.style.width = '0%';
+                this.connectionStateSpan.textContent = 'Отключен';
+            }
+
+            updateStatus(className, text) {
+                if (this.status) {
+                    this.status.className = `status ${className}`;
+                    this.status.textContent = text;
+                }
+            }
+
+            addMessage(type, content) {
+                console.log(`📝 Adding message: ${type} - ${content}`);
+                if (this.chatArea) {
+                    const message = document.createElement('div');
+                    message.className = `message ${type}`;
+                    message.textContent = content;
+                    
+                    this.chatArea.appendChild(message);
+                    this.chatArea.scrollTop = this.chatArea.scrollHeight;
+                } else {
+                    console.error('❌ chatArea not found, message not added');
+                }
+            }
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 DOM loaded, initializing PythonVoiceChat...');
+            
+            try {
+                window.voiceChat = new PythonVoiceChat();
+                console.log('✅ PythonVoiceChat initialized successfully');
+            } catch (error) {
+                console.error('❌ Failed to initialize PythonVoiceChat:', error);
+                alert('Ошибка инициализации: ' + error.message);
+            }
+        });
+        
+        // Обработчик глобальных ошибок
+        window.addEventListener('error', (event) => {
+            console.error('🚨 Global JavaScript Error:', event.error);
+        });
+    </script>
+</body>
+</html>
